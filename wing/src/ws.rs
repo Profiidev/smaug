@@ -45,4 +45,4 @@ async fn init_connection(
   Ok((headers, ws.on_upgrade(connection)))
 }
 
-async fn connection(socket: WebSocket) {}
+async fn connection(_socket: WebSocket) {}

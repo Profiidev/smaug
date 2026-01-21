@@ -47,7 +47,7 @@ impl Wings {
 
     info!("Connecting to wing at {}", addr);
 
-    let (stream, res) = connect_async(request)
+    let (_stream, res) = connect_async(request)
       .await
       .context("Failed to connect to wing")?;
 
