@@ -62,7 +62,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         if: github.event_name != 'pull_request'
         with:
           subject-name: ${{ env.REGISTRY }}/${{ matrix.item.image }}
@@ -70,7 +70,7 @@ jobs:
           push-to-registry: true
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.33.1
         if: github.event_name == 'pull_request'
         with:
           image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
@@ -78,7 +78,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         with:
           sarif_file: "trivy-results.sarif"
