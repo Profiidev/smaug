@@ -12,6 +12,8 @@ pub struct Config {
   pub base: BaseConfig,
   #[serde(flatten)]
   pub metrics: MetricsConfig,
+
+  pub token: String,
 }
 
 impl Default for Config {
@@ -22,6 +24,7 @@ impl Default for Config {
         metrics_name: "smaug-wing".to_string(),
         ..Default::default()
       },
+      token: "test-token".to_string(),
     }
   }
 }

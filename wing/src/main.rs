@@ -1,11 +1,8 @@
 use axum::{Extension, Router};
-use centaurus::{
-  init::{
-    axum::{listener_setup, run_app},
-    logging::init_logging,
-    router::base_router,
-  },
-  router_extension,
+use centaurus::init::{
+  axum::{listener_setup, run_app},
+  logging::init_logging,
+  router::base_router,
 };
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
@@ -13,8 +10,10 @@ use tracing::info;
 
 use crate::config::Config;
 
+mod auth;
 mod config;
 mod dummy;
+mod ws;
 
 #[tokio::main]
 async fn main() {
@@ -26,23 +25,20 @@ async fn main() {
 
   let listener = listener_setup(config.base.port).await;
 
-  let app = base_router(api_router(), &config.base, &config.metrics)
-    .await
-    .state(config)
-    .await;
+  let mut router = api_router();
+  router = base_router(router, &config.base, &config.metrics).await;
+  let app = state(router, config);
 
   info!("Starting application");
   run_app(listener, app).await;
 }
 
 fn api_router() -> Router {
-  dummy::router()
+  dummy::router().merge(ws::router())
 }
 
-router_extension!(
-  async fn state(self, config: Config) -> Self {
-    use dummy::dummy;
-
-    self.dummy().await.layer(Extension(config))
-  }
-);
+fn state(router: Router, config: Config) -> Router {
+  let router = auth::state(router, &config);
+  let router = dummy::state(router);
+  router.layer(Extension(config))
+}

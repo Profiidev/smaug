@@ -1,15 +1,13 @@
 use axum::{Extension, Router, extract::FromRequestParts, routing::get};
-use centaurus::{error::Result, router_extension};
+use centaurus::error::Result;
 
 pub fn router() -> Router {
   Router::new().route("/test", get(test))
 }
 
-router_extension!(
-  async fn dummy(self) -> Self {
-    self.layer(Extension(TestState::default()))
-  }
-);
+pub fn state(router: Router) -> Router {
+  router.layer(Extension(TestState::default()))
+}
 
 async fn test(test: TestState) -> Result<String> {
   Ok(test.test)

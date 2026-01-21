@@ -9,6 +9,7 @@ centaurus = { version = "0.4.7", features = [
   "logging",
   "metrics",
   "uuid",
+  "hmac",
 ], default-features = false }
 uuid = { version = "1.19.0", features = ["v4"] }
 axum = { version = "0.8.8", features = ["macros", "ws", "tracing"] }
@@ -22,6 +23,11 @@ dotenv = "0.15.0"
 serde = { version = "1.0.228", features = ["derive"] }
 figment = { version = "0.10.19", features = ["env"] }
 hyper-util = { version = "0.1.19", features = ["client-legacy"] }
+chrono = "0.4.43"
+hmac = "0.12.1"
+sha3 = "0.10.8"
+rand = "0.9.2"
+hex = "0.4.3"
 
 [[bin]]
 name = "wing"
