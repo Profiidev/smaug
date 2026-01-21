@@ -25,9 +25,10 @@ ARG RUSTFLAGS
 COPY backend/Cargo.toml backend/
 COPY backend/entity/Cargo.toml backend/entity/
 COPY backend/migration/Cargo.toml backend/migration/
+COPY shared/Cargo.toml shared/
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration"]' Cargo.toml
+RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration", "shared"]' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
@@ -53,9 +54,11 @@ COPY backend/entity/Cargo.toml backend/entity/
 COPY backend/entity/src backend/entity/src
 COPY backend/migration/Cargo.toml backend/migration/
 COPY backend/migration/src backend/migration/src
+COPY shared/Cargo.toml shared/
+COPY shared/src shared/src
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration"]' Cargo.toml
+RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration", "shared"]' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \

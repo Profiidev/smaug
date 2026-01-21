@@ -7,9 +7,10 @@ ARG TARGET
 ARG RUSTFLAGS
 
 COPY wing/Cargo.toml wing/
+COPY shared/Cargo.toml shared/
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["wing"]' Cargo.toml
+RUN sed -i '/^members = /c\members = ["wing", "shared"]' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
@@ -30,9 +31,11 @@ RUN \
 
 COPY wing/Cargo.toml wing/
 COPY wing/src wing/src
+COPY shared/Cargo.toml shared/
+COPY shared/src shared/src
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["wing"]' Cargo.toml
+RUN sed -i '/^members = /c\members = ["wing", "shared"]' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
