@@ -24,7 +24,9 @@ struct WingsSender(SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungste
 
 impl Wings {
   pub async fn connect(&self, addr: &str, token: &str) -> Result<()> {
-    let mut request = addr.into_client_request().context("Invalid wings address")?;
+    let mut request = addr
+      .into_client_request()
+      .context("Invalid wings address")?;
 
     let data = SignData::new();
     data.add_to_header_map(request.headers_mut(), token);
