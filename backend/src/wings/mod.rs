@@ -103,12 +103,3 @@ impl WingsSender {
     Ok(())
   }
 }
-
-pub async fn test() {
-  let wings = Wings::default();
-
-  wings
-    .connect("ws://wings:8000/api", "test-token")
-    .await
-    .unwrap();
-}

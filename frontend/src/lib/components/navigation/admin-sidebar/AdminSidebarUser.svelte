@@ -1,6 +1,5 @@
 <script lang="ts">
   import * as Sidebar from 'positron-components/components/ui/sidebar';
-  //@ts-ignore
   import * as DropdownMenu from 'positron-components/components/ui/dropdown-menu';
   import * as Avatar from 'positron-components/components/ui/avatar';
   import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
@@ -22,7 +21,7 @@
   <Sidebar.MenuItem>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
-        {#snippet child({ props }: any)}
+        {#snippet child({ props })}
           <Sidebar.MenuButton
             size="lg"
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
@@ -61,7 +60,7 @@
         <DropdownMenu.Separator />
         <DropdownMenu.Group>
           <DropdownMenu.Item>
-            {#snippet child({ props }: any)}
+            {#snippet child({ props })}
               <a href="/account" {...props}>
                 <SettingsIcon />
                 Account

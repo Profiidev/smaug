@@ -2,12 +2,14 @@
   import * as Sidebar from 'positron-components/components/ui/sidebar';
   import type { Component } from 'svelte';
 
+  export interface AdminNavItem {
+    label: string;
+    href: string;
+    icon?: Component;
+  }
+
   interface Props {
-    items: {
-      label: string;
-      href: string;
-      icon?: Component;
-    }[];
+    items: AdminNavItem[];
   }
 
   const { items }: Props = $props();

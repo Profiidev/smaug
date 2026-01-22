@@ -1,26 +1,27 @@
 <script lang="ts">
   import * as Sidebar from 'positron-components/components/ui/sidebar';
   import AdminSidebarHeader from './AdminSidebarHeader.svelte';
-  import AdminSidebarContent from './AdminSidebarContent.svelte';
-  import Settings from '@lucide/svelte/icons/settings';
-  import House from '@lucide/svelte/icons/house';
+  import AdminSidebarContent, {
+    type AdminNavItem
+  } from './AdminSidebarContent.svelte';
   import AdminSidebarUser from './AdminSidebarUser.svelte';
+  import type { Snippet } from 'svelte';
 
-  const { children } = $props();
+  interface Props {
+    items: AdminNavItem[];
+    children: Snippet;
+  }
 
-  const contentItems = [
-    { label: 'Overview', href: '/admin', icon: House },
-    { label: 'Settings', href: '/admin/settings', icon: Settings }
-  ];
+  const { children, items }: Props = $props();
 </script>
 
 <Sidebar.Provider>
-  <Sidebar.Root collapsible="icon">
+  <Sidebar.Root collapsible="icon" variant="floating">
     <Sidebar.Header>
       <AdminSidebarHeader />
     </Sidebar.Header>
     <Sidebar.Content>
-      <AdminSidebarContent items={contentItems} />
+      <AdminSidebarContent {items} />
     </Sidebar.Content>
     <Sidebar.Footer>
       <AdminSidebarUser
