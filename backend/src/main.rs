@@ -16,6 +16,7 @@ use crate::config::Config;
 mod config;
 mod db;
 mod dummy;
+#[allow(unused)]
 mod wings;
 
 #[tokio::main]
@@ -25,8 +26,6 @@ async fn main() {
 
   let config = Config::parse();
   init_logging(&config.base);
-
-  wings::test().await;
 
   let listener = listener_setup(config.base.port).await;
 
