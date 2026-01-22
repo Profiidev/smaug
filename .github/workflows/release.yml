@@ -28,7 +28,7 @@ jobs:
         item:
           [
             { df_path: ./, image: "${{ github.repository}}/smaug" },
-            { df_path: ./wing, image: "${{ github.repository}}/smaug-wing" },
+            { df_path: ./wings, image: "${{ github.repository}}/smaug-wings" },
           ]
     steps:
       - name: Checkout repository

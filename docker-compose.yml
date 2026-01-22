@@ -31,10 +31,10 @@ services:
       postgres:
         condition: service_healthy
 
-  wing:
+  wings:
     image: ghcr.io/profiidev/images/rust-musl-watch:main
     volumes:
-      - ./wing:/app
+      - ./wings:/app
       - ./shared:/shared
     networks:
       - nginx

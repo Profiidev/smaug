@@ -12,21 +12,21 @@ pub struct Auth {
 
 #[derive(FromRequestParts, Clone)]
 #[from_request(via(Extension))]
-pub struct WingToken(pub String);
+pub struct WingsToken(pub String);
 
 impl<S: Sync> FromRequestParts<S> for Auth {
   type Rejection = ErrorReport;
 
   async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-    let token = parts.extract_state::<WingToken>().await.0;
+    let token = parts.extract_state::<WingsToken>().await.0;
     let timestamp = SignData::validate_header_map(&parts.headers, &token, None)?;
 
-    info!("Authenticated wing request with timestamp {}", timestamp);
+    info!("Authenticated wings request with timestamp {}", timestamp);
 
     Ok(Auth { timestamp })
   }
 }
 
 pub fn state(router: Router, config: &Config) -> Router {
-  router.layer(Extension(WingToken(config.token.clone())))
+  router.layer(Extension(WingsToken(config.token.clone())))
 }

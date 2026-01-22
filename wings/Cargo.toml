@@ -1,5 +1,5 @@
 [package]
-name = "wing"
+name = "wings"
 version = "0.1.0"
 edition = "2024"
 
@@ -27,5 +27,5 @@ hyper-util = { version = "0.1.19", features = ["client-legacy"] }
 serde_json = "1.0.149"
 
 [[bin]]
-name = "wing"
+name = "wings"
 path = "src/main.rs"

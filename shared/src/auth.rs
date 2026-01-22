@@ -9,9 +9,9 @@ use rand::RngCore;
 
 type HmacSha3_512 = hmac::Hmac<sha3::Sha3_512>;
 
-const TIMESTAMP_HEADER: &str = "x-wing-timestamp";
-const NONCE_HEADER: &str = "x-wing-nonce";
-const SIGNATURE_HEADER: &str = "x-wing-signature";
+const TIMESTAMP_HEADER: &str = "x-wings-timestamp";
+const NONCE_HEADER: &str = "x-wings-nonce";
+const SIGNATURE_HEADER: &str = "x-wings-signature";
 
 pub struct SignData {
   timestamp: String,
@@ -60,7 +60,7 @@ impl SignData {
   fn validate(&self, token: &str, signature: &str) -> Result<()> {
     let correct_signature = self.signature(token);
     if correct_signature != signature {
-      bail!(UNAUTHORIZED, "Invalid wing signature");
+      bail!(UNAUTHORIZED, "Invalid wings signature");
     }
     Ok(())
   }
@@ -77,7 +77,7 @@ impl SignData {
     if let Some(data) = initial_data
       && data.nonce == nonce
     {
-      bail!(UNAUTHORIZED, "Invalid wing nonce");
+      bail!(UNAUTHORIZED, "Invalid wings nonce");
     }
 
     let sign_data = SignData { timestamp, nonce };

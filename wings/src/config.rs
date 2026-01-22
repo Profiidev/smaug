@@ -21,7 +21,7 @@ impl Default for Config {
     Self {
       base: BaseConfig::default(),
       metrics: MetricsConfig {
-        metrics_name: "smaug-wing".to_string(),
+        metrics_name: "smaug-wings".to_string(),
         ..Default::default()
       },
       token: "test-token".to_string(),
