@@ -1,4 +1,5 @@
-import type { FormRecord } from 'positron-components/components/form/types';
+import type { CreateNode } from '$lib/backend/node.svelte';
+import type { FormValue } from 'positron-components/components/form/types';
 import z from 'zod';
 
 export const units = {
@@ -13,37 +14,51 @@ export const units = {
   TiB: 1024 * 1024 * 1024 * 1024
 };
 
-export const reformatData = (data: FormRecord): any => {
-  let storage_size = data.storage_size as number;
-  let storage_size_unit = (data.storage_size_unit as string[])[0];
-  let storage_mb = Math.ceil(
-    (storage_size * (units as Record<string, number>)[storage_size_unit]) /
-      (1000 * 1000)
+const convertToMB = (amount: number, unitArray: string[]) => {
+  return Math.ceil(
+    (amount * (units as Record<string, number>)[unitArray[0]]) / (1000 * 1000)
   );
+};
 
+export const reformatData = (
+  data: FormValue<typeof generalSettings> & FormValue<typeof advancedSettings>
+): CreateNode => {
   return {
-    name: data.name as string,
-    address: data.address as string,
-    storage_mb
+    name: data.name,
+    address: data.address,
+    secure: data.secure,
+    cpu_limit: data.cpu_unlimit ? undefined : data.cpu_limit,
+    memory_limit_mb: data.memory_unlimit
+      ? undefined
+      : convertToMB(data.memory_limit, data.memory_limit_unit),
+    disk_limit_mb: data.storage_unlimit
+      ? undefined
+      : convertToMB(data.storage_size, data.storage_size_unit)
   };
 };
 
-export const generalInformation = z.object({
+export const generalSettings = z.object({
   name: z.string().min(1, 'Name is required').default(''),
   address: z.string().min(1, 'Address is required').default(''),
   secure: z.boolean().default(true)
 });
 
-export const resources = z.object({
-  storage_size: z
-    .number()
-    .gt(0, 'Storage size must be greater than 0')
-    .default(100),
-  storage_size_unit: z
-    .array(z.enum(Object.keys(units)))
-    .min(1)
-    .max(1)
-    .default(['GiB'])
+const amount = z.number().gt(0, 'Amount must be greater than 0');
+const unit = z
+  .array(z.enum(Object.keys(units)))
+  .min(1)
+  .max(1)
+  .default(['GiB']);
+
+export const advancedSettings = z.object({
+  cpu_unlimit: z.boolean().default(true),
+  cpu_limit: z.number().gt(1, 'CPU limit must be at least 1').default(1000),
+  memory_unlimit: z.boolean().default(true),
+  memory_limit: amount.default(2048),
+  memory_limit_unit: unit,
+  storage_unlimit: z.boolean().default(true),
+  storage_size: amount.default(100),
+  storage_size_unit: unit
 });
 
 export const summary = z.object({

@@ -3,6 +3,6 @@ frontend/build/
 node_modules/
 .svelte-kit/
 target/
-backend/
+/backend/
 postgres/
 .github/

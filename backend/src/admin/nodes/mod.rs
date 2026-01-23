@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use axum::Router;
 use centaurus::{error::Result, eyre::Context};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use shared::{auth::SignData, msg::WingsMessage};
@@ -11,6 +12,10 @@ use tokio_tungstenite::{
 use tracing::info;
 
 mod management;
+
+pub fn router() -> Router {
+  management::router()
+}
 
 #[derive(Default, Clone)]
 struct Wings {

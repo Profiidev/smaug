@@ -1,4 +1,8 @@
-use axum::{Json, Router, extract::FromRequest, routing::post};
+use axum::{
+  Json, Router,
+  extract::FromRequest,
+  routing::{get, post},
+};
 use centaurus::{
   bail,
   db::init::Connection,
@@ -9,10 +13,12 @@ use http::Uri;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::DBTrait;
+use crate::db::{DBTrait, node::Node};
 
 pub fn router() -> Router {
-  Router::new().route("/create", post(create_node))
+  Router::new()
+    .route("/", post(create_node))
+    .route("/", get(list_nodes))
 }
 
 #[derive(FromRequest, Deserialize)]
@@ -38,7 +44,7 @@ async fn create_node(db: Connection, data: CreateNode) -> Result<()> {
     .to_string();
   let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 }) as i16;
 
-  let model = entity::node::Model {
+  let model = Node {
     id: Uuid::new_v4(),
     name: data.name,
     address,
@@ -54,7 +60,7 @@ async fn create_node(db: Connection, data: CreateNode) -> Result<()> {
   Ok(())
 }
 
-async fn list_nodes(db: Connection) -> Result<Json<Vec<entity::node::Model>>> {
+async fn list_nodes(db: Connection) -> Result<Json<Vec<Node>>> {
   let nodes = db.node().list_nodes().await?;
   Ok(Json(nodes))
 }

@@ -1,6 +1,13 @@
 <script lang="ts">
   import { Button } from 'positron-components/components/ui/button';
   import Plus from '@lucide/svelte/icons/plus';
+  import type { PageData } from './$types';
+
+  interface Props {
+    data: PageData;
+  }
+
+  const { data }: Props = $props();
 </script>
 
 <div class="p-4">
@@ -11,4 +18,14 @@
       Create
     </Button>
   </div>
+  {#await data.nodes}
+    <p>Loading...</p>
+  {:then nodes}
+    {#if nodes?.length === 0}
+      <p>No nodes found.</p>
+    {/if}
+    {#each nodes as node}
+      <p>{node.name}</p>
+    {/each}
+  {/await}
 </div>

@@ -13,10 +13,9 @@ use tracing::info;
 
 use crate::config::Config;
 
+mod admin;
 mod config;
 mod db;
-#[allow(unused)]
-mod wings;
 
 #[tokio::main]
 async fn main() {
@@ -37,7 +36,7 @@ async fn main() {
 }
 
 fn api_router() -> Router {
-  Router::new()
+  Router::new().nest("/admin", admin::router())
 }
 
 async fn state(router: Router, config: Config) -> Router {

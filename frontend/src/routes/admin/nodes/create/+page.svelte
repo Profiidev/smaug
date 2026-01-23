@@ -20,6 +20,7 @@
   } from 'svelte';
   import GeneralSettings from './GeneralSettings.svelte';
   import AdvancedSettings from './AdvancedSettings.svelte';
+  import { createNode } from '$lib/backend/node.svelte';
 
   interface StageProps {
     initialValue?: any;
@@ -70,9 +71,10 @@
         // last element is summary
         .filter((_, i) => i < stages.length)
         .reduce((acc, s) => ({ ...acc, ...s.data }), {});
-      let data = await reformatData(rawData);
 
-      let res = 'test'; //await create_deployment(data);
+      let data = reformatData(rawData as any);
+      let res = await createNode(data);
+
       if (res) {
         return { error: 'Error creating deployment.' };
       } else {

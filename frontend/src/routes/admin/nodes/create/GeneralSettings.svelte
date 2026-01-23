@@ -4,12 +4,12 @@
   import FormSwitch from 'positron-components/components/form/form-switch.svelte';
   import { type FormValue } from 'positron-components/components/form/types';
   import type { ComponentProps, Snippet } from 'svelte';
-  import { generalInformation } from './schema.svelte';
+  import { generalSettings } from './schema.svelte';
   import { Label } from 'positron-components/components/ui/dropdown-menu';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 
   interface Props {
-    initialValue?: FormValue<typeof generalInformation>;
+    initialValue?: FormValue<typeof generalSettings>;
     onsubmit: ComponentProps<typeof BaseForm>['onsubmit'];
     footer: Snippet<[{ isLoading: boolean }]>;
     isLoading: boolean;
@@ -17,7 +17,7 @@
 
   let { initialValue, onsubmit, footer, isLoading }: Props = $props();
 
-  let form: BaseForm<typeof generalInformation> | undefined = $state();
+  let form: BaseForm<typeof generalSettings> | undefined = $state();
   // svelte-ignore state_referenced_locally
   let secure = $state(initialValue?.secure ?? true);
 
@@ -27,7 +27,7 @@
 </script>
 
 <BaseForm
-  schema={generalInformation}
+  schema={generalSettings}
   {onsubmit}
   {footer}
   {initialValue}
