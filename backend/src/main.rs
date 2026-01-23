@@ -15,7 +15,6 @@ use crate::config::Config;
 
 mod config;
 mod db;
-mod dummy;
 #[allow(unused)]
 mod wings;
 
@@ -38,11 +37,10 @@ async fn main() {
 }
 
 fn api_router() -> Router {
-  dummy::router()
+  Router::new()
 }
 
-async fn state(mut router: Router, config: Config) -> Router {
+async fn state(router: Router, config: Config) -> Router {
   let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
-  router = dummy::state(router);
   router.layer(Extension(db)).layer(Extension(config))
 }

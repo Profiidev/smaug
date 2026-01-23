@@ -10,6 +10,8 @@ use tokio_tungstenite::{
 };
 use tracing::info;
 
+mod management;
+
 #[derive(Default, Clone)]
 struct Wings {
   wings: Arc<Mutex<Vec<WingsConnection>>>,

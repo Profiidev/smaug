@@ -9,11 +9,16 @@ impl MigrationTrait for Migration {
     manager
       .create_table(
         Table::create()
-          .table(Key::Table)
+          .table(Node::Table)
           .if_not_exists()
-          .col(pk_uuid(Key::Id))
-          .col(string(Key::Name))
-          .col(string(Key::PrivateKey))
+          .col(pk_uuid(Node::Id))
+          .col(string(Node::Name))
+          .col(string(Node::Address))
+          .col(tiny_unsigned(Node::Port))
+          .col(boolean(Node::Secure))
+          .col(unsigned_null(Node::DiskLimitMb))
+          .col(unsigned_null(Node::MemoryLimitMb))
+          .col(unsigned_null(Node::CpuLimit))
           .to_owned(),
       )
       .await
@@ -21,16 +26,20 @@ impl MigrationTrait for Migration {
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
     manager
-      .drop_table(Table::drop().table(Key::Table).to_owned())
+      .drop_table(Table::drop().table(Node::Table).to_owned())
       .await
   }
 }
 
 #[derive(DeriveIden)]
-enum Key {
+enum Node {
   Table,
   Id,
   Name,
-  #[allow(clippy::enum_variant_names)]
-  PrivateKey,
+  Address,
+  Port,
+  Secure,
+  DiskLimitMb,
+  MemoryLimitMb,
+  CpuLimit,
 }

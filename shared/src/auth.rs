@@ -36,29 +36,27 @@ impl SignData {
     Self { timestamp, nonce }
   }
 
-  fn signature(&self, token: &str) -> String {
-    let msg = format!("{}{}", self.nonce, self.timestamp);
-
-    let mut mac = HmacSha3_512::new_from_slice(token.as_bytes()).unwrap();
-    mac.update(msg.as_bytes());
-    hex::encode(mac.finalize().into_bytes())
+  fn signature(&self, token: &str) -> Result<String> {
+    let data = format!("{}.{}", self.timestamp, self.nonce);
+    hmac(&data, token)
   }
 
-  pub fn add_to_header_map(&self, headers: &mut HeaderMap, token: &str) {
-    let signature = self.signature(token);
+  pub fn add_to_header_map(&self, headers: &mut HeaderMap, token: &str) -> Result<()> {
+    let signature = self.signature(token)?;
     headers.insert(NONCE_HEADER, self.nonce.parse().unwrap());
     headers.insert(TIMESTAMP_HEADER, self.timestamp.parse().unwrap());
     headers.insert(SIGNATURE_HEADER, signature.parse().unwrap());
+    Ok(())
   }
 
-  pub fn to_header_map(&self, token: &str) -> HeaderMap {
+  pub fn to_header_map(&self, token: &str) -> Result<HeaderMap> {
     let mut headers = HeaderMap::new();
-    self.add_to_header_map(&mut headers, token);
-    headers
+    self.add_to_header_map(&mut headers, token)?;
+    Ok(headers)
   }
 
   fn validate(&self, token: &str, signature: &str) -> Result<()> {
-    let correct_signature = self.signature(token);
+    let correct_signature = self.signature(token)?;
     if correct_signature != signature {
       bail!(UNAUTHORIZED, "Invalid wings signature");
     }
@@ -102,4 +100,10 @@ fn get_header_value(headers: &HeaderMap, key: &str) -> Result<String> {
     .status_context(StatusCode::UNAUTHORIZED, &format!("Invalid {} header", key))?
     .to_string();
   Ok(value)
+}
+
+fn hmac(data: &str, key: &str) -> Result<String> {
+  let mut mac = HmacSha3_512::new_from_slice(key.as_bytes())?;
+  mac.update(data.as_bytes());
+  Ok(hex::encode(mac.finalize().into_bytes()))
 }

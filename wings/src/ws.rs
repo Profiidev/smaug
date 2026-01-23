@@ -24,7 +24,7 @@ async fn init_connection(
   ws: WebSocketUpgrade,
 ) -> Result<(HeaderMap, Response)> {
   let data = SignData::from_timestamp(auth.timestamp);
-  let headers = data.to_header_map(&token.0);
+  let headers = data.to_header_map(&token.0)?;
 
   info!("Established wings websocket connection");
 
