@@ -12,6 +12,7 @@ pub struct Node {
   pub disk_limit_mb: Option<i32>,
   pub memory_limit_mb: Option<i32>,
   pub cpu_limit: Option<i32>,
+  pub token: String,
 }
 
 pub struct NodeTable<'db> {
@@ -43,6 +44,11 @@ impl<'db> NodeTable<'db> {
     let nodes = node::Entity::find().all(self.db).await?;
     Ok(nodes.into_iter().map(Node::from).collect())
   }
+
+  pub async fn delete_node(&self, id: Uuid) -> Result<(), DbErr> {
+    node::Entity::delete_by_id(id).exec(self.db).await?;
+    Ok(())
+  }
 }
 
 impl From<node::Model> for Node {
@@ -56,6 +62,7 @@ impl From<node::Model> for Node {
       disk_limit_mb: model.disk_limit_mb,
       memory_limit_mb: model.memory_limit_mb,
       cpu_limit: model.cpu_limit,
+      token: model.token,
     }
   }
 }
@@ -71,6 +78,7 @@ impl From<Node> for node::Model {
       disk_limit_mb: node.disk_limit_mb,
       memory_limit_mb: node.memory_limit_mb,
       cpu_limit: node.cpu_limit,
+      token: node.token,
     }
   }
 }

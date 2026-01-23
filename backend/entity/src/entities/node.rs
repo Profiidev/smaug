@@ -14,6 +14,7 @@ pub struct Model {
   pub disk_limit_mb: Option<i32>,
   pub memory_limit_mb: Option<i32>,
   pub cpu_limit: Option<i32>,
+  pub token: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

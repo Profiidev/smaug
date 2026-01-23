@@ -1,16 +1,4 @@
-import {
-  RequestError,
-  ResponseType,
-  get,
-  post
-} from 'positron-components/backend';
-
-export const dummy = async () => {
-  let res = await get<string>('/api/test', ResponseType.Text);
-  if (!Object.values(RequestError).includes(res as RequestError)) {
-    return res;
-  }
-};
+import { ResponseType, get, post } from 'positron-components/backend';
 
 export interface CreateNode {
   name: string;
@@ -22,7 +10,9 @@ export interface CreateNode {
 }
 
 export const createNode = async (node: CreateNode) => {
-  return await post<undefined>('/api/admin/nodes', ResponseType.None, node);
+  return await post<undefined>('/api/admin/nodes', {
+    body: node
+  });
 };
 
 export interface Node {
@@ -36,8 +26,11 @@ export interface Node {
   cpu_limit?: number;
 }
 
-export const listNodes = async () => {
-  let ret = await get<Node[]>('/api/admin/nodes', ResponseType.Json);
+export const listNodes = async (fetch: typeof window.fetch = window.fetch) => {
+  let ret = await get<Node[]>('/api/admin/nodes', {
+    res_type: ResponseType.Json,
+    fetch
+  });
   if (Array.isArray(ret)) {
     return ret;
   }

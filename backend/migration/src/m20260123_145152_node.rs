@@ -19,6 +19,7 @@ impl MigrationTrait for Migration {
           .col(unsigned_null(Node::DiskLimitMb))
           .col(unsigned_null(Node::MemoryLimitMb))
           .col(unsigned_null(Node::CpuLimit))
+          .col(string(Node::Token))
           .to_owned(),
       )
       .await
@@ -42,4 +43,5 @@ enum Node {
   DiskLimitMb,
   MemoryLimitMb,
   CpuLimit,
+  Token,
 }

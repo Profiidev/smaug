@@ -27,9 +27,9 @@
     "vite": "^7.3.0"
   },
   "dependencies": {
-    "@lucide/svelte": "^0.562.0",
+    "@lucide/svelte": "^0.563.1",
     "@sveltejs/enhanced-img": "0.9.3",
-    "positron-components": "^1.13.1",
+    "positron-components": "^1.13.2",
     "valibot": "^1.2.0"
   }
 }

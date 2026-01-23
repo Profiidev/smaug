@@ -39,7 +39,8 @@ fn api_router() -> Router {
   Router::new().nest("/admin", admin::router())
 }
 
-async fn state(router: Router, config: Config) -> Router {
+async fn state(mut router: Router, config: Config) -> Router {
   let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
+  router = admin::state(router);
   router.layer(Extension(db)).layer(Extension(config))
 }
