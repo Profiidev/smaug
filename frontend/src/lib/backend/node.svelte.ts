@@ -24,6 +24,8 @@ export interface Node {
   disk_limit_mb?: number;
   memory_limit_mb?: number;
   cpu_limit?: number;
+  token: string;
+  connected: boolean;
 }
 
 export const listNodes = async (fetch: typeof window.fetch = window.fetch) => {

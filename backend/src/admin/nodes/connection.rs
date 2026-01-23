@@ -20,11 +20,14 @@ use tokio::{
 };
 use tokio_tungstenite::tungstenite;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use crate::admin::nodes::auth::{WingsAuth, WsStream};
 
 pub struct WingsConnection {
+  uuid: Uuid,
   sender: Option<SplitSink<WsStream, tungstenite::Message>>,
+  #[allow(unused)]
   client: ClientWithMiddleware,
   receiver: Option<JoinHandle<()>>,
   reconnect: JoinHandle<()>,
@@ -32,8 +35,19 @@ pub struct WingsConnection {
 }
 
 impl WingsConnection {
-  pub async fn new(addr: &str, port: i16, secure: bool, token: String) -> Result<Arc<Mutex<Self>>> {
-    let addr = format!("{}://{}:{}", if secure { "wss" } else { "ws" }, addr, port);
+  pub async fn new(
+    uuid: Uuid,
+    addr: &str,
+    port: i16,
+    secure: bool,
+    token: String,
+  ) -> Result<Arc<Mutex<Self>>> {
+    let addr = format!(
+      "{}://{}:{}/api",
+      if secure { "wss" } else { "ws" },
+      addr,
+      port
+    );
 
     let client = Client::new();
     let client = ClientBuilder::new(client)
@@ -46,10 +60,11 @@ impl WingsConnection {
     let reconnect = spawn({
       let disconnect = disconnect.clone();
 
-      reconnect_task(receiver, addr, token, disconnect)
+      reconnect_task(uuid, receiver, addr, token, disconnect)
     });
 
     let conn = Arc::new(Mutex::new(Self {
+      uuid,
       sender: None,
       receiver: None,
       client,
@@ -60,7 +75,7 @@ impl WingsConnection {
     sender
       .send(conn.clone())
       .ok()
-      .context("Failed to init reconnect")?;
+      .with_context(|| format!("Failed to init reconnect for wings connection {}", uuid))?;
 
     Ok(conn)
   }
@@ -77,29 +92,34 @@ impl WingsConnection {
     self.reconnect.abort();
   }
 
+  #[allow(unused)]
   pub async fn send(&mut self, msg: &WingsMessage) -> Result<()> {
     let Some(sender) = &mut self.sender else {
-      bail!("Wings connection is not established");
+      bail!("Wings connection to {} is not established", self.uuid);
     };
 
     let msg = serde_json::to_string(msg)?;
     sender
       .send(tungstenite::Message::Binary(msg.into()))
       .await
-      .context("Failed to send Message")?;
+      .with_context(|| format!("Failed to send Message to wings connection {}", self.uuid))?;
 
     Ok(())
   }
 }
 
 async fn reconnect_task(
+  uuid: Uuid,
   receiver: oneshot::Receiver<Arc<Mutex<WingsConnection>>>,
   addr: String,
   token: String,
   disconnect: Arc<Notify>,
 ) {
   let Ok(conn) = receiver.await else {
-    error!("Wings connection task failed to receive initial connection");
+    error!(
+      "Wings connection task failed to receive initial connection for {}",
+      uuid
+    );
     return;
   };
 
@@ -109,11 +129,11 @@ async fn reconnect_task(
   loop {
     tokio::select! {
       _ = disconnect.notified() => {
-        debug!("Wings connection received disconnect signal, stopping reconnect task");
+        debug!("Wings connection for {} received disconnect signal, stopping reconnect task", uuid);
         return;
       }
       _ = reconnect.notified() => {
-        debug!("Wings connection lost, attempting to reconnect...");
+        debug!("Wings connection for {} lost, attempting to reconnect", uuid);
       }
     }
 
@@ -125,7 +145,10 @@ async fn reconnect_task(
     let stream = match WingsAuth::connect_websocket(&addr, &token).await {
       Ok(stream) => stream,
       Err(err) => {
-        warn!("Failed to reconnect to wings websocket: {}", err);
+        warn!(
+          "Failed to reconnect to wings websocket for {}: {}",
+          uuid, err
+        );
         spawn({
           let reconnect = reconnect.clone();
           async move {
@@ -139,6 +162,7 @@ async fn reconnect_task(
 
     let (sender, receiver) = stream.split();
     let receiver = spawn(receiver_task(
+      uuid,
       receiver,
       reconnect.clone(),
       disconnect.clone(),
@@ -149,11 +173,12 @@ async fn reconnect_task(
     conn_ref.receiver = Some(receiver);
     drop(conn_ref);
 
-    debug!("Wings connection re-established");
+    debug!("Wings connection to {} re-established", uuid);
   }
 }
 
 async fn receiver_task(
+  uuid: Uuid,
   mut receiver: SplitStream<WsStream>,
   reconnect: Arc<Notify>,
   disconnect: Arc<Notify>,
@@ -161,26 +186,25 @@ async fn receiver_task(
   loop {
     let msg = tokio::select! {
       _ = disconnect.notified() => {
-        debug!("Wings receiver task received disconnect signal, stopping receiver task");
+        debug!("Wings receiver task for {} received disconnect signal, stopping receiver task", uuid);
         return;
       }
       msg = receiver.next() => msg
     };
 
     let Some(Ok(next)) = msg else {
-      debug!("Wings websocket connection closed or errored");
       break;
     };
 
-    info!("Received wings message: {:?}", next);
+    info!("Received wings message for {}: {:?}", uuid, next);
     match next {
       tungstenite::Message::Binary(raw_msg) => {
         match serde_json::from_slice::<WingsMessage>(&raw_msg) {
           Ok(msg) => {
-            info!("Parsed wings message: {:?}", msg);
+            info!("Parsed wings message for {}: {:?}", uuid, msg);
           }
           Err(err) => {
-            info!("Failed to parse wings message: {}", err);
+            info!("Failed to parse wings message for {}: {}", uuid, err);
           }
         }
       }
@@ -191,6 +215,9 @@ async fn receiver_task(
     }
   }
 
-  debug!("Websocket connection closed");
+  warn!(
+    "Websocket connection closed for {}, notifying reconnect task",
+    uuid
+  );
   reconnect.notify_one();
 }

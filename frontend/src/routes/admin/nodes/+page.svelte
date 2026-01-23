@@ -25,7 +25,11 @@
       <p>No nodes found.</p>
     {/if}
     {#each nodes as node}
-      <p>{node.name}</p>
+      <p>
+        {node.name}
+        {node.token}
+        {node.connected ? 'Connected' : 'Disconnected'}
+      </p>
     {/each}
   {/await}
 </div>

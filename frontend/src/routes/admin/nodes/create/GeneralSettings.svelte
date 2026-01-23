@@ -49,10 +49,10 @@
     />
     {#if !secure}
       <div class="flex items-center">
-        <Label class="text-destructive p-0 font-medium"
+        <Label class="p-0 font-medium text-orange-500"
           >Only use HTTP on private networks!</Label
         >
-        <TriangleAlert class="text-destructive ml-auto" />
+        <TriangleAlert class="ml-auto text-orange-500" />
       </div>
     {/if}
     <FormSwitch

@@ -1,4 +1,5 @@
 use axum::{Extension, Router};
+use centaurus::db::init::Connection;
 
 use crate::admin::nodes::state::Wings;
 
@@ -11,6 +12,8 @@ pub fn router() -> Router {
   management::router()
 }
 
-pub fn state(router: Router) -> Router {
-  router.layer(Extension(Wings::default()))
+pub async fn state(router: Router, db: &Connection) -> Router {
+  router.layer(Extension(
+    Wings::new(db).await.expect("Failed to create Wings state"),
+  ))
 }
