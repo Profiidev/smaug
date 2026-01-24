@@ -1,6 +1,8 @@
 ARG TARGET=x86_64-unknown-linux-gnu
 ARG RUSTFLAGS="-C target-feature=+crt-static"
 ARG FRONTEND_DIR=/app/frontend
+ARG FRONTEND_URL="http://localhost:3000"
+ARG BACKEND_URL="http://localhost:8000"
 
 FROM node:24-alpine AS frontend-builder
 
@@ -10,6 +12,9 @@ COPY frontend/package.json ./
 COPY package-lock.json package.json ../
 
 RUN npm ci
+
+ARG FRONTEND_URL
+ARG BACKEND_URL
 
 COPY frontend/svelte.config.js frontend/tsconfig.json frontend/vite.config.ts ./
 COPY frontend/src ./src
