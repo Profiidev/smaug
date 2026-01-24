@@ -43,7 +43,7 @@ const createWebsocket = () => {
     }
 
     updater.send('heartbeat');
-  }, 10000);
+  }, 10000) as unknown as number;
 };
 
 const handleMessage = (msg: UpdateMessage) => {
