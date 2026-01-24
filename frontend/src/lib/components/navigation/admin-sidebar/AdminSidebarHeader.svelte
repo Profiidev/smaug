@@ -15,7 +15,7 @@
   <Sidebar.MenuItem class="flex flex-row">
     <Sidebar.MenuButton
       size="lg"
-      class="overflow-hidden transition-all ease-linear data-[open=true]:max-w-54 md:data-[open=true]:max-w-42 md:max-w-0"
+      class="overflow-hidden transition-all ease-linear data-[open=true]:max-w-54 md:max-w-0 md:data-[open=true]:max-w-42"
       data-open={isOpen}
     >
       {#snippet child({ props })}
