@@ -2,13 +2,13 @@ use std::{sync::Arc, time::Duration};
 
 use centaurus::{
   bail,
-  error::Result,
-  eyre::{Context, ContextCompat},
+  error::{ErrorReportStatusExt, Result},
 };
 use futures_util::{
   SinkExt, StreamExt,
   stream::{SplitSink, SplitStream},
 };
+use http::StatusCode;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use shared::msg::WingsMessage;
@@ -72,10 +72,10 @@ impl WingsConnection {
       disconnect,
     }));
 
-    sender
-      .send(conn.clone())
-      .ok()
-      .with_context(|| format!("Failed to init reconnect for wings connection {}", uuid))?;
+    sender.send(conn.clone()).ok().status_context(
+      StatusCode::INTERNAL_SERVER_ERROR,
+      &format!("Failed to init reconnect for wings connection {}", uuid),
+    )?;
 
     Ok(conn)
   }
@@ -102,7 +102,10 @@ impl WingsConnection {
     sender
       .send(tungstenite::Message::Binary(msg.into()))
       .await
-      .with_context(|| format!("Failed to send Message to wings connection {}", self.uuid))?;
+      .status_context(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        &format!("Failed to send Message to wings connection {}", self.uuid),
+      )?;
 
     Ok(())
   }

@@ -6,10 +6,9 @@ use axum::{
 use centaurus::{
   bail,
   db::init::Connection,
-  error::Result,
-  eyre::{Context, ContextCompat},
+  error::{ErrorReportStatusExt, Result},
 };
-use http::Uri;
+use http::{StatusCode, Uri};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -39,13 +38,14 @@ struct CreateNode {
 
 async fn create_node(db: Connection, wings: Wings, data: CreateNode) -> Result<()> {
   if db.node().find_by_name(data.name.clone()).await.is_ok() {
-    bail!("Node with this name already exists");
+    bail!(CONFLICT, "Node with this name already exists");
   }
 
-  let url = Uri::try_from(data.address).context("Invalid Address")?;
+  let url =
+    Uri::try_from(data.address).status_context(StatusCode::BAD_REQUEST, "Invalid Address")?;
   let address = url
     .host()
-    .context("Address must contain a valid host")?
+    .status_context(StatusCode::BAD_REQUEST, "Address must contain a valid host")?
     .to_string();
   let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 }) as i16;
 

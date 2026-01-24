@@ -21,6 +21,7 @@
   import GeneralSettings from './GeneralSettings.svelte';
   import AdvancedSettings from './AdvancedSettings.svelte';
   import { createNode } from '$lib/backend/node.svelte';
+  import { RequestError } from 'positron-components/backend';
 
   interface StageProps {
     initialValue?: any;
@@ -76,7 +77,14 @@
       let res = await createNode(data);
 
       if (res) {
-        return { error: 'Error creating deployment.' };
+        if (res === RequestError.Conflict) {
+          return { error: 'A node with this name already exists.' };
+          // TODO: use BadRequest error message when added to component library
+        } else if (res === RequestError.Other) {
+          return { error: 'Invalid node address.' };
+        } else {
+          return { error: 'Error creating deployment.' };
+        }
       } else {
         setTimeout(() => {
           goto('/admin/nodes');

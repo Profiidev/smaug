@@ -49,16 +49,12 @@
       Create
     </Button>
   </div>
-  {#await data.nodes}
-    <p>Loading...</p>
-  {:then nodes}
-    <Table
-      data={nodes}
-      {columns}
-      class="mt-4"
-      columnData={{ deleteNode: startDeleteNode }}
-    />
-  {/await}
+  <Table
+    data={data.nodes}
+    {columns}
+    class="mt-4"
+    columnData={{ deleteNode: startDeleteNode }}
+  />
 </div>
 <FormDialog
   title={`Delete Node`}

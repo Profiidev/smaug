@@ -7,7 +7,7 @@
   import type { ColumnDef } from '@tanstack/table-core';
 
   type Props = {
-    data?: T[];
+    data?: T[] | Promise<T[] | undefined>;
     class?: string;
   } & (
     | {
@@ -22,8 +22,24 @@
 
   let { class: className, data, columns, columnData }: Props = $props();
 
+  let rows = $state<T[]>([]);
+  let isLoading = $state(true);
+
+  $effect(() => {
+    if (data instanceof Promise) {
+      isLoading = true;
+      data.then((d) => {
+        rows = d || [];
+        isLoading = false;
+      });
+    } else if (data) {
+      rows = data;
+      isLoading = false;
+    }
+  });
+
   let table = $derived(
-    createTable(data ?? [], columns(columnData as any), () => true)
+    createTable(rows, columns(columnData as any), () => true)
   );
 </script>
 
@@ -70,7 +86,7 @@
               colspan={table.getAllColumns().length}
               class="h-24 text-center"
             >
-              No results.
+              {isLoading ? 'Loading...' : 'No results.'}
             </Table.Cell>
           </Table.Row>
         {/each}
