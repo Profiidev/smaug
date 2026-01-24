@@ -1,0 +1,92 @@
+use std::{collections::HashMap, sync::Arc};
+
+use axum::{Extension, extract::FromRequestParts};
+use serde::{Deserialize, Serialize};
+use tokio::{
+  spawn,
+  sync::{
+    Mutex,
+    mpsc::{self, Receiver, Sender},
+  },
+  task::JoinHandle,
+};
+use uuid::Uuid;
+
+pub type Sessions = Arc<Mutex<HashMap<Uuid, Sender<UpdateMessage>>>>;
+
+#[derive(Clone, FromRequestParts)]
+#[from_request(via(Extension))]
+pub struct UpdateState {
+  sessions: Sessions,
+  update_proxy: Arc<JoinHandle<()>>,
+  updater: Updater,
+}
+
+#[derive(Clone, FromRequestParts)]
+#[from_request(via(Extension))]
+pub struct Updater(Arc<Sender<UpdateMessage>>);
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum UpdateMessage {
+  Nodes,
+  Node { uuid: Uuid },
+}
+
+impl UpdateState {
+  pub async fn init() -> (Self, Updater) {
+    let sessions: Sessions = Default::default();
+    let (sender, mut receiver) = mpsc::channel(100);
+    let updater = Updater(Arc::new(sender));
+
+    let update_proxy = spawn({
+      let sessions = sessions.clone();
+      async move {
+        while let Some(message) = receiver.recv().await {
+          for sender in sessions.lock().await.values() {
+            sender.send(message.clone()).await.ok();
+          }
+        }
+      }
+    });
+
+    let state = Self {
+      sessions,
+      update_proxy: Arc::new(update_proxy),
+      updater: updater.clone(),
+    };
+
+    (state, updater)
+  }
+
+  pub async fn create_session(&self) -> (Uuid, Receiver<UpdateMessage>) {
+    let (send, recv) = mpsc::channel(100);
+    let uuid = Uuid::new_v4();
+
+    let mut lock = self.sessions.lock().await;
+    lock.insert(uuid, send);
+
+    (uuid, recv)
+  }
+
+  pub async fn remove_session(&self, uuid: &Uuid) {
+    self.sessions.lock().await.remove(uuid);
+  }
+
+  #[allow(unused)]
+  pub async fn broadcast_message(&self, msg: UpdateMessage) {
+    self.updater.broadcast(msg).await;
+  }
+}
+
+impl Drop for UpdateState {
+  fn drop(&mut self) {
+    self.update_proxy.abort();
+  }
+}
+
+impl Updater {
+  pub async fn broadcast(&self, msg: UpdateMessage) {
+    let _ = self.0.send(msg).await;
+  }
+}

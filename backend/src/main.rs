@@ -16,6 +16,7 @@ use crate::config::Config;
 mod admin;
 mod config;
 mod db;
+mod ws;
 
 #[tokio::main]
 async fn main() {
@@ -36,11 +37,14 @@ async fn main() {
 }
 
 fn api_router() -> Router {
-  Router::new().nest("/admin", admin::router())
+  Router::new()
+    .nest("/admin", admin::router())
+    .nest("/ws", ws::router())
 }
 
-async fn state(mut router: Router, config: Config) -> Router {
+async fn state(router: Router, config: Config) -> Router {
   let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
-  router = admin::state(router, &db).await;
+  let (mut router, updater) = ws::state(router).await;
+  router = admin::state(router, &db, updater).await;
   router.layer(Extension(db)).layer(Extension(config))
 }

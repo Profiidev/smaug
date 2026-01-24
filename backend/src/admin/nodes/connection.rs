@@ -22,7 +22,10 @@ use tokio_tungstenite::tungstenite;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::admin::nodes::auth::{WingsAuth, WsStream};
+use crate::{
+  admin::nodes::auth::{WingsAuth, WsStream},
+  ws::state::{UpdateMessage, Updater},
+};
 
 pub struct WingsConnection {
   uuid: Uuid,
@@ -41,6 +44,7 @@ impl WingsConnection {
     port: i16,
     secure: bool,
     token: String,
+    updater: Updater,
   ) -> Result<Arc<Mutex<Self>>> {
     let addr = format!(
       "{}://{}:{}/api",
@@ -60,7 +64,7 @@ impl WingsConnection {
     let reconnect = spawn({
       let disconnect = disconnect.clone();
 
-      reconnect_task(uuid, receiver, addr, token, disconnect)
+      reconnect_task(uuid, receiver, addr, token, disconnect, updater)
     });
 
     let conn = Arc::new(Mutex::new(Self {
@@ -123,6 +127,7 @@ async fn reconnect_task(
   addr: String,
   token: String,
   disconnect: Arc<Notify>,
+  updater: Updater,
 ) {
   let Ok(conn) = receiver.await else {
     error!(
@@ -147,6 +152,12 @@ async fn reconnect_task(
     }
 
     let mut conn_ref = conn.lock().await;
+
+    // only send update if we were previously connected
+    if conn_ref.sender.is_some() {
+      updater.broadcast(UpdateMessage::Nodes).await;
+    }
+
     conn_ref.sender = None;
     conn_ref.receiver = None;
     drop(conn_ref);
@@ -181,6 +192,8 @@ async fn reconnect_task(
     conn_ref.sender = Some(sender);
     conn_ref.receiver = Some(receiver);
     drop(conn_ref);
+
+    updater.broadcast(UpdateMessage::Nodes).await;
 
     debug!("Wings connection to {} re-established", uuid);
   }

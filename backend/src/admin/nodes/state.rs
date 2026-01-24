@@ -5,16 +5,17 @@ use centaurus::{db::init::Connection, error::Result};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{admin::nodes::connection::WingsConnection, db::DBTrait};
+use crate::{admin::nodes::connection::WingsConnection, db::DBTrait, ws::state::Updater};
 
 #[derive(Clone, FromRequestParts)]
 #[from_request(via(Extension))]
 pub struct Wings {
   wings: Arc<Mutex<HashMap<Uuid, Arc<Mutex<WingsConnection>>>>>,
+  updater: Updater,
 }
 
 impl Wings {
-  pub async fn new(db: &Connection) -> Result<Self> {
+  pub async fn new(db: &Connection, updater: Updater) -> Result<Self> {
     let nodes = db.node().list_nodes().await?;
     let mut wings = HashMap::new();
 
@@ -25,6 +26,7 @@ impl Wings {
         node.port,
         node.secure,
         node.token.clone(),
+        updater.clone(),
       )
       .await?;
 
@@ -33,6 +35,7 @@ impl Wings {
 
     Ok(Self {
       wings: Arc::new(Mutex::new(wings)),
+      updater,
     })
   }
 
@@ -44,7 +47,15 @@ impl Wings {
     secure: bool,
     token: &str,
   ) -> Result<()> {
-    let conn = WingsConnection::new(uuid, addr, port, secure, token.to_string()).await?;
+    let conn = WingsConnection::new(
+      uuid,
+      addr,
+      port,
+      secure,
+      token.to_string(),
+      self.updater.clone(),
+    )
+    .await?;
     self.wings.lock().await.insert(uuid, conn);
     Ok(())
   }

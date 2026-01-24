@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::{
   admin::nodes::state::Wings,
   db::{DBTrait, node::Node},
+  ws::state::{UpdateMessage, Updater},
 };
 
 pub fn router() -> Router {
@@ -36,7 +37,12 @@ struct CreateNode {
   cpu_limit: Option<u32>,
 }
 
-async fn create_node(db: Connection, wings: Wings, data: CreateNode) -> Result<()> {
+async fn create_node(
+  db: Connection,
+  wings: Wings,
+  updater: Updater,
+  data: CreateNode,
+) -> Result<()> {
   if db.node().find_by_name(data.name.clone()).await.is_ok() {
     bail!(CONFLICT, "Node with this name already exists");
   }
@@ -72,6 +78,8 @@ async fn create_node(db: Connection, wings: Wings, data: CreateNode) -> Result<(
   };
 
   db.node().create_node(model).await?;
+
+  updater.broadcast(UpdateMessage::Nodes).await;
 
   Ok(())
 }
@@ -118,10 +126,17 @@ struct DeleteNode {
   uuid: Uuid,
 }
 
-async fn delete_node(db: Connection, wings: Wings, data: DeleteNode) -> Result<()> {
+async fn delete_node(
+  db: Connection,
+  wings: Wings,
+  updater: Updater,
+  data: DeleteNode,
+) -> Result<()> {
   wings.disconnect(data.uuid).await?;
 
   db.node().delete_node(data.uuid).await?;
+
+  updater.broadcast(UpdateMessage::Nodes).await;
 
   Ok(())
 }
