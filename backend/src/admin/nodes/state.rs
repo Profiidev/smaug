@@ -51,7 +51,7 @@ impl Wings {
 
   pub async fn disconnect(&self, uuid: Uuid) -> Result<()> {
     if let Some(conn) = self.wings.lock().await.remove(&uuid) {
-      conn.lock().await.disconnect().await;
+      conn.lock().await.disconnect();
     }
     Ok(())
   }

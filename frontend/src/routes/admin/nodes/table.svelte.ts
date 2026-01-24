@@ -1,6 +1,4 @@
 import type { NodeInfo } from '$lib/backend/node.svelte';
-import HeartPulseIcon from '@lucide/svelte/icons/heart-pulse';
-import HeartCrack from '@lucide/svelte/icons/heart-crack';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
 import type { ColumnDef } from '@tanstack/table-core';
@@ -11,6 +9,7 @@ import {
 } from 'positron-components/components/table/helpers.svelte';
 import Actions from '$lib/components/table/Actions.svelte';
 import { createRawSnippet } from 'svelte';
+import Status from '$lib/components/table/Status.svelte';
 
 export const columns = ({
   deleteNode
@@ -22,12 +21,9 @@ export const columns = ({
     header: () => {},
     cell: ({ row }) => {
       let connected = row.getValue<boolean>('connected');
-      return DataTable.renderComponent(
-        connected ? HeartPulseIcon : HeartCrack,
-        {
-          class: `ml-3 ${connected ? 'text-green-500' : 'text-red-500'}`
-        }
-      );
+      return DataTable.renderComponent(Status, {
+        connected
+      });
     }
   },
   createColumn('name', 'Name'),

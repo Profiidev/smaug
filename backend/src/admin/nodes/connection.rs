@@ -84,7 +84,7 @@ impl WingsConnection {
     self.sender.is_some()
   }
 
-  pub async fn disconnect(&self) {
+  pub fn disconnect(&self) {
     self.disconnect.notify_waiters();
     if let Some(handle) = &self.receiver {
       handle.abort();
@@ -108,6 +108,12 @@ impl WingsConnection {
       )?;
 
     Ok(())
+  }
+}
+
+impl Drop for WingsConnection {
+  fn drop(&mut self) {
+    self.disconnect();
   }
 }
 
