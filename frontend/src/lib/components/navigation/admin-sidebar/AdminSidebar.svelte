@@ -32,6 +32,7 @@
     </Sidebar.Footer>
   </Sidebar.Root>
   <Sidebar.Inset>
+     <Sidebar.Trigger class="absolute top-5 left-3 flex md:hidden" />
     {@render children()}
   </Sidebar.Inset>
 </Sidebar.Provider>

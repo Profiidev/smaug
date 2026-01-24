@@ -42,7 +42,7 @@
 </script>
 
 <div class="p-4">
-  <div class="flex items-center">
+  <div class="flex items-center ml-7 md:m-0">
     <h3 class="text-xl font-medium">Nodes</h3>
     <Button class="ml-auto" href="/admin/nodes/create">
       <Plus />
