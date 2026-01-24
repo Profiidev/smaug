@@ -1,4 +1,4 @@
-import { ResponseType, get, post } from 'positron-components/backend';
+import { ResponseType, delete_, get, post } from 'positron-components/backend';
 
 export interface CreateNode {
   name: string;
@@ -15,7 +15,7 @@ export const createNode = async (node: CreateNode) => {
   });
 };
 
-export interface Node {
+export interface NodeInfo {
   id: string;
   name: string;
   address: string;
@@ -29,11 +29,17 @@ export interface Node {
 }
 
 export const listNodes = async (fetch: typeof window.fetch = window.fetch) => {
-  let ret = await get<Node[]>('/api/admin/nodes', {
+  let ret = await get<NodeInfo[]>('/api/admin/nodes', {
     res_type: ResponseType.Json,
     fetch
   });
   if (Array.isArray(ret)) {
     return ret;
   }
+};
+
+export const deleteNode = async (uuid: string) => {
+  return await delete_(`/api/admin/nodes`, {
+    body: { uuid }
+  });
 };

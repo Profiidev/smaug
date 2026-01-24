@@ -1,0 +1,74 @@
+import type { NodeInfo } from '$lib/backend/node.svelte';
+import HeartPulseIcon from '@lucide/svelte/icons/heart-pulse';
+import HeartCrack from '@lucide/svelte/icons/heart-crack';
+import Lock from '@lucide/svelte/icons/lock';
+import LockOpen from '@lucide/svelte/icons/lock-open';
+import type { ColumnDef } from '@tanstack/table-core';
+import * as DataTable from 'positron-components/components/ui/data-table';
+import {
+  createColumn,
+  createColumnHeader
+} from 'positron-components/components/table/helpers.svelte';
+import Actions from '$lib/components/table/Actions.svelte';
+import { createRawSnippet } from 'svelte';
+
+export const columns = ({
+  deleteNode
+}: {
+  deleteNode: (node: NodeInfo) => void;
+}): ColumnDef<NodeInfo>[] => [
+  {
+    accessorKey: 'connected',
+    header: () => {},
+    cell: ({ row }) => {
+      let connected = row.getValue<boolean>('connected');
+      return DataTable.renderComponent(
+        connected ? HeartPulseIcon : HeartCrack,
+        {
+          class: `ml-3 ${connected ? 'text-green-500' : 'text-red-500'}`
+        }
+      );
+    }
+  },
+  createColumn('name', 'Name'),
+  {
+    ...createColumnHeader('address', 'Address'),
+    cell: ({ row }) => {
+      let address = row.getValue<string>('address');
+      let port = row.original.port;
+      let value = `${address}:${port}`;
+
+      return DataTable.renderSnippet(
+        createRawSnippet(() => {
+          return {
+            render: () =>
+              `<div class="ml-4 truncate h-full w-full text-wrap">${value}</div>`
+          };
+        })
+      );
+    }
+  },
+  {
+    ...createColumnHeader('secure', 'Secure'),
+    cell: ({ row }) => {
+      let secure = row.getValue<boolean>('secure');
+      return DataTable.renderComponent(secure ? Lock : LockOpen, {
+        class: `ml-3 ${secure ? 'text-green-500' : 'text-orange-500'}`
+      });
+    }
+  },
+  createColumn('id', 'UUID'),
+  {
+    accessorKey: 'actions',
+    header: () => {},
+    cell: ({ row }) => {
+      return DataTable.renderComponent(Actions, {
+        edit_disabled: false,
+        delete_disabled: false,
+        editHref: `/admin/nodes/${row.original.id}`,
+        remove: () => deleteNode(row.original)
+      });
+    },
+    enableHiding: false
+  }
+];
