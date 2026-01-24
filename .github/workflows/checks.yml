@@ -28,6 +28,7 @@ jobs:
       - name: Generate svelte data
         run: |
           cd frontend && npm run sync
+          echo "BACKEND_URL=http://localhost:8000" > .env
 
       - name: Run linters
         uses: profiidev/rust-lint-action@v3

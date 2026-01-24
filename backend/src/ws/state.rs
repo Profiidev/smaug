@@ -18,26 +18,26 @@ pub type Sessions = Arc<Mutex<HashMap<Uuid, Sender<UpdateMessage>>>>;
 #[from_request(via(Extension))]
 pub struct UpdateState {
   sessions: Sessions,
+  #[allow(dead_code)]
   update_proxy: Arc<JoinHandle<()>>,
   updater: Updater,
 }
 
 #[derive(Clone, FromRequestParts)]
 #[from_request(via(Extension))]
-pub struct Updater(Arc<Sender<UpdateMessage>>);
+pub struct Updater(Sender<UpdateMessage>);
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type")]
 pub enum UpdateMessage {
   Nodes,
-  Node { uuid: Uuid },
 }
 
 impl UpdateState {
   pub async fn init() -> (Self, Updater) {
     let sessions: Sessions = Default::default();
     let (sender, mut receiver) = mpsc::channel(100);
-    let updater = Updater(Arc::new(sender));
+    let updater = Updater(sender);
 
     let update_proxy = spawn({
       let sessions = sessions.clone();
@@ -76,12 +76,6 @@ impl UpdateState {
   #[allow(unused)]
   pub async fn broadcast_message(&self, msg: UpdateMessage) {
     self.updater.broadcast(msg).await;
-  }
-}
-
-impl Drop for UpdateState {
-  fn drop(&mut self) {
-    self.update_proxy.abort();
   }
 }
 

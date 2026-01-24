@@ -24,6 +24,8 @@
     <Tooltip.Content>
       {#if !connected}
         <p>Check the server logs for more information.</p>
+      {:else}
+        <p>Connection is healthy.</p>
       {/if}
     </Tooltip.Content>
   </Tooltip.Root>
