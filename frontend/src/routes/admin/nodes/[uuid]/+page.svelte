@@ -7,7 +7,7 @@
   import { z } from 'zod';
   import { deleteNode, updateNode } from '$lib/backend/node.svelte';
   import { toast } from 'positron-components/components/util/general';
-  import { goto, invalidate } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { Button } from 'positron-components/components/ui/button';
   import Trash from '@lucide/svelte/icons/trash';
   import { reformatData, undoReformatData } from '../create/schema.svelte';
@@ -17,6 +17,12 @@
   import type { FormRecord } from 'positron-components/components/form/types';
   import { Spinner } from 'positron-components/components/ui/spinner';
   import { RequestError } from 'positron-components/backend';
+  import * as Code from '$lib/components/code';
+  import { dockerCompose, dockerRun } from './code.svelte';
+  import { Label } from 'positron-components/components/ui/label';
+  import { Input } from 'positron-components/components/ui/input';
+  import * as Select from 'positron-components/components/ui/select';
+  import { CopyButton } from 'positron-components/components/ui-extra/copy-button';
 
   interface Props {
     data: PageData;
@@ -24,9 +30,10 @@
 
   const { data }: Props = $props();
 
-  let tab = $state('settings');
+  let tab = $state('setup');
   let deleteOpen = $state(false);
   let isLoading = $state(false);
+  let setupMethod = $state('Docker Compose');
 
   const deleteItemConfirm = async () => {
     isLoading = true;
@@ -37,7 +44,9 @@
       return { error: 'Failed to delete node' };
     } else {
       toast.success(`Node ${data.node.name} deleted successfully`);
-      goto('/admin/nodes');
+      setTimeout(() => {
+        goto('/admin/nodes');
+      });
     }
   };
 
@@ -68,7 +77,7 @@
   <div class="ml-7 flex items-center md:m-0">
     <h3 class="text-xl font-medium">Node: {data.node.name}</h3>
     <Button
-      class="ml-auto"
+      class="ml-auto cursor-pointer"
       onclick={() => (deleteOpen = true)}
       variant="destructive"
     >
@@ -80,14 +89,54 @@
     <Tabs.Root bind:value={tab}>
       <Card.Header class="px-2">
         <Tabs.List>
-          <Tabs.Trigger value="setup">Node Setup</Tabs.Trigger>
-          <Tabs.Trigger value="settings">Settings</Tabs.Trigger>
+          <Tabs.Trigger value="setup" class="cursor-pointer"
+            >Node Setup</Tabs.Trigger
+          >
+          <Tabs.Trigger value="settings" class="cursor-pointer"
+            >Settings</Tabs.Trigger
+          >
         </Tabs.List>
       </Card.Header>
       <Separator />
       <Card.Content class="px-4 py-2">
         <Tabs.Content value="setup">
-          <p>Setup</p>
+          <div class="grid gap-4 lg:grid-cols-[auto_1fr]">
+            <Label class="mr-4 text-lg text-nowrap">Node Auth Token:</Label>
+            <CopyButton
+              text={data.node.token}
+              variant="outline"
+              class="max-w-155"
+            >
+              <span class="truncate">{data.node.token}</span>
+            </CopyButton>
+            <Label class="mr-4 text-lg text-nowrap">Setup Method:</Label>
+            <Select.Root
+              bind:value={setupMethod}
+              type="single"
+              allowDeselect={false}
+            >
+              <Select.Trigger class="w-48">
+                {setupMethod}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  <Select.Item value="Docker Compose"
+                    >Docker Compose</Select.Item
+                  >
+                  <Select.Item value="Docker Run">Docker Run</Select.Item>
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+          </div>
+          <Code.Root
+            code={setupMethod === 'Docker Compose'
+              ? dockerCompose(data.node.token)
+              : dockerRun(data.node.token)}
+            lang={setupMethod === 'Docker Compose' ? 'yaml' : 'bash'}
+            class="mt-4"
+          >
+            <Code.CopyButton />
+          </Code.Root>
         </Tabs.Content>
         <Tabs.Content value="settings">
           <div class="grid items-start gap-8 lg:grid-cols-[1fr_auto_1fr]">
@@ -130,7 +179,7 @@
 
 {#snippet footer({ isLoading }: { isLoading: boolean })}
   <div class="mt-4 flex w-full">
-    <Button class="ml-auto" type="submit" disabled={isLoading}>
+    <Button class="ml-auto cursor-pointer" type="submit" disabled={isLoading}>
       {#if isLoading}
         <Spinner />
       {:else}

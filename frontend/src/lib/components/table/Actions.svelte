@@ -19,12 +19,13 @@
     variant="secondary"
     href={editHref}
     disabled={edit_disabled}
-    class="ml-auto"
+    class="ml-auto cursor-pointer"
   >
     <Pencil />
   </Button>
   <Button
     size="icon"
+    class="cursor-pointer"
     variant="destructive"
     onclick={remove}
     disabled={delete_disabled}

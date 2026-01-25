@@ -34,7 +34,7 @@
     </Sidebar.MenuButton>
     <Sidebar.MenuButton
       size="lg"
-      class="ml-auto size-12"
+      class="ml-auto size-12 cursor-pointer"
       onclick={sidebar.toggle}
       aria-label="Open/Close Sidebar"
       tooltipContent="Smaug"

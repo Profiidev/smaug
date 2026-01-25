@@ -40,12 +40,17 @@ struct CreateNode {
   cpu_limit: Option<u32>,
 }
 
+#[derive(Serialize)]
+struct CreateNodeRes {
+  uuid: Uuid,
+}
+
 async fn create_node(
   db: Connection,
   wings: Wings,
   updater: Updater,
   data: CreateNode,
-) -> Result<()> {
+) -> Result<Json<CreateNodeRes>> {
   if db.node().find_by_name(data.name.clone()).await.is_ok() {
     bail!(CONFLICT, "Node with this name already exists");
   }
@@ -95,7 +100,7 @@ async fn create_node(
 
   updater.broadcast(UpdateMessage::Nodes).await;
 
-  Ok(())
+  Ok(Json(CreateNodeRes { uuid: id }))
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

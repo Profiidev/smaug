@@ -58,7 +58,7 @@
 <div class="p-4">
   <div class="ml-7 flex items-center md:m-0">
     <h3 class="text-xl font-medium">Nodes</h3>
-    <Button class="ml-auto" href="/admin/nodes/create">
+    <Button class="ml-auto cursor-pointer" href="/admin/nodes/create">
       <Plus />
       Create
     </Button>

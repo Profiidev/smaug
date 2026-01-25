@@ -22,6 +22,7 @@
   import AdvancedSettings from './AdvancedSettings.svelte';
   import { createNode } from '$lib/backend/node.svelte';
   import { RequestError } from 'positron-components/backend';
+  import { toast } from 'positron-components/components/util/general';
 
   interface StageProps {
     initialValue?: any;
@@ -76,7 +77,7 @@
       let data = reformatData(rawData as any);
       let res = await createNode(data);
 
-      if (res) {
+      if (typeof res === 'string') {
         if (res === RequestError.Conflict) {
           return { error: 'A node with this name already exists.' };
           // TODO: use BadRequest error message when added to component library
@@ -86,8 +87,9 @@
           return { error: 'Error creating deployment.' };
         }
       } else {
+        toast.success('Node created successfully.');
         setTimeout(() => {
-          goto('/admin/nodes');
+          goto(`/admin/nodes/${res.uuid}`);
         });
       }
     }

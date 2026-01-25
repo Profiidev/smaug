@@ -9,9 +9,14 @@ export interface CreateNode {
   cpu_limit?: number;
 }
 
+export interface CreateNodeRes {
+  uuid: string;
+}
+
 export const createNode = async (node: CreateNode) => {
-  return await post<undefined>('/api/admin/nodes', {
-    body: node
+  return await post<CreateNodeRes>('/api/admin/nodes', {
+    body: node,
+    res_type: ResponseType.Json
   });
 };
 
