@@ -20,6 +20,20 @@
   let deleteOpen = $state(false);
   let isLoading = $state(false);
 
+  $effect(() => {
+    if (data.error) {
+      if (data.error === 'node_not_found') {
+        toast.error('Node not found');
+      } else if (data.error === 'node_other') {
+        toast.error('Failed to load node');
+      }
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      window.history.replaceState({}, '', url);
+    }
+  });
+
   const deleteItemConfirm = async () => {
     if (!selected) return;
 

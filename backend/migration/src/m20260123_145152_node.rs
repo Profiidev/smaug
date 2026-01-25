@@ -16,8 +16,8 @@ impl MigrationTrait for Migration {
           .col(string(Node::Address))
           .col(tiny_unsigned(Node::Port))
           .col(boolean(Node::Secure))
-          .col(unsigned_null(Node::DiskLimitMb))
-          .col(unsigned_null(Node::MemoryLimitMb))
+          .col(double_null(Node::DiskLimitMb))
+          .col(double_null(Node::MemoryLimitMb))
           .col(unsigned_null(Node::CpuLimit))
           .col(string(Node::Token))
           .to_owned(),

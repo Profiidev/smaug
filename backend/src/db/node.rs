@@ -1,4 +1,6 @@
+use centaurus::error::ErrorReportStatusExt;
 use entity::node;
+use http::StatusCode;
 use sea_orm::{IntoActiveModel, prelude::*};
 use serde::{Deserialize, Serialize};
 
@@ -9,8 +11,8 @@ pub struct Node {
   pub address: String,
   pub port: i16,
   pub secure: bool,
-  pub disk_limit_mb: Option<i32>,
-  pub memory_limit_mb: Option<i32>,
+  pub disk_limit_mb: Option<f64>,
+  pub memory_limit_mb: Option<f64>,
   pub cpu_limit: Option<i32>,
   pub token: String,
 }
@@ -40,6 +42,12 @@ impl<'db> NodeTable<'db> {
     res.ok_or(DbErr::RecordNotFound("Not Found".into()))
   }
 
+  pub async fn find_by_id(&self, id: Uuid) -> centaurus::error::Result<node::Model> {
+    let res = node::Entity::find_by_id(id).one(self.db).await?;
+
+    res.status_context(StatusCode::NOT_FOUND, "Node not found")
+  }
+
   pub async fn list_nodes(&self) -> Result<Vec<Node>, DbErr> {
     let nodes = node::Entity::find().all(self.db).await?;
     Ok(nodes.into_iter().map(Node::from).collect())
@@ -47,6 +55,12 @@ impl<'db> NodeTable<'db> {
 
   pub async fn delete_node(&self, id: Uuid) -> Result<(), DbErr> {
     node::Entity::delete_by_id(id).exec(self.db).await?;
+    Ok(())
+  }
+
+  pub async fn update_node(&self, model: node::ActiveModel) -> Result<(), DbErr> {
+    let model = model.into_active_model();
+    model.update(self.db).await?;
     Ok(())
   }
 }

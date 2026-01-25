@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "node")]
 pub struct Model {
   #[sea_orm(primary_key, auto_increment = false)]
@@ -11,8 +11,10 @@ pub struct Model {
   pub address: String,
   pub port: i16,
   pub secure: bool,
-  pub disk_limit_mb: Option<i32>,
-  pub memory_limit_mb: Option<i32>,
+  #[sea_orm(column_type = "Double", nullable)]
+  pub disk_limit_mb: Option<f64>,
+  #[sea_orm(column_type = "Double", nullable)]
+  pub memory_limit_mb: Option<f64>,
   pub cpu_limit: Option<i32>,
   pub token: String,
 }

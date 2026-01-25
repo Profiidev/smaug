@@ -43,3 +43,28 @@ export const deleteNode = async (uuid: string) => {
     body: { uuid }
   });
 };
+
+export const nodeInfo = async (
+  uuid: string,
+  fetch: typeof window.fetch = window.fetch
+) => {
+  return await get<NodeInfo>(`/api/admin/nodes/${uuid}`, {
+    res_type: ResponseType.Json,
+    fetch
+  });
+};
+
+export interface UpdateNode {
+  name: string;
+  address: string;
+  secure: boolean;
+  disk_limit_mb?: number;
+  memory_limit_mb?: number;
+  cpu_limit?: number;
+}
+
+export const updateNode = async (uuid: string, node: UpdateNode) => {
+  return await post<undefined>(`/api/admin/nodes/${uuid}`, {
+    body: node
+  });
+};

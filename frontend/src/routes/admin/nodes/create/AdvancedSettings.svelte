@@ -60,10 +60,9 @@
       onCheckedChange={(v) => (memoryUnlimit = v)}
     />
     {#if !memoryUnlimit}
-      <div class="flex w-full gap-2">
+      <div class="grid w-full grid-cols-[1fr_auto] gap-2">
         <FormInput
           {...props}
-          class="w-89"
           key="memory_limit"
           label="Available Memory"
           placeholder="Enter amount of memory"
@@ -89,10 +88,9 @@
       onCheckedChange={(v) => (storageUnlimit = v)}
     />
     {#if !storageUnlimit}
-      <div class="flex w-full gap-2">
+      <div class="grid w-full grid-cols-[1fr_auto] gap-2">
         <FormInput
           {...props}
-          class="w-89"
           key="storage_size"
           label="Available Storage Space"
           placeholder="Enter amount of storage"
