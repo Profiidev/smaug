@@ -1,4 +1,5 @@
 import { tv, type VariantProps } from 'tailwind-variants';
+// @ts-ignore
 import Root from './code.svelte';
 import Overflow from './code-overflow.svelte';
 import CopyButton from './code-copy-button.svelte';
