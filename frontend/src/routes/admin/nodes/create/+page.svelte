@@ -80,8 +80,7 @@
       if (typeof res === 'string') {
         if (res === RequestError.Conflict) {
           return { error: 'A node with this name already exists.' };
-          // TODO: use BadRequest error message when added to component library
-        } else if (res === RequestError.Other) {
+        } else if (res === RequestError.BadRequest) {
           return { error: 'Invalid node address.' };
         } else {
           return { error: 'Error creating deployment.' };

@@ -20,7 +20,6 @@
   import * as Code from '$lib/components/code';
   import { dockerCompose, dockerRun } from './code.svelte';
   import { Label } from 'positron-components/components/ui/label';
-  import { Input } from 'positron-components/components/ui/input';
   import * as Select from 'positron-components/components/ui/select';
   import { CopyButton } from 'positron-components/components/ui-extra/copy-button';
 
@@ -59,8 +58,7 @@
     if (res) {
       if (res === RequestError.Conflict) {
         return { error: 'This node name is already in use', field: 'name' };
-        // TODO: use bad request when component supports it
-      } else if (res === RequestError.Gone) {
+      } else if (res === RequestError.BadRequest) {
         return { error: 'Invalid node address', field: 'address' };
       } else {
         return { error: 'Failed to update node' };
@@ -101,7 +99,7 @@
       <Card.Content class="px-4 py-2">
         <Tabs.Content value="setup">
           <div class="grid gap-4 lg:grid-cols-[auto_1fr]">
-            <Label class="mr-4 text-lg text-nowrap">Node Auth Token:</Label>
+            <Label class="text-md mr-4 text-nowrap">Node Auth Token:</Label>
             <CopyButton
               text={data.node.token}
               variant="outline"
@@ -109,7 +107,7 @@
             >
               <span class="truncate">{data.node.token}</span>
             </CopyButton>
-            <Label class="mr-4 text-lg text-nowrap">Setup Method:</Label>
+            <Label class="text-md mr-4 text-nowrap">Setup Method:</Label>
             <Select.Root
               bind:value={setupMethod}
               type="single"

@@ -7,8 +7,7 @@ export const load: PageLoad = async ({ params, fetch }) => {
   let res = await nodeInfo(params.uuid, fetch);
 
   if (typeof res !== 'object') {
-    // TODO: use NotFound error from positron-components when available
-    if (res === RequestError.Gone) {
+    if (res === RequestError.NotFound) {
       redirect(307, '/admin/nodes?error=node_not_found');
     } else {
       redirect(307, '/admin/nodes?error=node_other');

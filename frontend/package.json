@@ -29,7 +29,7 @@
   "dependencies": {
     "@lucide/svelte": "^0.563.1",
     "@sveltejs/enhanced-img": "0.9.3",
-    "positron-components": "^1.13.2",
+    "positron-components": "^1.14.0",
     "valibot": "^1.2.0"
   }
 }
