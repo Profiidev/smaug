@@ -6,7 +6,6 @@ use centaurus::{
     logging::init_logging,
     router::base_router,
   },
-  router_extension,
 };
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
@@ -14,9 +13,10 @@ use tracing::info;
 
 use crate::config::Config;
 
+mod admin;
 mod config;
 mod db;
-mod dummy;
+mod ws;
 
 #[tokio::main]
 async fn main() {
@@ -28,29 +28,23 @@ async fn main() {
 
   let listener = listener_setup(config.base.port).await;
 
-  let app = base_router(api_router(), &config.base, &config.metrics)
-    .await
-    .state(config)
-    .await;
+  let mut router = api_router();
+  router = base_router(router, &config.base, &config.metrics).await;
+  let app = state(router, config).await;
 
   info!("Starting application");
   run_app(listener, app).await;
 }
 
 fn api_router() -> Router {
-  dummy::router()
+  Router::new()
+    .nest("/admin", admin::router())
+    .nest("/ws", ws::router())
 }
 
-router_extension!(
-  async fn state(self, config: Config) -> Self {
-    use dummy::dummy;
-
-    let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
-
-    self
-      .dummy()
-      .await
-      .layer(Extension(db))
-      .layer(Extension(config))
-  }
-);
+async fn state(router: Router, config: Config) -> Router {
+  let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
+  let (mut router, updater) = ws::state(router).await;
+  router = admin::state(router, &db, updater).await;
+  router.layer(Extension(db)).layer(Extension(config))
+}

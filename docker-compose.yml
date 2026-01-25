@@ -1,6 +1,7 @@
 services:
   frontend:
     image: ghcr.io/profiidev/images/node-alpine-dev:main
+    restart: unless-stopped
     volumes:
       - ./frontend:/app/frontend
       - ./node_modules:/app/node_modules
@@ -17,8 +18,10 @@ services:
 
   backend:
     image: ghcr.io/profiidev/images/rust-musl-watch:main
+    restart: unless-stopped
     volumes:
       - ./backend:/app
+      - ./shared:/shared
     networks:
       - nginx
     tty: true
@@ -29,6 +32,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  wings:
+    image: ghcr.io/profiidev/images/rust-musl-watch:main
+    restart: unless-stopped
+    volumes:
+      - ./wings:/app
+      - ./shared:/shared
+    networks:
+      - nginx
+    tty: true
+    ports:
+      - '8123:8000'
+    entrypoint: ['tini', '--']
+    command: ['cargo', 'watch', '-x', 'run']
 
   postgres:
     image: postgres:17

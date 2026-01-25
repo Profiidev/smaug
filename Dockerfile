@@ -1,6 +1,8 @@
 ARG TARGET=x86_64-unknown-linux-gnu
 ARG RUSTFLAGS="-C target-feature=+crt-static"
 ARG FRONTEND_DIR=/app/frontend
+ARG FRONTEND_URL="http://localhost:3000"
+ARG BACKEND_URL="http://localhost:8000"
 
 FROM node:24-alpine AS frontend-builder
 
@@ -10,6 +12,9 @@ COPY frontend/package.json ./
 COPY package-lock.json package.json ../
 
 RUN npm ci
+
+ARG FRONTEND_URL
+ARG BACKEND_URL
 
 COPY frontend/svelte.config.js frontend/tsconfig.json frontend/vite.config.ts ./
 COPY frontend/src ./src
@@ -25,7 +30,10 @@ ARG RUSTFLAGS
 COPY backend/Cargo.toml backend/
 COPY backend/entity/Cargo.toml backend/entity/
 COPY backend/migration/Cargo.toml backend/migration/
+COPY shared/Cargo.toml shared/
 COPY ./Cargo.lock ./Cargo.toml ./
+
+RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration", "shared"]' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
@@ -51,7 +59,11 @@ COPY backend/entity/Cargo.toml backend/entity/
 COPY backend/entity/src backend/entity/src
 COPY backend/migration/Cargo.toml backend/migration/
 COPY backend/migration/src backend/migration/src
+COPY shared/Cargo.toml shared/
+COPY shared/src shared/src
 COPY ./Cargo.lock ./Cargo.toml ./
+
+RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration", "shared"]' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \

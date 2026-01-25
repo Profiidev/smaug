@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   pull_request:
 
 env:
@@ -22,10 +22,14 @@ jobs:
       attestations: write
       id-token: write
       security-events: write
-      
+
     strategy:
       matrix:
-        item: [{ df_path: ./, image: "${{ github.repository}}/smaug" }]
+        item:
+          [
+            { df_path: ./, image: "${{ github.repository}}/smaug" },
+            { df_path: ./wings, image: "${{ github.repository}}/smaug-wings" },
+          ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

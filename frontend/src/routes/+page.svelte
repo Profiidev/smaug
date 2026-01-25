@@ -1,11 +1,7 @@
 <script lang="ts">
-  import { dummy } from '../lib/backend/dummy.svelte';
-
-  let text = dummy();
+  import { Label } from 'positron-components/components/ui/label';
+  import { Button } from 'positron-components/components/ui/button';
 </script>
 
-{#await text}
-  <p>Loading ...</p>
-{:then text}
-  <p>{text}</p>
-{/await}
+<Label>Testing</Label>
+<Button href="/admin" variant="link">Admin</Button>
