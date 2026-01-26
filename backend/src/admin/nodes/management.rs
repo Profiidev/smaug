@@ -17,7 +17,9 @@ use uuid::Uuid;
 
 use crate::{
   admin::nodes::state::Wings,
+  auth::jwt_auth::JwtAuth,
   db::{DBTrait, node::Node},
+  permissions::{NodeEditPerm, NodeViewPerm},
   ws::state::{UpdateMessage, Updater},
 };
 
@@ -47,6 +49,7 @@ struct CreateNodeRes {
 }
 
 async fn create_node(
+  _auth: JwtAuth<NodeEditPerm>,
   db: Connection,
   wings: Wings,
   updater: Updater,
@@ -136,7 +139,11 @@ impl NodeInfo {
   }
 }
 
-async fn list_nodes(db: Connection, wings: Wings) -> Result<Json<Vec<NodeInfo>>> {
+async fn list_nodes(
+  _auth: JwtAuth<NodeViewPerm>,
+  db: Connection,
+  wings: Wings,
+) -> Result<Json<Vec<NodeInfo>>> {
   let nodes = db.node().list_nodes().await?;
   let mut node_infos = Vec::new();
 
@@ -154,6 +161,7 @@ struct DeleteNode {
 }
 
 async fn delete_node(
+  _auth: JwtAuth<NodeEditPerm>,
   db: Connection,
   wings: Wings,
   updater: Updater,
@@ -175,7 +183,12 @@ struct NodeInfoRequest {
   uuid: Uuid,
 }
 
-async fn node_info(db: Connection, wings: Wings, req: NodeInfoRequest) -> Result<Json<NodeInfo>> {
+async fn node_info(
+  _auth: JwtAuth<NodeViewPerm>,
+  db: Connection,
+  wings: Wings,
+  req: NodeInfoRequest,
+) -> Result<Json<NodeInfo>> {
   let node = db.node().find_by_id(req.uuid).await?;
   let node_info = NodeInfo::from_node(node.into(), &wings).await;
 
@@ -194,6 +207,7 @@ struct UpdateNode {
 }
 
 async fn update_node(
+  _auth: JwtAuth<NodeEditPerm>,
   db: Connection,
   wings: Wings,
   updater: Updater,

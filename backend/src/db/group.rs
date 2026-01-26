@@ -1,5 +1,5 @@
 use entity::{group, group_permission, group_user};
-use sea_orm::{IntoActiveModel, prelude::*};
+use sea_orm::{IntoActiveModel, JoinType, QuerySelect, prelude::*};
 
 pub struct GroupTable<'db> {
   db: &'db DatabaseConnection,
@@ -67,5 +67,21 @@ impl<'db> GroupTable<'db> {
       .await?;
 
     Ok(())
+  }
+
+  pub async fn user_hash_permissions(
+    &self,
+    user_id: Uuid,
+    permission: &str,
+  ) -> Result<bool, DbErr> {
+    let res = group_user::Entity::find()
+      .join(JoinType::InnerJoin, group_user::Relation::Group.def())
+      .join(JoinType::InnerJoin, group::Relation::GroupPermission.def())
+      .filter(group_user::Column::UserId.eq(user_id))
+      .filter(group_permission::Column::Permission.eq(permission))
+      .all(self.db)
+      .await?;
+
+    Ok(!res.is_empty())
   }
 }

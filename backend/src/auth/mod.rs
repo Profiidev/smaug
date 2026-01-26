@@ -15,7 +15,7 @@ use crate::{
   db::DBTrait,
 };
 
-mod jwt_auth;
+pub mod jwt_auth;
 mod jwt_state;
 mod logout;
 mod password;

@@ -1,5 +1,5 @@
 pub fn permissions() -> Vec<&'static str> {
-  vec![NodeView::name(), NodeEdit::name()]
+  vec![NodeViewPerm::name(), NodeEditPerm::name()]
 }
 
 pub trait Permission {
@@ -18,5 +18,8 @@ macro_rules! permission {
   };
 }
 
-permission!(NodeView, "node:view");
-permission!(NodeEdit, "node:edit");
+// No permissions required
+permission!(NoPerm, "");
+
+permission!(NodeViewPerm, "node:view");
+permission!(NodeEditPerm, "node:edit");
