@@ -14,7 +14,7 @@ impl<'db> SetupTable<'db> {
 
   pub async fn is_setup(&self) -> Result<bool, DbErr> {
     let res = Setup::find_by_id(SETUP_ID).one(self.db).await?;
-    Ok(res.is_some())
+    Ok(res.is_some_and(|s| s.completed))
   }
 
   async fn get_setup(&self) -> Result<setup::Model, DbErr> {

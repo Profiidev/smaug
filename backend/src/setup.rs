@@ -1,13 +1,20 @@
 use argon2::password_hash::SaltString;
-use axum::{Json, Router, extract::FromRequest, routing::post};
+use axum::{
+  Json, Router,
+  extract::FromRequest,
+  routing::{get, post},
+};
 use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
 use rsa::rand_core::OsRng;
-use serde::Deserialize;
+use sea_orm::ConnectionTrait;
+use serde::{Deserialize, Serialize};
 
 use crate::db::DBTrait;
 
 pub fn router() -> Router {
-  Router::new().route("/", post(complete_setup))
+  Router::new()
+    .route("/", post(complete_setup))
+    .route("/", get(is_setup))
 }
 
 pub async fn create_admin_group(db: &Connection) -> Result<()> {
@@ -88,4 +95,24 @@ async fn complete_setup(db: Connection, state: PasswordState, payload: SetupPayl
   db.setup().mark_completed().await?;
 
   Ok(())
+}
+
+#[derive(Serialize)]
+struct IsSetupResponse {
+  is_setup: bool,
+  db_backend: String,
+}
+
+async fn is_setup(db: Connection) -> Result<Json<IsSetupResponse>> {
+  let db_backend = match db.0.get_database_backend() {
+    sea_orm::DatabaseBackend::Postgres => "PostgreSQL",
+    sea_orm::DatabaseBackend::MySql => "MySQL",
+    sea_orm::DatabaseBackend::Sqlite => "SQLite",
+  }
+  .to_string();
+
+  Ok(Json(IsSetupResponse {
+    is_setup: db.setup().is_setup().await?,
+    db_backend,
+  }))
 }
