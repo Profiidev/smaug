@@ -15,6 +15,7 @@ centaurus = { version = "0.4.7", features = [
   "base64",
   "rsa",
   "auth",
+  "jsonwebtoken",
 ] }
 uuid = { version = "1.19.0", features = ["v4"] }
 entity = { path = "entity" }
@@ -52,6 +53,8 @@ reqwest-middleware = { version = "0.5.0", features = [
 async-trait = "0.1.89"
 rsa = "0.9.10"
 argon2 = "0.5.3"
+jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
+time = "0.3.46"
 
 [[bin]]
 name = "backend"

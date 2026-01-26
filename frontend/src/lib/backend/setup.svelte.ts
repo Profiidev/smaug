@@ -4,7 +4,7 @@ import {
   RequestError,
   ResponseType
 } from 'positron-components/backend';
-import { fetch_key, getEncrypt } from './auth.svelte';
+import { fetchKey, getEncrypt } from './auth.svelte';
 
 export interface SetupPayload {
   admin_username: string;
@@ -44,7 +44,7 @@ export const performSetup = async (payload: SetupPayload) => {
   });
 
   if (res === RequestError.Unauthorized) {
-    fetch_key();
+    fetchKey();
   }
 
   return res;

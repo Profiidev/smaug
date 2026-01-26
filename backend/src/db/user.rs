@@ -30,4 +30,15 @@ impl<'db> UserTable<'db> {
 
     Ok(ret.id)
   }
+
+  pub async fn get_user_by_email(&self, email: &str) -> Result<user::Model, DbErr> {
+    user::Entity::find()
+      .filter(user::Column::Email.eq(email.to_string()))
+      .one(self.db)
+      .await?
+      .ok_or(DbErr::RecordNotFound(format!(
+        "User with email {} not found",
+        email
+      )))
+  }
 }

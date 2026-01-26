@@ -8,7 +8,6 @@ use crate::db::setup::SetupTable;
 use crate::db::user::UserTable;
 
 pub mod group;
-#[allow(unused)]
 pub mod invalid_jwt;
 pub mod key;
 pub mod node;
@@ -17,7 +16,6 @@ pub mod user;
 
 pub trait DBTrait {
   fn key(&self) -> KeyTable<'_>;
-  #[allow(unused)]
   fn invalid_jwt(&self) -> InvalidJwtTable<'_>;
   fn node(&self) -> NodeTable<'_>;
   fn setup(&self) -> SetupTable<'_>;

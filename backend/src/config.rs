@@ -19,7 +19,10 @@ pub struct Config {
   pub metrics: MetricsConfig,
 
   pub db_url: String,
+
   pub auth_pepper: String,
+  pub auth_issuer: String,
+  pub auth_jwt_expiration: i64,
 }
 
 impl Default for Config {
@@ -33,6 +36,8 @@ impl Default for Config {
         ..Default::default()
       },
       auth_pepper: "__SMAUG_PEPPER__".to_string(),
+      auth_issuer: "smaug_auth".to_string(),
+      auth_jwt_expiration: 60 * 60 * 24 * 7, // 7 days
     }
   }
 }
