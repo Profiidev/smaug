@@ -1,4 +1,10 @@
-import { get, post, ResponseType } from 'positron-components/backend';
+import {
+  get,
+  post,
+  RequestError,
+  ResponseType
+} from 'positron-components/backend';
+import { fetch_key, getEncrypt } from './auth.svelte';
 
 export interface SetupPayload {
   admin_username: string;
@@ -25,7 +31,21 @@ export const getSetupStatus = async (
 };
 
 export const performSetup = async (payload: SetupPayload) => {
-  return await post('/api/setup', {
+  let encrypt = getEncrypt();
+  if (!encrypt) {
+    return RequestError.Other;
+  }
+
+  let encrypted_password = encrypt.encrypt(payload.admin_password);
+  payload.admin_password = encrypted_password || '';
+
+  let res = await post('/api/setup', {
     body: payload
   });
+
+  if (res === RequestError.Unauthorized) {
+    fetch_key();
+  }
+
+  return res;
 };

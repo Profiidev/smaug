@@ -12,7 +12,7 @@
     type Error,
     type FormRecord
   } from 'positron-components/components/form/types';
-  import type { SvelteComponent } from 'svelte';
+  import type { Component, SvelteComponent } from 'svelte';
   import type { Stage } from './types.svelte';
 
   interface Props<T> {
@@ -21,9 +21,17 @@
       data: object
     ) => Error | undefined | void | Promise<Error | undefined | void>;
     data?: T;
+    submitLabel?: string;
+    submitIcon?: Component;
   }
 
-  let { stages, onsubmit, data = undefined as T }: Props<T> = $props();
+  let {
+    stages,
+    onsubmit,
+    data = undefined as T,
+    submitLabel = 'Create',
+    submitIcon: SubmitIcon = Plus
+  }: Props<T> = $props();
 
   let stage = $state(0);
   let form: undefined | SvelteComponent = $state();
@@ -110,11 +118,11 @@
             </Button>
             <Button class="cursor-pointer" type="submit" disabled={isLoading}>
               {#if stage === stages.length - 1}
-                Create
+                {submitLabel}
                 {#if isLoading}
                   <Spinner />
                 {:else}
-                  <Plus />
+                  <SubmitIcon />
                 {/if}
               {:else}
                 Next
