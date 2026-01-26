@@ -10,14 +10,12 @@ use crate::db::user::UserTable;
 pub mod group;
 #[allow(unused)]
 pub mod invalid_jwt;
-#[allow(unused)]
 pub mod key;
 pub mod node;
 pub mod setup;
 pub mod user;
 
 pub trait DBTrait {
-  #[allow(unused)]
   fn key(&self) -> KeyTable<'_>;
   #[allow(unused)]
   fn invalid_jwt(&self) -> InvalidJwtTable<'_>;

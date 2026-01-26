@@ -37,7 +37,7 @@ impl<'db> SetupTable<'db> {
     let mut model = self.get_setup().await?.into_active_model();
     model.completed = Set(true);
 
-    model.insert(self.db).await?;
+    model.update(self.db).await?;
 
     Ok(())
   }
@@ -46,7 +46,7 @@ impl<'db> SetupTable<'db> {
     let mut model = self.get_setup().await?.into_active_model();
     model.admin_group_created = Set(Some(group_id));
 
-    model.insert(self.db).await?;
+    model.update(self.db).await?;
 
     Ok(())
   }

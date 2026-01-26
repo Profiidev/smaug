@@ -17,6 +17,7 @@ mod admin;
 mod auth;
 mod config;
 mod db;
+mod permissions;
 mod setup;
 mod ws;
 
@@ -48,8 +49,13 @@ fn api_router() -> Router {
 
 async fn state(router: Router, config: Config) -> Router {
   let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
+  setup::create_admin_group(&db)
+    .await
+    .expect("Failed to create admin group");
+
   let (mut router, updater) = ws::state(router).await;
   router = admin::state(router, &db, updater).await;
   router = auth::state(router, &config, &db).await;
+
   router.layer(Extension(db)).layer(Extension(config))
 }
