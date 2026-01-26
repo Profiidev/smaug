@@ -10,6 +10,7 @@ use tokio::{
   },
   task::JoinHandle,
 };
+use tracing::debug;
 use uuid::Uuid;
 
 pub type Sessions = Arc<Mutex<HashMap<Uuid, Sender<UpdateMessage>>>>;
@@ -42,6 +43,7 @@ impl UpdateState {
       let sessions = sessions.clone();
       async move {
         while let Some(message) = receiver.recv().await {
+          debug!("Broadcasting update message: {:?}", message);
           for sender in sessions.lock().await.values() {
             sender.send(message.clone()).await.ok();
           }

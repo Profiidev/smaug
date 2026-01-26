@@ -8,6 +8,7 @@ use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Resu
 use rsa::rand_core::OsRng;
 use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::db::DBTrait;
 
@@ -20,8 +21,8 @@ pub fn router() -> Router {
 pub async fn create_admin_group(db: &Connection) -> Result<()> {
   match db.setup().get_admin_group_id().await? {
     Some(id) => {
-      tracing::info!("Admin group already created with ID {}", id);
-      tracing::info!("Adding missing permissions to admin group");
+      info!("Admin group already created with ID {}", id);
+      info!("Adding missing permissions to admin group");
 
       let existing_perms = db.group().get_group_permissions(id).await?;
       let all_perms = crate::permissions::permissions();
@@ -35,13 +36,13 @@ pub async fn create_admin_group(db: &Connection) -> Result<()> {
         db.group()
           .add_permissions_to_group(id, missing_perms)
           .await?;
-        tracing::info!("Added missing permissions to admin group");
+        info!("Added missing permissions to admin group");
       } else {
-        tracing::info!("No missing permissions for admin group");
+        info!("No missing permissions for admin group");
       }
     }
     None => {
-      tracing::info!("Admin group not found, creating it with all permissions");
+      info!("Admin group not found, creating it with all permissions");
 
       let all_perms: Vec<String> = crate::permissions::permissions()
         .into_iter()
@@ -54,7 +55,7 @@ pub async fn create_admin_group(db: &Connection) -> Result<()> {
         .await?;
 
       db.setup().set_admin_group_created(admin_group_id).await?;
-      tracing::info!("Created admin group with ID {}", admin_group_id);
+      info!("Created admin group with ID {}", admin_group_id);
     }
   }
 
@@ -93,6 +94,7 @@ async fn complete_setup(db: Connection, state: PasswordState, payload: SetupPayl
     .await?;
 
   db.setup().mark_completed().await?;
+  info!("Setup completed, created admin user with ID {}", admin);
 
   Ok(())
 }

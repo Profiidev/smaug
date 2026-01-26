@@ -6,6 +6,7 @@ use rsa::{
   pkcs8::LineEnding,
   rand_core::OsRng,
 };
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{config::Config, db::DBTrait};
@@ -26,6 +27,9 @@ async fn init_pw_state(config: &Config, db: &Connection) -> PasswordState {
     RsaPrivateKey::from_pkcs1_pem(&key.private_key).expect("Failed to parse private password key")
   } else {
     let mut rng = OsRng {};
+    info!(
+      "Generating new RSA key for password transfer encryption. This may take a few seconds..."
+    );
     let private_key = RsaPrivateKey::new(&mut rng, 4096).expect("Failed to create Rsa key");
     let key = private_key
       .to_pkcs1_pem(LineEnding::CRLF)

@@ -12,6 +12,7 @@ use http::{StatusCode, Uri};
 use rand::RngCore;
 use sea_orm::{IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -97,6 +98,7 @@ async fn create_node(
   };
 
   db.node().create_node(model).await?;
+  info!("Created node with ID {}", id);
 
   updater.broadcast(UpdateMessage::Nodes).await;
 
@@ -160,6 +162,7 @@ async fn delete_node(
   wings.disconnect(data.uuid).await?;
 
   db.node().delete_node(data.uuid).await?;
+  info!("Deleted node with ID {}", data.uuid);
 
   updater.broadcast(UpdateMessage::Nodes).await;
 
@@ -245,6 +248,7 @@ async fn update_node(
   node.cpu_limit = Set(data.cpu_limit.map(|v| v as i32));
 
   db.node().update_node(node).await?;
+  info!("Updated node with ID {}", req.uuid);
   updater.broadcast(UpdateMessage::Nodes).await;
 
   Ok(())
