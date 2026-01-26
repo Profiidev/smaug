@@ -14,8 +14,10 @@ use tracing::info;
 use crate::config::Config;
 
 mod admin;
+mod auth;
 mod config;
 mod db;
+mod setup;
 mod ws;
 
 #[tokio::main]
@@ -40,11 +42,14 @@ fn api_router() -> Router {
   Router::new()
     .nest("/admin", admin::router())
     .nest("/ws", ws::router())
+    .nest("/setup", setup::router())
+    .nest("/auth", auth::router())
 }
 
 async fn state(router: Router, config: Config) -> Router {
   let db = init_db::<migration::Migrator>(&config.db, &config.db_url).await;
   let (mut router, updater) = ws::state(router).await;
   router = admin::state(router, &db, updater).await;
+  router = auth::state(router, &config, &db).await;
   router.layer(Extension(db)).layer(Extension(config))
 }

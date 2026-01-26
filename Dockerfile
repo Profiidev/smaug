@@ -75,6 +75,9 @@ FROM node:24-alpine
 
 ARG FRONTEND_DIR
 
+ENV DB_URL="sqlite:/data/smaug.db?mode=rwc"
+RUN mkdir /data
+
 COPY --from=backend-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app

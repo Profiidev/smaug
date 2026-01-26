@@ -19,6 +19,7 @@ pub struct Config {
   pub metrics: MetricsConfig,
 
   pub db_url: String,
+  pub auth_pepper: String,
 }
 
 impl Default for Config {
@@ -31,6 +32,7 @@ impl Default for Config {
         metrics_name: "smaug".to_string(),
         ..Default::default()
       },
+      auth_pepper: "__SMAUG_PEPPER__".to_string(),
     }
   }
 }

@@ -9,13 +9,11 @@ impl MigrationTrait for Migration {
     manager
       .create_table(
         Table::create()
-          .table(User::Table)
+          .table(Setup::Table)
           .if_not_exists()
-          .col(pk_uuid(User::Id))
-          .col(string(User::Name))
-          .col(string(User::Email))
-          .col(string(User::Password))
-          .col(string(User::Salt))
+          .col(pk_auto(Setup::Id))
+          .col(uuid_null(Setup::AdminGroupCreated))
+          .col(boolean(Setup::Completed))
           .to_owned(),
       )
       .await
@@ -23,17 +21,15 @@ impl MigrationTrait for Migration {
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
     manager
-      .drop_table(Table::drop().table(User::Table).to_owned())
+      .drop_table(Table::drop().table(Setup::Table).to_owned())
       .await
   }
 }
 
 #[derive(DeriveIden)]
-pub enum User {
+enum Setup {
   Table,
   Id,
-  Name,
-  Email,
-  Password,
-  Salt,
+  AdminGroupCreated,
+  Completed,
 }
