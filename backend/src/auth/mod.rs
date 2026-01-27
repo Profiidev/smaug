@@ -10,7 +10,10 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-  auth::jwt_state::{JwtInvalidState, JwtState},
+  auth::{
+    jwt_state::{JwtInvalidState, JwtState},
+    oidc::OidcState,
+  },
   config::Config,
   db::DBTrait,
 };
@@ -18,6 +21,7 @@ use crate::{
 pub mod jwt_auth;
 pub mod jwt_state;
 mod logout;
+mod oidc;
 mod password;
 mod res;
 mod test_token;
@@ -27,15 +31,18 @@ pub fn router() -> Router {
     .nest("/password", password::router())
     .nest("/logout", logout::router())
     .nest("/test_token", test_token::router())
+    .nest("/oidc", oidc::router())
 }
 
 pub async fn state(router: Router, config: &Config, db: &Connection) -> Router {
   let pw_state = init_pw_state(config, db).await;
   let jwt_state = JwtState::init(config, db).await;
+  let oidc_state = OidcState::new(db).await.unwrap();
 
   router
     .layer(Extension(pw_state))
     .layer(Extension(jwt_state))
+    .layer(Extension(oidc_state))
     .layer(Extension(JwtInvalidState::default()))
 }
 

@@ -6,6 +6,7 @@ mod m20260123_144752_user;
 mod m20260123_145152_node;
 mod m20260126_155842_group;
 mod m20260126_160754_setup;
+mod m20260127_211643_settings;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20260123_145152_node::Migration),
       Box::new(m20260126_155842_group::Migration),
       Box::new(m20260126_160754_setup::Migration),
+      Box::new(m20260127_211643_settings::Migration),
     ]
   }
 }

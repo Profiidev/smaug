@@ -4,6 +4,7 @@ use crate::db::group::GroupTable;
 use crate::db::invalid_jwt::InvalidJwtTable;
 use crate::db::key::KeyTable;
 use crate::db::node::NodeTable;
+use crate::db::settings::SettingsTable;
 use crate::db::setup::SetupTable;
 use crate::db::user::UserTable;
 
@@ -11,6 +12,7 @@ pub mod group;
 pub mod invalid_jwt;
 pub mod key;
 pub mod node;
+pub mod settings;
 pub mod setup;
 pub mod user;
 
@@ -21,6 +23,7 @@ pub trait DBTrait {
   fn setup(&self) -> SetupTable<'_>;
   fn group(&self) -> GroupTable<'_>;
   fn user(&self) -> UserTable<'_>;
+  fn settings(&self) -> SettingsTable<'_>;
 }
 
 impl DBTrait for Connection {
@@ -46,5 +49,9 @@ impl DBTrait for Connection {
 
   fn user(&self) -> UserTable<'_> {
     UserTable::new(self)
+  }
+
+  fn settings(&self) -> SettingsTable<'_> {
+    SettingsTable::new(self)
   }
 }

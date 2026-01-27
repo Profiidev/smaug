@@ -6,5 +6,6 @@ pub use super::group_user::Entity as GroupUser;
 pub use super::invalid_jwt::Entity as InvalidJwt;
 pub use super::key::Entity as Key;
 pub use super::node::Entity as Node;
+pub use super::settings::Entity as Settings;
 pub use super::setup::Entity as Setup;
 pub use super::user::Entity as User;

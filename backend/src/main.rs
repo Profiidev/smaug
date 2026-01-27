@@ -18,6 +18,7 @@ mod config;
 mod db;
 mod nodes;
 mod permissions;
+mod settings;
 mod setup;
 mod user;
 mod ws;
@@ -47,6 +48,7 @@ fn api_router() -> Router {
     .nest("/setup", setup::router())
     .nest("/auth", auth::router())
     .nest("/user", user::router())
+    .nest("/settings", settings::router())
 }
 
 async fn state(router: Router, config: Config) -> Router {

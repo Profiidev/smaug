@@ -21,5 +21,10 @@ macro_rules! permission {
 // No permissions required
 permission!(NoPerm, "");
 
+// Nodes
 permission!(NodeViewPerm, "node:view");
 permission!(NodeEditPerm, "node:edit");
+
+// Settings
+permission!(SettingsView, "settings:view");
+permission!(SettingsEdit, "settings:edit");
