@@ -1,5 +1,7 @@
 # Smaug
 
 # SSO
-
-# Permissions
+# Forgot password
+# avatar
+# account settings
+# logout

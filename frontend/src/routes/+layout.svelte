@@ -7,13 +7,10 @@
   import { testToken } from '$lib/backend/auth.svelte';
   import { goto } from '$app/navigation';
   import Sidebar from '$lib/components/navigation/sidebar/Sidebar.svelte';
-  import Settings from '@lucide/svelte/icons/settings';
-  import Server from '@lucide/svelte/icons/server';
-  import House from '@lucide/svelte/icons/house';
-  import type { NavItem } from '$lib/components/navigation/sidebar/SidebarContent.svelte';
   import { page } from '$app/state';
+  import type { UserInfo } from '$lib/backend/user.svelte';
 
-  let { children } = $props();
+  let { children, data } = $props();
 
   onMount(() => {
     testToken().then((valid) => {
@@ -26,12 +23,6 @@
     });
   });
 
-  const items: NavItem[] = [
-    { label: 'Overview', href: '/', icon: House },
-    { label: 'Settings', href: '/settings', icon: Settings },
-    { label: 'Nodes', href: '/nodes', icon: Server }
-  ];
-
   const noSidebar = ['/login', '/setup'];
 </script>
 
@@ -41,7 +32,7 @@
 {#if noSidebar.includes(page.url.pathname)}
   {@render children()}
 {:else}
-  <Sidebar {items}>
+  <Sidebar user={data.user as UserInfo}>
     {@render children()}
   </Sidebar>
 {/if}

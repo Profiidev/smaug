@@ -2,19 +2,15 @@
   import { Button } from 'positron-components/components/ui/button';
   import FormDialog from 'positron-components/components/form/form-dialog.svelte';
   import Plus from '@lucide/svelte/icons/plus';
-  import type { PageData } from './$types';
   import Table from '$lib/components/table/Table.svelte';
   import { columns } from './table.svelte';
   import { deleteNode, type NodeInfo } from '$lib/backend/node.svelte';
   import { z } from 'zod';
   import { toast } from 'positron-components/components/util/general';
   import { invalidate } from '$app/navigation';
+  import { Permission } from '$lib/permissions.svelte';
 
-  interface Props {
-    data: PageData;
-  }
-
-  const { data }: Props = $props();
+  const { data } = $props();
 
   let selected: NodeInfo | undefined = $state();
   let deleteOpen = $state(false);
@@ -58,7 +54,11 @@
 <div class="p-4">
   <div class="ml-7 flex items-center md:m-0">
     <h3 class="text-xl font-medium">Nodes</h3>
-    <Button class="ml-auto cursor-pointer" href="/nodes/create">
+    <Button
+      class="ml-auto cursor-pointer"
+      href="/nodes/create"
+      disabled={!data.user?.permissions.includes(Permission.NODE_EDIT)}
+    >
       <Plus />
       Create
     </Button>
@@ -67,7 +67,7 @@
     data={data.nodes}
     {columns}
     class="mt-4"
-    columnData={{ deleteNode: startDeleteNode }}
+    columnData={{ deleteNode: startDeleteNode, user: data.user }}
   />
 </div>
 <FormDialog

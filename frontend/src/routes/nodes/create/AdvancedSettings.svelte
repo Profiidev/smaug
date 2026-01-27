@@ -12,9 +12,10 @@
     onsubmit: ComponentProps<typeof BaseForm>['onsubmit'];
     footer: Snippet<[{ isLoading: boolean }]>;
     isLoading: boolean;
+    readonly?: boolean;
   }
 
-  let { initialValue, onsubmit, footer, isLoading }: Props = $props();
+  let { initialValue, onsubmit, footer, isLoading, readonly }: Props = $props();
 
   let form: BaseForm<typeof advancedSettings> | undefined = $state();
   // svelte-ignore state_referenced_locally
@@ -43,6 +44,7 @@
       key="cpu_unlimit"
       label="Unlimited CPU"
       onCheckedChange={(v) => (cpuUnlimit = v)}
+      disabled={readonly}
     />
     {#if !cpuUnlimit}
       <FormInput
@@ -51,6 +53,7 @@
         label="CPU Limit (in millicores)"
         placeholder="Enter CPU limit"
         type="number"
+        {readonly}
       />
     {/if}
     <FormSwitch
@@ -58,6 +61,7 @@
       key="memory_unlimit"
       label="Unlimited Memory"
       onCheckedChange={(v) => (memoryUnlimit = v)}
+      disabled={readonly}
     />
     {#if !memoryUnlimit}
       <div class="grid w-full grid-cols-[1fr_auto] gap-2">
@@ -67,6 +71,7 @@
           label="Available Memory"
           placeholder="Enter amount of memory"
           type="number"
+          {readonly}
         />
         <FormSelect
           {...props}
@@ -78,6 +83,7 @@
             value: unit,
             label: unit
           }))}
+          {readonly}
         />
       </div>
     {/if}
@@ -86,6 +92,7 @@
       key="storage_unlimit"
       label="Unlimited Storage"
       onCheckedChange={(v) => (storageUnlimit = v)}
+      disabled={readonly}
     />
     {#if !storageUnlimit}
       <div class="grid w-full grid-cols-[1fr_auto] gap-2">
@@ -95,6 +102,7 @@
           label="Available Storage Space"
           placeholder="Enter amount of storage"
           type="number"
+          {readonly}
         />
         <FormSelect
           {...props}
@@ -106,6 +114,7 @@
             value: unit,
             label: unit
           }))}
+          {readonly}
         />
       </div>
     {/if}

@@ -1,6 +1,5 @@
 <script lang="ts">
   import FormDialog from 'positron-components/components/form/form-dialog.svelte';
-  import type { PageData } from './$types';
   import * as Card from 'positron-components/components/ui/card';
   import { Separator } from 'positron-components/components/ui/separator';
   import * as Tabs from 'positron-components/components/ui/tabs';
@@ -23,17 +22,17 @@
   import * as Select from 'positron-components/components/ui/select';
   import { CopyButton } from 'positron-components/components/ui-extra/copy-button';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import { Permission } from '$lib/permissions.svelte';
 
-  interface Props {
-    data: PageData;
-  }
-
-  const { data }: Props = $props();
+  const { data } = $props();
 
   let tab = $state('setup');
   let deleteOpen = $state(false);
   let isLoading = $state(false);
   let setupMethod = $state('Docker Compose');
+  let readonly = $derived(
+    !data.user?.permissions.includes(Permission.NODE_EDIT)
+  );
 
   const deleteItemConfirm = async () => {
     isLoading = true;
@@ -82,6 +81,7 @@
       class="ml-auto cursor-pointer"
       onclick={() => (deleteOpen = true)}
       variant="destructive"
+      disabled={readonly}
     >
       <Trash />
       Delete
@@ -149,6 +149,7 @@
                 {isLoading}
                 initialValue={undoReformatData(data.node)}
                 {footer}
+                {readonly}
               />
             </div>
             <Separator orientation="horizontal" class="lg:hidden" />
@@ -160,6 +161,7 @@
                 {isLoading}
                 initialValue={undoReformatData(data.node)}
                 {footer}
+                {readonly}
               />
             </div>
           </div>
@@ -181,7 +183,11 @@
 
 {#snippet footer({ isLoading }: { isLoading: boolean })}
   <div class="mt-4 flex w-full">
-    <Button class="ml-auto cursor-pointer" type="submit" disabled={isLoading}>
+    <Button
+      class="ml-auto cursor-pointer"
+      type="submit"
+      disabled={isLoading || readonly}
+    >
       {#if isLoading}
         <Spinner />
       {:else}

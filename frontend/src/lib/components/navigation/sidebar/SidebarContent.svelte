@@ -1,5 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import type { UserInfo } from '$lib/backend/user.svelte';
+  import type { Permission } from '$lib/permissions.svelte';
   import * as Sidebar from 'positron-components/components/ui/sidebar';
   import type { Component } from 'svelte';
 
@@ -7,16 +9,26 @@
     label: string;
     href: string;
     icon?: Component;
+    requiredPermission?: Permission;
   }
 
   interface Props {
     items: NavItem[];
+    user: UserInfo;
   }
 
-  const { items }: Props = $props();
+  const { items, user }: Props = $props();
 
+  let filteredItems = $derived(
+    items.filter((item) => {
+      if (item.requiredPermission) {
+        return user.permissions.includes(item.requiredPermission);
+      }
+      return true;
+    })
+  );
   let current = $derived<NavItem | undefined>(
-    items
+    filteredItems
       .filter((item) => page.url.pathname.startsWith(item.href))
       .sort((a, b) => b.href.length - a.href.length)[0] ?? undefined
   );
@@ -25,7 +37,7 @@
 <Sidebar.Group>
   <Sidebar.GroupLabel>General</Sidebar.GroupLabel>
   <Sidebar.Menu>
-    {#each items as item}
+    {#each filteredItems as item}
       <Sidebar.MenuItem>
         <Sidebar.MenuButton
           tooltipContent={item.label}

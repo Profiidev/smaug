@@ -1,16 +1,18 @@
 <script lang="ts">
   import * as Sidebar from 'positron-components/components/ui/sidebar';
   import SidebarHeader from './SidebarHeader.svelte';
-  import SidebarContent, { type NavItem } from './SidebarContent.svelte';
+  import SidebarContent from './SidebarContent.svelte';
   import SidebarUser from './SidebarUser.svelte';
   import type { Snippet } from 'svelte';
+  import type { UserInfo } from '$lib/backend/user.svelte';
+  import { items } from './items.svelte';
 
   interface Props {
-    items: NavItem[];
+    user: UserInfo;
     children: Snippet;
   }
 
-  const { children, items }: Props = $props();
+  const { children, user }: Props = $props();
 </script>
 
 <Sidebar.Provider>
@@ -19,10 +21,10 @@
       <SidebarHeader />
     </Sidebar.Header>
     <Sidebar.Content>
-      <SidebarContent {items} />
+      <SidebarContent {items} {user} />
     </Sidebar.Content>
     <Sidebar.Footer>
-      <SidebarUser name="John Doe" email="john.doe@example.com" avatar="" />
+      <SidebarUser name={user.name} email={user.email} avatar="" />
     </Sidebar.Footer>
   </Sidebar.Root>
   <Sidebar.Inset>

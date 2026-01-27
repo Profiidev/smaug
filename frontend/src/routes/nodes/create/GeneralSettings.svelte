@@ -13,9 +13,10 @@
     onsubmit: ComponentProps<typeof BaseForm>['onsubmit'];
     footer: Snippet<[{ isLoading: boolean }]>;
     isLoading: boolean;
+    readonly?: boolean;
   }
 
-  let { initialValue, onsubmit, footer, isLoading }: Props = $props();
+  let { initialValue, onsubmit, footer, isLoading, readonly }: Props = $props();
 
   let form: BaseForm<typeof generalSettings> | undefined = $state();
   // svelte-ignore state_referenced_locally
@@ -40,12 +41,14 @@
       key="name"
       label="Node Name"
       placeholder="Enter name"
+      {readonly}
     />
     <FormInput
       {...props}
       key="address"
       label="Node Address (include port if needed)"
       placeholder="Enter address (e.g., IP or domain)"
+      {readonly}
     />
     {#if !secure}
       <div class="flex items-center">
@@ -60,6 +63,7 @@
       key="secure"
       label="Use Secure Connection (HTTPS)"
       onCheckedChange={(v) => (secure = v)}
+      disabled={readonly}
     />
   {/snippet}
 </BaseForm>

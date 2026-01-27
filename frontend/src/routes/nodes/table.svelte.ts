@@ -10,11 +10,15 @@ import {
 import Actions from '$lib/components/table/Actions.svelte';
 import { createRawSnippet } from 'svelte';
 import Status from '$lib/components/table/Status.svelte';
+import type { UserInfo } from '$lib/backend/user.svelte';
+import { Permission } from '$lib/permissions.svelte';
 
 export const columns = ({
-  deleteNode
+  deleteNode,
+  user
 }: {
   deleteNode: (node: NodeInfo) => void;
+  user?: UserInfo;
 }): ColumnDef<NodeInfo>[] => [
   {
     accessorKey: 'connected',
@@ -59,8 +63,8 @@ export const columns = ({
     header: () => {},
     cell: ({ row }) => {
       return DataTable.renderComponent(Actions, {
-        edit_disabled: false,
-        delete_disabled: false,
+        edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
+        delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         editHref: `/nodes/${row.original.id}`,
         remove: () => deleteNode(row.original)
       });
