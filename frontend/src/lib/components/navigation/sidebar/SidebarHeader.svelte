@@ -19,14 +19,14 @@
       data-open={isOpen}
     >
       {#snippet child({ props })}
-        <a href="/admin" {...props}>
+        <a href="/" {...props}>
           <div
             class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
           >
             <Dragon class="size-4" />
           </div>
           <div class="flex flex-col gap-0.5 leading-none">
-            <span class="font-medium text-nowrap">Smaug Admin</span>
+            <span class="font-medium text-nowrap">Smaug</span>
             <span class="text-nowrap">v{version}</span>
           </div>
         </a>

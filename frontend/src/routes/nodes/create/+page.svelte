@@ -37,7 +37,7 @@
     } else {
       toast.success('Node created successfully.');
       setTimeout(() => {
-        goto(`/admin/nodes/${res.uuid}`);
+        goto(`/nodes/${res.uuid}`);
       });
     }
   };

@@ -1,4 +1,4 @@
 <script lang="ts">
 </script>
 
-<h1>Admin Dashboard</h1>
+<h1>Settings</h1>

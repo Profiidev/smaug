@@ -1,7 +1,7 @@
 use axum::{Extension, Router};
 use centaurus::db::init::Connection;
 
-use crate::{admin::nodes::state::Wings, ws::state::Updater};
+use crate::{nodes::state::Wings, ws::state::Updater};
 
 mod auth;
 mod connection;

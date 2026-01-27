@@ -53,7 +53,7 @@ const createWebsocket = () => {
 const handleMessage = (msg: UpdateMessage) => {
   switch (msg.type) {
     case UpdateType.Nodes: {
-      invalidate((url) => url.pathname.startsWith('/api/admin/nodes'));
+      invalidate((url) => url.pathname.startsWith('/api/nodes'));
       break;
     }
   }

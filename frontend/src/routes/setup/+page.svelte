@@ -49,7 +49,7 @@
       }
     } else {
       setTimeout(() => {
-        goto('/admin');
+        goto('/');
       });
     }
   };

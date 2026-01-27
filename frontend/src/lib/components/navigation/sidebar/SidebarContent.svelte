@@ -3,19 +3,19 @@
   import * as Sidebar from 'positron-components/components/ui/sidebar';
   import type { Component } from 'svelte';
 
-  export interface AdminNavItem {
+  export interface NavItem {
     label: string;
     href: string;
     icon?: Component;
   }
 
   interface Props {
-    items: AdminNavItem[];
+    items: NavItem[];
   }
 
   const { items }: Props = $props();
 
-  let current = $derived<AdminNavItem | undefined>(
+  let current = $derived<NavItem | undefined>(
     items
       .filter((item) => page.url.pathname.startsWith(item.href))
       .sort((a, b) => b.href.length - a.href.length)[0] ?? undefined

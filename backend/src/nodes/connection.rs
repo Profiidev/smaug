@@ -23,7 +23,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
-  admin::nodes::auth::{WingsAuth, WsStream},
+  nodes::auth::{WingsAuth, WsStream},
   ws::state::{UpdateMessage, Updater},
 };
 

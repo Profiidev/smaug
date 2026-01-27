@@ -61,7 +61,7 @@ export const columns = ({
       return DataTable.renderComponent(Actions, {
         edit_disabled: false,
         delete_disabled: false,
-        editHref: `/admin/nodes/${row.original.id}`,
+        editHref: `/nodes/${row.original.id}`,
         remove: () => deleteNode(row.original)
       });
     },

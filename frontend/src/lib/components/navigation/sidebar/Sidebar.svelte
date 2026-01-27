@@ -1,14 +1,12 @@
 <script lang="ts">
   import * as Sidebar from 'positron-components/components/ui/sidebar';
-  import AdminSidebarHeader from './AdminSidebarHeader.svelte';
-  import AdminSidebarContent, {
-    type AdminNavItem
-  } from './AdminSidebarContent.svelte';
-  import AdminSidebarUser from './AdminSidebarUser.svelte';
+  import SidebarHeader from './SidebarHeader.svelte';
+  import SidebarContent, { type NavItem } from './SidebarContent.svelte';
+  import SidebarUser from './SidebarUser.svelte';
   import type { Snippet } from 'svelte';
 
   interface Props {
-    items: AdminNavItem[];
+    items: NavItem[];
     children: Snippet;
   }
 
@@ -18,17 +16,13 @@
 <Sidebar.Provider>
   <Sidebar.Root collapsible="icon" variant="floating">
     <Sidebar.Header>
-      <AdminSidebarHeader />
+      <SidebarHeader />
     </Sidebar.Header>
     <Sidebar.Content>
-      <AdminSidebarContent {items} />
+      <SidebarContent {items} />
     </Sidebar.Content>
     <Sidebar.Footer>
-      <AdminSidebarUser
-        name="John Doe"
-        email="john.doe@example.com"
-        avatar=""
-      />
+      <SidebarUser name="John Doe" email="john.doe@example.com" avatar="" />
     </Sidebar.Footer>
   </Sidebar.Root>
   <Sidebar.Inset>

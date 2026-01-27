@@ -16,9 +16,9 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-  admin::nodes::state::Wings,
   auth::jwt_auth::JwtAuth,
   db::{DBTrait, node::Node},
+  nodes::state::Wings,
   permissions::{NodeEditPerm, NodeViewPerm},
   ws::state::{UpdateMessage, Updater},
 };

@@ -8,9 +8,9 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
   if (typeof res !== 'object') {
     if (res === RequestError.NotFound) {
-      redirect(307, '/admin/nodes?error=node_not_found');
+      redirect(307, '/nodes?error=node_not_found');
     } else {
-      redirect(307, '/admin/nodes?error=node_other');
+      redirect(307, '/nodes?error=node_other');
     }
   }
 

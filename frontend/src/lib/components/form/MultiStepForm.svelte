@@ -111,7 +111,7 @@
               class="ml-auto cursor-pointer"
               variant="outline"
               disabled={isLoading}
-              href="/admin/nodes"
+              href="/nodes"
             >
               <Ban />
               Cancel

@@ -5,7 +5,7 @@ use centaurus::{db::init::Connection, error::Result};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{admin::nodes::connection::WingsConnection, db::DBTrait, ws::state::Updater};
+use crate::{db::DBTrait, nodes::connection::WingsConnection, ws::state::Updater};
 
 #[derive(Clone, FromRequestParts)]
 #[from_request(via(Extension))]
