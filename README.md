@@ -4,4 +4,3 @@
 # Forgot password
 # avatar
 # account settings
-# logout

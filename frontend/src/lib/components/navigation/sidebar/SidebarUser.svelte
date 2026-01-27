@@ -5,6 +5,9 @@
   import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
   import LogOutIcon from '@lucide/svelte/icons/log-out';
   import SettingsIcon from '@lucide/svelte/icons/settings';
+  import { logout } from '$lib/backend/auth.svelte';
+  import { goto } from '$app/navigation';
+  import { disconnectWebsocket } from '$lib/backend/updater.svelte';
 
   interface Props {
     name: string;
@@ -69,7 +72,15 @@
           </DropdownMenu.Item>
         </DropdownMenu.Group>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item class="cursor-pointer">
+        <DropdownMenu.Item
+          class="cursor-pointer"
+          onclick={async () => {
+            if (!(await logout())) {
+              disconnectWebsocket();
+              goto('/login');
+            }
+          }}
+        >
           <LogOutIcon />
           Log out
         </DropdownMenu.Item>

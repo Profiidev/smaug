@@ -12,6 +12,7 @@ export type UpdateMessage = {
 
 let updater: WebSocket | undefined | false = $state(browser && undefined);
 let interval: number;
+let disconnect = false;
 
 export const connectWebsocket = () => {
   if (updater === false || updater) return;
@@ -32,6 +33,7 @@ const createWebsocket = () => {
 
   updater.onclose = async () => {
     clearInterval(interval);
+    if (disconnect) return;
     await sleep(1000);
     createWebsocket();
   };
@@ -48,6 +50,14 @@ const createWebsocket = () => {
 
     updater.send('heartbeat');
   }, 10000) as unknown as number;
+};
+
+export const disconnectWebsocket = () => {
+  if (updater) {
+    disconnect = true;
+    updater.close();
+    updater = undefined;
+  }
 };
 
 const handleMessage = (msg: UpdateMessage) => {
