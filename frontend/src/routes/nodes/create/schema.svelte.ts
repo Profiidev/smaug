@@ -43,7 +43,6 @@ const selectUnit = (mb: number): [number, string[]] => {
   let unit_amount = bytes;
 
   for (const [key, value] of Object.entries(units)) {
-    console.log({ key, value, bytes, bytesMod: bytes % value });
     if (bytes % value === 0) {
       unit = key;
       unit_amount = bytes / value;

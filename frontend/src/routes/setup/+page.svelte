@@ -10,6 +10,7 @@
   import { performSetup } from '$lib/backend/setup.svelte';
   import { RequestError } from 'positron-components/backend';
   import { goto } from '$app/navigation';
+  import { connectWebsocket } from '$lib/backend/updater.svelte';
 
   interface Props {
     data: PageData;
@@ -49,6 +50,7 @@
       }
     } else {
       setTimeout(() => {
+        connectWebsocket();
         goto('/');
       });
     }
