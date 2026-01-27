@@ -19,6 +19,7 @@ mod config;
 mod db;
 mod permissions;
 mod setup;
+mod user;
 mod ws;
 
 #[tokio::main]
@@ -45,6 +46,7 @@ fn api_router() -> Router {
     .nest("/ws", ws::router())
     .nest("/setup", setup::router())
     .nest("/auth", auth::router())
+    .nest("/user", user::router())
 }
 
 async fn state(router: Router, config: Config) -> Router {
