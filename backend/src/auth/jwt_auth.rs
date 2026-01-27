@@ -38,6 +38,7 @@ impl<S: Sync, P: Permission> FromRequestParts<S> for JwtAuth<P> {
     }
 
     let Ok(claims) = state.validate_token(&token) else {
+      tracing::error!("invalid token claims for token: {}", token);
       bail!(UNAUTHORIZED, "invalid token");
     };
 

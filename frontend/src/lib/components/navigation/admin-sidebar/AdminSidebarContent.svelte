@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import * as Sidebar from 'positron-components/components/ui/sidebar';
   import type { Component } from 'svelte';
 
@@ -13,6 +14,12 @@
   }
 
   const { items }: Props = $props();
+
+  let current = $derived<AdminNavItem | undefined>(
+    items
+      .filter((item) => page.url.pathname.startsWith(item.href))
+      .sort((a, b) => b.href.length - a.href.length)[0] ?? undefined
+  );
 </script>
 
 <Sidebar.Group>
@@ -20,7 +27,10 @@
   <Sidebar.Menu>
     {#each items as item}
       <Sidebar.MenuItem>
-        <Sidebar.MenuButton tooltipContent={item.label}>
+        <Sidebar.MenuButton
+          tooltipContent={item.label}
+          class={item.href === current?.href ? 'bg-muted' : ''}
+        >
           {#snippet child({ props })}
             <a href={item.href} {...props}>
               {#if item.icon}

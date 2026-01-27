@@ -22,6 +22,7 @@
   import { Label } from 'positron-components/components/ui/label';
   import * as Select from 'positron-components/components/ui/select';
   import { CopyButton } from 'positron-components/components/ui-extra/copy-button';
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
   interface Props {
     data: PageData;
@@ -73,6 +74,9 @@
 
 <div class="p-4">
   <div class="ml-7 flex items-center md:m-0">
+    <Button size="icon" variant="ghost" href="/admin/nodes" class="mr-2">
+      <ArrowLeft class="size-5" />
+    </Button>
     <h3 class="text-xl font-medium">Node: {data.node.name}</h3>
     <Button
       class="ml-auto cursor-pointer"

@@ -166,7 +166,7 @@ async fn reconnect_task(
       Ok(stream) => stream,
       Err(err) => {
         warn!(
-          "Failed to reconnect to wings websocket for {}: {}",
+          "Failed to reconnect to wings websocket for {}: {:?}",
           uuid, err
         );
         spawn({
