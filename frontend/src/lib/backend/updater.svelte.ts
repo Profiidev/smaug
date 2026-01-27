@@ -23,7 +23,7 @@ const createWebsocket = () => {
 
   updater.onerror = (event) => {
     console.log('WebSocket error:', event);
-  }
+  };
 
   updater.onmessage = (event) => {
     const msg: UpdateMessage = JSON.parse(event.data);
