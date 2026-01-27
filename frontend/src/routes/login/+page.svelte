@@ -9,6 +9,7 @@
   import { passwordLogin } from '$lib/backend/auth.svelte';
   import { RequestError } from 'positron-components/backend';
   import { goto } from '$app/navigation';
+  import { connectWebsocket } from '$lib/backend/updater.svelte';
 
   const onsubmit = async (data: FormValue<typeof login>) => {
     let ret = await passwordLogin(data.email, data.password);
@@ -19,6 +20,7 @@
       return { error: 'Login failed. Please try again later.' };
     } else {
       setTimeout(() => {
+        connectWebsocket();
         goto('/');
       });
     }

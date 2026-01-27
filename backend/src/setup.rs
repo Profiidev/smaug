@@ -4,13 +4,14 @@ use axum::{
   extract::FromRequest,
   routing::{get, post},
 };
+use axum_extra::extract::CookieJar;
 use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
 use rsa::rand_core::OsRng;
 use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::db::DBTrait;
+use crate::{auth::jwt_state::JwtState, db::DBTrait};
 
 pub fn router() -> Router {
   Router::new()
@@ -70,7 +71,13 @@ struct SetupPayload {
   admin_email: String,
 }
 
-async fn complete_setup(db: Connection, state: PasswordState, payload: SetupPayload) -> Result<()> {
+async fn complete_setup(
+  db: Connection,
+  jwt: JwtState,
+  state: PasswordState,
+  mut cookies: CookieJar,
+  payload: SetupPayload,
+) -> Result<CookieJar> {
   if db.setup().is_setup().await? {
     bail!(CONFLICT, "Setup has already been completed");
   }
@@ -96,7 +103,11 @@ async fn complete_setup(db: Connection, state: PasswordState, payload: SetupPayl
   db.setup().mark_completed().await?;
   info!("Setup completed, created admin user with ID {}", admin);
 
-  Ok(())
+  let cookie = jwt.create_token(admin)?;
+  cookies = cookies.add(cookie);
+  info!("Created post setup login token for admin user");
+
+  Ok(cookies)
 }
 
 #[derive(Serialize)]

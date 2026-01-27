@@ -9,13 +9,13 @@
 
   let { children } = $props();
 
-  connectWebsocket();
-
   onMount(() => {
     testToken().then((valid) => {
       // can also be undefined if there was an error
       if (valid === false) {
         goto('/login');
+      } else {
+        connectWebsocket();
       }
     });
   });

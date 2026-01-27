@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub mod jwt_auth;
-mod jwt_state;
+pub mod jwt_state;
 mod logout;
 mod password;
 mod res;

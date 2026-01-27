@@ -21,6 +21,10 @@ export const connectWebsocket = () => {
 const createWebsocket = () => {
   updater = new WebSocket('/api/ws/updater');
 
+  updater.onerror = (event) => {
+    console.log('WebSocket error:', event);
+  }
+
   updater.onmessage = (event) => {
     const msg: UpdateMessage = JSON.parse(event.data);
     handleMessage(msg);
