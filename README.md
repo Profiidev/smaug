@@ -1,7 +1,5 @@
 # Smaug
 
-# SSO
-
 # Forgot password
 
 # avatar
@@ -10,8 +8,6 @@
 
 # rework notes edit layout
 
-# settings frontend
+# mail settings frontend
 
 # password show btn
-
-# oidc show callback url
