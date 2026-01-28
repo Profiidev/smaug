@@ -111,10 +111,10 @@ pub struct MailSettings {
 
 #[derive(Serialize, Deserialize)]
 pub struct SmtpSettings {
-  pub smtp_server: String,
-  pub smtp_port: u16,
-  pub smtp_username: String,
-  pub smtp_password: String,
+  pub server: String,
+  pub port: u16,
+  pub username: String,
+  pub password: String,
   pub from_address: String,
   pub from_name: String,
   pub use_tls: bool,

@@ -10,4 +10,4 @@
 
 # rework notes edit layout
 
-# oidc login button + rest of frontend
+# settings frontend
