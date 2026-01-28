@@ -1,5 +1,10 @@
 pub fn permissions() -> Vec<&'static str> {
-  vec![NodeViewPerm::name(), NodeEditPerm::name()]
+  vec![
+    NodeViewPerm::name(),
+    NodeEditPerm::name(),
+    SettingsView::name(),
+    SettingsEdit::name(),
+  ]
 }
 
 pub trait Permission {

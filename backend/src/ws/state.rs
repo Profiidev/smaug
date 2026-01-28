@@ -31,6 +31,7 @@ pub struct Updater(Sender<UpdateMessage>);
 #[serde(tag = "type")]
 pub enum UpdateMessage {
   Nodes,
+  Settings,
 }
 
 impl UpdateState {

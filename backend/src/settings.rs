@@ -12,13 +12,16 @@ use crate::{
   auth::{jwt_auth::JwtAuth, oidc::OidcState},
   db::{
     DBTrait,
-    settings::{MailSettings, Settings, UserSettings},
+    settings::{GeneralSettings, MailSettings, Settings, UserSettings},
   },
   permissions::{SettingsEdit, SettingsView},
+  ws::state::{UpdateMessage, Updater},
 };
 
 pub fn router() -> Router {
   Router::new()
+    .route("/general", get(get_settings::<GeneralSettings>))
+    .route("/general", post(save_settings::<GeneralSettings>))
     .route("/user", get(get_settings::<UserSettings>))
     .route("/user", post(save_user_settings))
     .route("/mail", get(get_settings::<MailSettings>))
@@ -35,15 +38,19 @@ async fn get_settings<S: Settings>(
 async fn save_settings<S: Settings>(
   _auth: JwtAuth<SettingsEdit>,
   db: Connection,
+  updater: Updater,
   settings: S,
 ) -> Result<()> {
-  db.settings().save_settings(&settings).await
+  db.settings().save_settings(&settings).await?;
+  updater.broadcast(UpdateMessage::Settings).await;
+  Ok(())
 }
 
 async fn save_user_settings(
   _auth: JwtAuth<SettingsEdit>,
   db: Connection,
   state: OidcState,
+  updater: Updater,
   settings: UserSettings,
 ) -> Result<()> {
   if let Some(oidc_settings) = &settings.oidc {
@@ -56,6 +63,7 @@ async fn save_user_settings(
   }
 
   db.settings().save_settings(&settings).await?;
+  updater.broadcast(UpdateMessage::Settings).await;
 
   Ok(())
 }
