@@ -27,6 +27,7 @@ FROM ghcr.io/profiidev/images/rust-gnu-builder:main AS backend-planner
 ARG TARGET
 ARG RUSTFLAGS
 
+COPY .cargo ./.cargo
 COPY backend/Cargo.toml backend/
 COPY backend/entity/Cargo.toml backend/entity/
 COPY backend/migration/Cargo.toml backend/migration/
@@ -53,6 +54,7 @@ RUN \
   --mount=type=cache,target=/app/target \
   cargo chef cook --release --target $TARGET
 
+COPY .cargo ./.cargo
 COPY backend/Cargo.toml backend/
 COPY backend/src backend/src
 COPY backend/entity/Cargo.toml backend/entity/

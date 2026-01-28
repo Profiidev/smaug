@@ -27,17 +27,18 @@
 <h4 class="mb-2">General Settings</h4>
 <BaseForm schema={generalSettings} {onsubmit} initialValue={data.settings}>
   {#snippet children({ props })}
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
       <FormInputTooltip
         {...props}
         label="Site URL"
         key="site_url"
         tooltip="The URL to reach Smaug from your browser."
+        placeholder="https://smaug.example.com"
       />
     </div>
   {/snippet}
   {#snippet footer({ isLoading }: { isLoading: boolean })}
-    <div class="mt-4 grid w-full grid-cols-2">
+    <div class="mt-4 grid w-full grid-cols-1 lg:grid-cols-2">
       <Button class="ml-auto cursor-pointer" type="submit" disabled={isLoading}>
         {#if isLoading}
           <Spinner />

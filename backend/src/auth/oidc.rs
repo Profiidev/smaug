@@ -103,9 +103,15 @@ impl OidcState {
 
 impl OidcConfig {
   async fn new(oidc_settings: &OidcSettings) -> Result<Self> {
-    let url = oidc_settings
-      .issuer
-      .join(".well-known/openid-configuration")?;
+    let mut url = oidc_settings.issuer.clone();
+    url
+      .path_segments_mut()
+      .ok()
+      .status_context(StatusCode::BAD_REQUEST, "Failed to add path to url")?
+      .pop_if_empty()
+      .push(".well-known")
+      .push("openid-configuration");
+
     info!("Configuring OIDC with URL: {}", url);
     let res = reqwest::get(url.clone()).await?;
     if !res.status().is_success() {
