@@ -1,5 +1,5 @@
 ARG TARGET=x86_64-unknown-linux-gnu
-ARG RUSTFLAGS="-C target-feature=+crt-static"
+ARG RUSTFLAGS="-C target-feature=+crt-static --cfg reqwest_unstable"
 ARG FRONTEND_DIR=/app/frontend
 ARG FRONTEND_URL="http://localhost:3000"
 ARG BACKEND_URL="http://localhost:8000"
@@ -74,6 +74,9 @@ RUN \
 FROM node:24-alpine
 
 ARG FRONTEND_DIR
+
+ENV DB_URL="sqlite:/data/smaug.db?mode=rwc"
+RUN mkdir /data
 
 COPY --from=backend-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 

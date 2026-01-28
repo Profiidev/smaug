@@ -11,13 +11,16 @@ use futures_util::StreamExt;
 use tokio::sync::mpsc::Receiver;
 use uuid::Uuid;
 
-use crate::ws::state::{UpdateMessage, UpdateState};
+use crate::{
+  auth::jwt_auth::JwtAuth,
+  ws::state::{UpdateMessage, UpdateState},
+};
 
 pub fn router() -> Router {
   Router::new().route("/updater", any(update))
 }
 
-async fn update(ws: WebSocketUpgrade, state: UpdateState) -> impl IntoResponse {
+async fn update(_auth: JwtAuth, ws: WebSocketUpgrade, state: UpdateState) -> impl IntoResponse {
   let (uuid, recv) = state.create_session().await;
 
   ws.on_upgrade(move |socket| handle_socket(socket, uuid, recv, state))

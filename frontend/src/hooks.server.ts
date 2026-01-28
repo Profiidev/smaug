@@ -3,7 +3,7 @@ import { BACKEND_URL } from '$env/static/private';
 
 const backendUrl = new URL(BACKEND_URL);
 
-export const handleFetch: HandleFetch = async ({ request, fetch }) => {
+export const handleFetch: HandleFetch = async ({ event, request, fetch }) => {
   let url = new URL(request.url);
   if (url.pathname.startsWith('/api/')) {
     url.hostname = backendUrl.hostname;
@@ -11,6 +11,9 @@ export const handleFetch: HandleFetch = async ({ request, fetch }) => {
     url.protocol = backendUrl.protocol;
 
     request = new Request(url.toString(), request);
+
+    let cookie = event.request.headers.get('cookie');
+    if (cookie) request.headers.set('cookie', cookie);
   }
   return fetch(request);
 };

@@ -10,6 +10,7 @@ use tokio::{
   },
   task::JoinHandle,
 };
+use tracing::debug;
 use uuid::Uuid;
 
 pub type Sessions = Arc<Mutex<HashMap<Uuid, Sender<UpdateMessage>>>>;
@@ -20,7 +21,6 @@ pub struct UpdateState {
   sessions: Sessions,
   #[allow(dead_code)]
   update_proxy: Arc<JoinHandle<()>>,
-  updater: Updater,
 }
 
 #[derive(Clone, FromRequestParts)]
@@ -31,6 +31,7 @@ pub struct Updater(Sender<UpdateMessage>);
 #[serde(tag = "type")]
 pub enum UpdateMessage {
   Nodes,
+  Settings,
 }
 
 impl UpdateState {
@@ -43,6 +44,7 @@ impl UpdateState {
       let sessions = sessions.clone();
       async move {
         while let Some(message) = receiver.recv().await {
+          debug!("Broadcasting update message: {:?}", message);
           for sender in sessions.lock().await.values() {
             sender.send(message.clone()).await.ok();
           }
@@ -53,7 +55,6 @@ impl UpdateState {
     let state = Self {
       sessions,
       update_proxy: Arc::new(update_proxy),
-      updater: updater.clone(),
     };
 
     (state, updater)
@@ -71,11 +72,6 @@ impl UpdateState {
 
   pub async fn remove_session(&self, uuid: &Uuid) {
     self.sessions.lock().await.remove(uuid);
-  }
-
-  #[allow(unused)]
-  pub async fn broadcast_message(&self, msg: UpdateMessage) {
-    self.updater.broadcast(msg).await;
   }
 }
 
