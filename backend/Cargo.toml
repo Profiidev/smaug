@@ -59,6 +59,14 @@ argon2 = "0.5.3"
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
 time = "0.3.46"
 url = { version = "2.5.8", features = ["serde"] }
+lettre = { version = "0.11.19", default-features = false, features = [
+  "smtp-transport",
+  "rustls",
+  "builder",
+  "rustls-native-certs",
+  "ring",
+  "tokio1-rustls",
+] }
 
 [[bin]]
 name = "backend"

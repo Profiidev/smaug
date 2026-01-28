@@ -1,6 +1,8 @@
 # Smaug
 
-# Forgot password
+# Forgot password reset form (remove unused for token validation)
+
+# test mail sending button
 
 # avatar
 
@@ -8,4 +10,6 @@
 
 # rework notes edit layout
 
-# mail settings frontend
+# rate limiting for auth and reset password endpoints
+
+# favicon

@@ -3,6 +3,7 @@
   import { type FormPath, type SuperForm } from 'sveltekit-superforms';
   import * as Password from 'positron-components/components/ui-extra/password';
   import type { FormRecord } from 'positron-components/components/form/types';
+  import type { Snippet } from 'svelte';
 
   interface Props {
     formData: SuperForm<S>;
@@ -11,6 +12,7 @@
     disabled?: boolean;
     placeholder?: string;
     readonly?: boolean;
+    children?: Snippet;
   }
 
   let {
@@ -19,7 +21,8 @@
     label,
     disabled,
     placeholder,
-    readonly
+    readonly,
+    children: child
   }: Props = $props();
 
   let formData = $derived(form.form);
@@ -28,7 +31,10 @@
 <Form.Field {form} name={key} class="gap-1/2 grid">
   <Form.Control>
     {#snippet children({ props })}
-      <Form.Label>{label}</Form.Label>
+      <div class="flex items-center">
+        <Form.Label>{label}</Form.Label>
+        {@render child?.()}
+      </div>
       <Password.Root>
         {/* @ts-ignore */ null}
         <Password.Input

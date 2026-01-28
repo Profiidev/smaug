@@ -1,10 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types.js';
+import { noSidebarPaths } from '$lib/components/navigation/sidebar/items.svelte.js';
 
 export const load: LayoutServerLoad = ({ cookies, url }) => {
   let cookie = cookies.get('smaug_jwt');
 
-  if (!cookie && url.pathname !== '/login' && url.pathname !== '/setup') {
+  if (!cookie && !noSidebarPaths.includes(url.pathname)) {
     redirect(302, '/login');
   }
 };

@@ -8,6 +8,7 @@ export enum SSOType {
 export interface AuthConfig {
   sso_type: SSOType;
   instant_redirect: boolean;
+  mail_enabled: boolean;
 }
 
 export const getAuthConfig = async (

@@ -1,0 +1,163 @@
+use std::{collections::HashMap, sync::Arc};
+
+use axum::{Extension, extract::FromRequestParts};
+use centaurus::{
+  bail,
+  db::init::Connection,
+  error::{ErrorReportStatusExt, Result},
+  eyre::Context,
+};
+use http::StatusCode;
+use lettre::{
+  AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+  message::{Mailbox, header::ContentType},
+  transport::smtp::authentication::Credentials,
+};
+use tokio::sync::Mutex;
+use uuid::Uuid;
+
+use crate::db::{
+  DBTrait,
+  settings::{MailSettings, SmtpSettings},
+};
+
+#[derive(Clone, FromRequestParts)]
+#[from_request(via(Extension))]
+pub struct Mailer(Arc<Mutex<Option<MailConfig>>>);
+
+struct MailConfig {
+  sender: Mailbox,
+  transport: AsyncSmtpTransport<Tokio1Executor>,
+}
+
+impl Mailer {
+  pub async fn new(db: &Connection) -> Self {
+    let state = Mailer(Arc::new(Mutex::new(None)));
+    let settings: MailSettings = db.settings().get_settings().await.unwrap_or_default();
+    if let Some(smtp_config) = settings.smtp {
+      state.try_init(&smtp_config).await.ok();
+    }
+    state
+  }
+
+  pub async fn try_init(&self, smtp_config: &SmtpSettings) -> Result<()> {
+    let mut guard = self.0.lock().await;
+    if guard.is_none() {
+      let config = MailConfig::new(smtp_config)?;
+      *guard = Some(config);
+    }
+    Ok(())
+  }
+
+  pub async fn deactivate(&self) {
+    let mut guard = self.0.lock().await;
+    *guard = None;
+  }
+
+  pub async fn is_active(&self) -> bool {
+    let guard = self.0.lock().await;
+    guard.is_some()
+  }
+
+  pub async fn send_mail(
+    &self,
+    username: String,
+    email: String,
+    subject: String,
+    body: String,
+  ) -> Result<()> {
+    let lock = self.0.lock().await;
+    if let Some(config) = &*lock {
+      config.send_mail(username, email, subject, body).await
+    } else {
+      bail!("Mail service is not configured");
+    }
+  }
+}
+
+impl MailConfig {
+  fn new(smtp_config: &SmtpSettings) -> Result<Self> {
+    let credentials = Credentials::new(smtp_config.username.clone(), smtp_config.password.clone());
+
+    let relay = if smtp_config.use_tls {
+      AsyncSmtpTransport::<Tokio1Executor>::relay(&smtp_config.server)
+    } else {
+      AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&smtp_config.server)
+    };
+    let transport = relay
+      .status_context(StatusCode::BAD_REQUEST, "Failed to create SMTP transport")?
+      .port(smtp_config.port)
+      .credentials(credentials)
+      .build();
+
+    let sender = Mailbox::new(
+      Some(smtp_config.from_name.clone()),
+      smtp_config
+        .from_address
+        .clone()
+        .parse()
+        .status_context(StatusCode::NOT_ACCEPTABLE, "Invalid from address")?,
+    );
+
+    Ok(MailConfig { sender, transport })
+  }
+
+  pub async fn send_mail(
+    &self,
+    username: String,
+    email: String,
+    subject: String,
+    body: String,
+  ) -> Result<()> {
+    let receiver = Mailbox::new(
+      Some(username),
+      email.parse().with_context(|| "Invalid email")?,
+    );
+
+    let mail = Message::builder()
+      .from(self.sender.clone())
+      .to(receiver)
+      .subject(subject)
+      .header(ContentType::TEXT_HTML)
+      .body(body)?;
+
+    self
+      .transport
+      .send(mail)
+      .await
+      .with_context(|| "Failed to send email")?;
+
+    Ok(())
+  }
+}
+
+#[derive(Default, FromRequestParts, Clone)]
+#[from_request(via(Extension))]
+pub struct ResetPasswordState {
+  tokens: Arc<Mutex<HashMap<String, String>>>,
+}
+
+impl ResetPasswordState {
+  pub async fn generate_token(&self, email: String) -> String {
+    let token = Uuid::new_v4().to_string();
+    let mut guard = self.tokens.lock().await;
+    guard.insert(email, token.clone());
+    token
+  }
+
+  #[allow(unused)]
+  pub async fn validate_token(&self, email: &str, token: &str) -> bool {
+    let guard = self.tokens.lock().await;
+    if let Some(stored_token) = guard.get(email) {
+      stored_token == token
+    } else {
+      false
+    }
+  }
+
+  #[allow(unused)]
+  pub async fn invalidate_token(&self, email: &str) {
+    let mut guard = self.tokens.lock().await;
+    guard.remove(email);
+  }
+}

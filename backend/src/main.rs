@@ -16,6 +16,7 @@ use crate::config::Config;
 mod auth;
 mod config;
 mod db;
+mod mail;
 mod nodes;
 mod permissions;
 mod settings;
@@ -49,6 +50,7 @@ fn api_router() -> Router {
     .nest("/auth", auth::router())
     .nest("/user", user::router())
     .nest("/settings", settings::router())
+    .nest("/mail", mail::router())
 }
 
 async fn state(router: Router, config: Config) -> Router {
@@ -60,6 +62,7 @@ async fn state(router: Router, config: Config) -> Router {
   let (mut router, updater) = ws::state(router).await;
   router = nodes::state(router, &db, updater).await;
   router = auth::state(router, &config, &db).await;
+  router = mail::state(router, &db).await;
 
   router.layer(Extension(db)).layer(Extension(config))
 }

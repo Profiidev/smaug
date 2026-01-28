@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::{
   auth::oidc::OidcState,
   db::{DBTrait, settings::UserSettings},
+  mail::state::Mailer,
 };
 
 pub fn router() -> Router {
@@ -21,9 +22,10 @@ enum SSOType {
 struct AuthConfig {
   sso_type: SSOType,
   instant_redirect: bool,
+  mail_enabled: bool,
 }
 
-async fn config(oidc: OidcState, db: Connection) -> Result<Json<AuthConfig>> {
+async fn config(oidc: OidcState, mailer: Mailer, db: Connection) -> Result<Json<AuthConfig>> {
   let sso_type = if oidc.is_enabled().await {
     SSOType::Oidc
   } else {
@@ -31,9 +33,11 @@ async fn config(oidc: OidcState, db: Connection) -> Result<Json<AuthConfig>> {
   };
 
   let user_settings = db.settings().get_settings::<UserSettings>().await?;
+  let mail_enabled = mailer.is_active().await;
 
   Ok(Json(AuthConfig {
     sso_type,
     instant_redirect: user_settings.sso_instant_redirect,
+    mail_enabled,
   }))
 }

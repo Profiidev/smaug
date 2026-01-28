@@ -11,6 +11,7 @@
   import FormSwitch from 'positron-components/components/form/form-switch.svelte';
   import FormInput from 'positron-components/components/form/form-input.svelte';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
+  import { RequestError } from 'positron-components/backend';
 
   let { data } = $props();
 
@@ -28,6 +29,17 @@
     let ret = await saveMailSettings(data);
 
     if (ret) {
+      if (ret === RequestError.NotAcceptable) {
+        return {
+          path: 'smtp_from_address',
+          error: 'Invalid From Address provided'
+        };
+      } else if (ret === RequestError.BadRequest) {
+        return {
+          path: 'smtp_host',
+          error: 'Failed to create SMTP transport with provided settings'
+        };
+      }
       toast.error('Failed to save mail settings');
     } else {
       toast.success('Mail settings saved successfully');

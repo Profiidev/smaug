@@ -9,6 +9,7 @@
   import Sidebar from '$lib/components/navigation/sidebar/Sidebar.svelte';
   import { page } from '$app/state';
   import type { UserInfo } from '$lib/backend/user.svelte';
+  import { noSidebarPaths } from '$lib/components/navigation/sidebar/items.svelte';
 
   let { children, data } = $props();
 
@@ -16,20 +17,20 @@
     testToken().then((valid) => {
       // can also be undefined if there was an error
       if (valid === false) {
-        goto('/login');
+        if (!noSidebarPaths.includes(page.url.pathname)) {
+          goto('/login');
+        }
       } else {
         connectWebsocket();
       }
     });
   });
-
-  const noSidebar = ['/login', '/setup'];
 </script>
 
 <ModeWatcher />
 <Toaster position="top-right" closeButton={true} richColors={true} />
 
-{#if noSidebar.includes(page.url.pathname)}
+{#if noSidebarPaths.includes(page.url.pathname)}
   {@render children()}
 {:else}
   <Sidebar user={data.user as UserInfo}>

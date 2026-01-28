@@ -14,6 +14,7 @@ use crate::{
     DBTrait,
     settings::{GeneralSettings, MailSettings, Settings, UserSettings},
   },
+  mail::state::Mailer,
   permissions::{SettingsEdit, SettingsView},
   ws::state::{UpdateMessage, Updater},
 };
@@ -25,7 +26,7 @@ pub fn router() -> Router {
     .route("/user", get(get_settings::<UserSettings>))
     .route("/user", post(save_user_settings))
     .route("/mail", get(get_settings::<MailSettings>))
-    .route("/mail", post(save_settings::<MailSettings>))
+    .route("/mail", post(save_mail_settings))
 }
 
 async fn get_settings<S: Settings>(
@@ -58,6 +59,25 @@ async fn save_user_settings(
       StatusCode::NOT_ACCEPTABLE,
       "Failed to initialize OIDC state",
     )?;
+  } else {
+    state.deactivate().await;
+  }
+
+  db.settings().save_settings(&settings).await?;
+  updater.broadcast(UpdateMessage::Settings).await;
+
+  Ok(())
+}
+
+async fn save_mail_settings(
+  _auth: JwtAuth<SettingsEdit>,
+  db: Connection,
+  state: Mailer,
+  updater: Updater,
+  settings: MailSettings,
+) -> Result<()> {
+  if let Some(smtp_settings) = &settings.smtp {
+    state.try_init(smtp_settings).await?;
   } else {
     state.deactivate().await;
   }

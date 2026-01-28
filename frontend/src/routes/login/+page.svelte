@@ -88,7 +88,16 @@
             label="Password"
             placeholder="Your password"
             key="password"
-          />
+          >
+            {#if data.config?.mail_enabled}
+              <a
+                href="/forgot-password"
+                class="ms-auto inline-block text-sm underline"
+              >
+                Forgot your password?
+              </a>
+            {/if}
+          </FormInputPassword>
         {/snippet}
         {#snippet footer({ defaultBtn })}
           {@render defaultBtn({ content: 'Login' })}

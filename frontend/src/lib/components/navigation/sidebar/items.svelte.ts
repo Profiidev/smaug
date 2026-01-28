@@ -26,3 +26,10 @@ export const items: NavItem[] = [
     requiredPermission: Permission.NODE_VIEW
   }
 ];
+
+export const noSidebarPaths = [
+  '/login',
+  '/setup',
+  '/forgot-password',
+  '/reset-password'
+];
