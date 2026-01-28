@@ -54,7 +54,7 @@ export const unReformat = (
     oidc_enabled: !!settings.oidc,
     oidc_issuer: settings.oidc?.issuer,
     oidc_client_id: settings.oidc?.client_id,
-    oidc_client_secret: settings.oidc?.client_secret,
+    oidc_client_secret: settings.oidc?.client_secret || '',
     oidc_scopes: settings.oidc?.scopes.join(' ')
   };
 };

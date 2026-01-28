@@ -13,7 +13,12 @@ export interface NavItem {
 
 export const items: NavItem[] = [
   { label: 'Overview', href: '/', icon: House },
-  { label: 'Settings', href: '/settings', icon: Settings },
+  {
+    label: 'Settings',
+    href: '/settings',
+    icon: Settings,
+    requiredPermission: Permission.SETTINGS_VIEW
+  },
   {
     label: 'Nodes',
     href: '/nodes',

@@ -8,8 +8,13 @@
   import { saveGeneralSettings } from '$lib/backend/settings.svelte';
   import { toast } from 'positron-components/components/util/general';
   import FormInputTooltip from '$lib/components/form/FormInputTooltip.svelte';
+  import { Permission } from '$lib/permissions.svelte';
 
   let { data } = $props();
+
+  let readonly = $derived(
+    !data.user?.permissions.includes(Permission.SETTINGS_EDIT)
+  );
 
   const onsubmit = async (form: FormValue<typeof generalSettings>) => {
     let ret = await saveGeneralSettings(form);
@@ -28,13 +33,16 @@
 <BaseForm schema={generalSettings} {onsubmit} initialValue={data.settings}>
   {#snippet children({ props })}
     <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <FormInputTooltip
-        {...props}
-        label="Site URL"
-        key="site_url"
-        tooltip="The URL to reach Smaug from your browser."
-        placeholder="https://smaug.example.com"
-      />
+      <div class="flex flex-col gap-1">
+        <FormInputTooltip
+          {...props}
+          label="Site URL"
+          key="site_url"
+          tooltip="The URL to reach Smaug from your browser."
+          placeholder="https://smaug.example.com"
+          {readonly}
+        />
+      </div>
     </div>
   {/snippet}
   {#snippet footer({ isLoading }: { isLoading: boolean })}

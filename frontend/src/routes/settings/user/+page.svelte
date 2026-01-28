@@ -14,6 +14,7 @@
   import { Label } from 'positron-components/components/ui/label';
   import { Input } from 'positron-components/components/ui/input';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
+  import { Permission } from '$lib/permissions.svelte';
 
   let { data } = $props();
 
@@ -22,6 +23,9 @@
   $effect(() => {
     oidcEnabled = !!data.settings?.oidc;
   });
+  let readonly = $derived(
+    !data.user?.permissions.includes(Permission.SETTINGS_EDIT)
+  );
 
   const onsubmit = async (form: FormValue<typeof userSettings>) => {
     let data = reformat(form);
@@ -57,12 +61,13 @@
 >
   {#snippet children({ props })}
     <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <div>
+      <div class="flex flex-col gap-1">
         <FormSwitch
           {...props}
           key="oidc_enabled"
           label="Enable SSO via OpenID Connect"
           onCheckedChange={(v) => (oidcEnabled = v)}
+          disabled={readonly}
         />
         {#if oidcEnabled}
           <FormInputTooltip
@@ -71,24 +76,28 @@
             key="oidc_issuer"
             tooltip="The URL where the OpenID Connect configuration can be found. Without .well-known/openid-configuration at the end."
             placeholder="https://accounts.example.com"
+            {readonly}
           />
           <FormInput
             {...props}
             label="OpenID Connect Client ID"
             key="oidc_client_id"
             placeholder="your-client-id"
+            {readonly}
           />
           <FormInputPassword
             {...props}
             label="OpenID Connect Client Secret"
             key="oidc_client_secret"
             placeholder="your-client-secret"
+            {readonly}
           />
           <FormInput
             {...props}
             label="OpenID Connect Scopes (space separated)"
             key="oidc_scopes"
             placeholder="openid profile email"
+            {readonly}
           />
           <Label for="callback-url">Callback URL</Label>
           <Input
@@ -99,16 +108,18 @@
           />
         {/if}
       </div>
-      <div>
+      <div class="flex flex-col gap-1">
         <FormSwitch
           {...props}
           key="sso_create_user"
           label="Create missing users on SSO login"
+          disabled={readonly}
         />
         <FormSwitch
           {...props}
           key="sso_instant_redirect"
           label="Instantly redirect to SSO provider when accessing the login page"
+          disabled={readonly}
         />
       </div>
     </div>

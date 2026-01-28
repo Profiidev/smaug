@@ -10,9 +10,17 @@
     label: string;
     disabled?: boolean;
     placeholder?: string;
+    readonly?: boolean;
   }
 
-  let { formData: form, key, label, disabled, placeholder }: Props = $props();
+  let {
+    formData: form,
+    key,
+    label,
+    disabled,
+    placeholder,
+    readonly
+  }: Props = $props();
 
   let formData = $derived(form.form);
 </script>
@@ -26,6 +34,7 @@
         <Password.Input
           {disabled}
           {placeholder}
+          {readonly}
           {...props}
           bind:value={$formData[key]}
         >
