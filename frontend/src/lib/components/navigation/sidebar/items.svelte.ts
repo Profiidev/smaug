@@ -1,8 +1,15 @@
 import Settings from '@lucide/svelte/icons/settings';
 import Server from '@lucide/svelte/icons/server';
 import House from '@lucide/svelte/icons/house';
-import type { NavItem } from '$lib/components/navigation/sidebar/SidebarContent.svelte';
 import { Permission } from '$lib/permissions.svelte';
+import type { Component } from 'svelte';
+
+export interface NavItem {
+  label: string;
+  href: string;
+  icon?: Component;
+  requiredPermission?: Permission;
+}
 
 export const items: NavItem[] = [
   { label: 'Overview', href: '/', icon: House },

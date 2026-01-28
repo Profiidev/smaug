@@ -1,16 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import type { UserInfo } from '$lib/backend/user.svelte';
-  import type { Permission } from '$lib/permissions.svelte';
   import * as Sidebar from 'positron-components/components/ui/sidebar';
-  import type { Component } from 'svelte';
-
-  export interface NavItem {
-    label: string;
-    href: string;
-    icon?: Component;
-    requiredPermission?: Permission;
-  }
+  import type { NavItem } from './items.svelte';
 
   interface Props {
     items: NavItem[];
