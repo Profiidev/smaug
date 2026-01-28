@@ -21,9 +21,10 @@ use crate::{
 pub mod jwt_auth;
 pub mod jwt_state;
 mod logout;
-mod oidc;
+pub mod oidc;
 mod password;
 mod res;
+mod sso;
 mod test_token;
 
 pub fn router() -> Router {
@@ -32,12 +33,13 @@ pub fn router() -> Router {
     .nest("/logout", logout::router())
     .nest("/test_token", test_token::router())
     .nest("/oidc", oidc::router())
+    .nest("/sso", sso::router())
 }
 
 pub async fn state(router: Router, config: &Config, db: &Connection) -> Router {
   let pw_state = init_pw_state(config, db).await;
   let jwt_state = JwtState::init(config, db).await;
-  let oidc_state = OidcState::new(db).await.unwrap();
+  let oidc_state = OidcState::new(db).await;
 
   router
     .layer(Extension(pw_state))

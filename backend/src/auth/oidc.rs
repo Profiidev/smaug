@@ -3,24 +3,26 @@ use std::{
   sync::Arc,
 };
 
+use argon2::password_hash::SaltString;
 use axum::{
   Extension, Json, Router,
-  extract::{FromRequestParts, OptionalFromRequestParts, Query},
+  extract::{FromRequestParts, Query},
   routing::get,
 };
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use centaurus::{
   bail,
   db::init::Connection,
-  error::{ErrorReport, ErrorReportStatusExt, Result},
+  error::{ErrorReportStatusExt, Result},
   req::redirect::Redirect,
 };
-use http::{StatusCode, header::LOCATION, request::Parts};
+use http::{StatusCode, header::LOCATION};
 use jsonwebtoken::{
   DecodingKey, Validation,
   jwk::{AlgorithmParameters, JwkSet},
 };
 use reqwest::{Client, redirect::Policy};
+use rsa::rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::{debug, info};
@@ -29,7 +31,10 @@ use uuid::Uuid;
 
 use crate::{
   auth::jwt_state::JwtState,
-  db::{DBTrait, settings::UserSettings},
+  db::{
+    DBTrait,
+    settings::{GeneralSettings, OidcSettings, UserSettings},
+  },
 };
 
 pub const OIDC_STATE: &str = "oidc_state";
@@ -42,11 +47,13 @@ pub fn router() -> Router {
 
 #[derive(Clone, FromRequestParts, Debug)]
 #[from_request(via(Extension))]
-pub struct OidcState {
-  state: Arc<Mutex<HashSet<Uuid>>>,
-  nonce: Arc<Mutex<HashSet<Uuid>>>,
+pub struct OidcState(Arc<Mutex<Option<OidcConfig>>>);
+
+#[derive(Debug)]
+struct OidcConfig {
+  state: HashSet<Uuid>,
+  nonce: HashSet<Uuid>,
   issuer: String,
-  app_url: Url,
   authorization_endpoint: Url,
   token_endpoint: Url,
   userinfo_endpoint: Url,
@@ -66,27 +73,36 @@ struct OidcConfiguration {
   jwks_uri: Url,
 }
 
-impl<S: Sync + Send> OptionalFromRequestParts<S> for OidcState {
-  type Rejection = ErrorReport;
-
-  async fn from_request_parts(
-    parts: &mut Parts,
-    state: &S,
-  ) -> std::result::Result<Option<Self>, Self::Rejection> {
-    match <Self as FromRequestParts<S>>::from_request_parts(parts, state).await {
-      Ok(state) => Ok(Some(state)),
-      Err(_) => Ok(None),
+impl OidcState {
+  pub async fn new(db: &Connection) -> Self {
+    let state = Self(Arc::new(Mutex::new(None)));
+    let settings: UserSettings = db.settings().get_settings().await.unwrap_or_default();
+    if let Some(oidc_settings) = &settings.oidc {
+      let _ = state.try_init(oidc_settings).await;
     }
+    state
+  }
+
+  pub async fn try_init(&self, settings: &OidcSettings) -> Result<()> {
+    let config = OidcConfig::new(settings).await?;
+    let mut lock = self.0.lock().await;
+    *lock = Some(config);
+    Ok(())
+  }
+
+  pub async fn deactivate(&self) {
+    let mut lock = self.0.lock().await;
+    *lock = None;
+  }
+
+  pub async fn is_enabled(&self) -> bool {
+    let lock = self.0.lock().await;
+    lock.is_some()
   }
 }
 
-impl OidcState {
-  pub async fn new(db: &Connection) -> Result<Self> {
-    let settings = db.settings().get_settings::<UserSettings>().await?;
-    let Some(oidc_settings) = settings.oidc else {
-      bail!("OIDC settings not configured");
-    };
-
+impl OidcConfig {
+  async fn new(oidc_settings: &OidcSettings) -> Result<Self> {
     let url = oidc_settings
       .issuer
       .join(".well-known/openid-configuration")?;
@@ -116,21 +132,20 @@ impl OidcState {
       state: Default::default(),
       nonce: Default::default(),
       issuer: config.issuer,
-      app_url: oidc_settings.app_url,
       authorization_endpoint: config.authorization_endpoint,
       token_endpoint: config.token_endpoint,
       userinfo_endpoint: config.userinfo_endpoint,
       jwk_set,
-      client_id: oidc_settings.client_id,
-      client_secret: oidc_settings.client_secret,
+      client_id: oidc_settings.client_id.clone(),
+      client_secret: oidc_settings.client_secret.clone(),
       client,
-      scope: oidc_settings.scopes,
+      scope: oidc_settings.scopes.clone(),
     })
   }
 }
 
-impl OidcState {
-  async fn validate_jwk(&self, token: &str) -> Result<()> {
+impl OidcConfig {
+  async fn validate_jwk(&mut self, token: &str) -> Result<()> {
     let header = jsonwebtoken::decode_header(token)?;
 
     let Some(kid) = header.kid else {
@@ -170,7 +185,7 @@ impl OidcState {
     else {
       bail!(INTERNAL_SERVER_ERROR, "Missing nonce in JWK claims");
     };
-    if !self.nonce.lock().await.remove(&nonce) {
+    if !self.nonce.remove(&nonce) {
       bail!(INTERNAL_SERVER_ERROR, "Invalid nonce");
     }
 
@@ -184,11 +199,11 @@ struct OidcResponse {
 }
 
 async fn oidc_url(
-  state: Option<OidcState>,
+  state: OidcState,
   jwt: JwtState,
   mut cookies: CookieJar,
 ) -> Result<(CookieJar, Json<OidcResponse>)> {
-  if let Some(config) = state {
+  if let Some(config) = state.0.lock().await.as_mut() {
     let state = Uuid::new_v4();
     let nonce = Uuid::new_v4();
 
@@ -225,10 +240,10 @@ async fn oidc_url(
       );
     };
 
-    config.state.lock().await.insert(state);
+    config.state.insert(state);
     cookies = cookies.add(jwt.create_cookie(OIDC_STATE, state.to_string()));
 
-    config.nonce.lock().await.insert(nonce);
+    config.nonce.insert(nonce);
 
     Ok((
       cookies,
@@ -254,25 +269,25 @@ struct TokenRes {
   id_token: String,
 }
 
-#[allow(unused)]
 #[derive(Deserialize)]
 pub struct AuthInfo {
-  pub sub: String,
   pub email: String,
   pub name: String,
 }
 
 async fn oidc_callback(
   OidcCallbackQuery { code, state, error }: OidcCallbackQuery,
-  oidc_state: Option<OidcState>,
-  mut cookies: CookieJar,
+  oidc_state: OidcState,
+  cookies: CookieJar,
+  db: Connection,
   jwt: JwtState,
 ) -> Result<(CookieJar, Redirect)> {
-  let Some(config) = oidc_state else {
+  let mut lock = oidc_state.0.lock().await;
+  let Some(config) = lock.as_mut() else {
     bail!(BAD_REQUEST, "OIDC not configured");
   };
 
-  if !config.state.lock().await.remove(&state) {
+  if !config.state.remove(&state) {
     bail!(BAD_REQUEST, "Invalid OIDC state");
   }
   let Some(cookie) = cookies.get(OIDC_STATE) else {
@@ -282,59 +297,95 @@ async fn oidc_callback(
     bail!(BAD_REQUEST, "OIDC state mismatch");
   }
 
-  let (path, error) = if let Some(error) = error {
-    ("/login", Some(error))
-  } else if let Some(code) = code {
-    let mut form = HashMap::new();
-    form.insert("grant_type", "authorization_code".to_string());
-    form.insert("code", code);
-
-    let req = config
-      .client
-      .post(config.token_endpoint.clone())
-      .basic_auth(config.client_id.clone(), Some(config.client_secret.clone()))
-      .form(&form)
-      .build()?;
-
-    let res = config.client.execute(req).await?;
-    if !res.status().is_success() {
-      let body = res.text().await.unwrap_or_default();
-      bail!(INTERNAL_SERVER_ERROR, "OIDC token request failed: {}", body);
-    }
-
-    let res: TokenRes = res.json().await?;
-    config.validate_jwk(&res.id_token).await?;
-
-    let req = config
-      .client
-      .get(config.userinfo_endpoint)
-      .bearer_auth(res.id_token)
-      .build()?;
-
-    let res = config.client.execute(req).await?;
-    if !res.status().is_success() {
-      let body = res.text().await.unwrap_or_default();
-      bail!(
-        INTERNAL_SERVER_ERROR,
-        "OIDC userinfo request failed: {}",
-        body
-      );
-    }
-    let res: AuthInfo = res.json().await?;
-
-    debug!("OIDC user authenticated: {}", res.sub);
-    cookies = cookies.add(jwt.create_token(Uuid::new_v4())?);
-
-    ("/", None)
-  } else {
-    ("/login", Some("missing_code".to_string()))
-  };
+  let (path, error, mut cookies) = check_code(error, code, config, &db, cookies, &jwt).await?;
 
   cookies = cookies.remove(Cookie::from(OIDC_STATE));
 
-  let mut url = config.app_url;
+  let config = db.settings().get_settings::<GeneralSettings>().await?;
+
+  let mut url = config.site_url;
   url.set_path(path);
   url.set_query(error.map(|e| format!("error={e}")).as_deref());
 
   Ok((cookies, Redirect::found(url.to_string())))
+}
+
+async fn check_code(
+  error: Option<String>,
+  code: Option<String>,
+  config: &mut OidcConfig,
+  db: &Connection,
+  mut cookies: CookieJar,
+  jwt: &JwtState,
+) -> Result<(&'static str, Option<String>, CookieJar)> {
+  if let Some(error) = error {
+    return Ok(("/login", Some(error), cookies));
+  }
+  let Some(code) = code else {
+    return Ok(("/login", Some("missing_code".to_string()), cookies));
+  };
+
+  let mut form = HashMap::new();
+  form.insert("grant_type", "authorization_code".to_string());
+  form.insert("code", code);
+
+  let req = config
+    .client
+    .post(config.token_endpoint.clone())
+    .basic_auth(config.client_id.clone(), Some(config.client_secret.clone()))
+    .form(&form)
+    .build()?;
+
+  let res = config.client.execute(req).await?;
+  if !res.status().is_success() {
+    let body = res.text().await.unwrap_or_default();
+    bail!(INTERNAL_SERVER_ERROR, "OIDC token request failed: {}", body);
+  }
+
+  let res: TokenRes = res.json().await?;
+  config.validate_jwk(&res.id_token).await?;
+
+  let req = config
+    .client
+    .get(config.userinfo_endpoint.clone())
+    .bearer_auth(res.id_token)
+    .build()?;
+
+  let res = config.client.execute(req).await?;
+  if !res.status().is_success() {
+    let body = res.text().await.unwrap_or_default();
+    bail!(
+      INTERNAL_SERVER_ERROR,
+      "OIDC userinfo request failed: {}",
+      body
+    );
+  }
+  let res: AuthInfo = res.json().await?;
+
+  if let Some(user) = db.user().try_get_user_by_email(&res.email).await? {
+    debug!("OIDC user authenticated: {}", user.id);
+    cookies = cookies.add(jwt.create_token(user.id)?);
+
+    return Ok(("/", None, cookies));
+  }
+
+  let user_settings = db.settings().get_settings::<UserSettings>().await?;
+  if !user_settings.sso_create_user {
+    return Ok(("/login", Some("user_not_found".to_string()), cookies));
+  }
+
+  let user = db
+    .user()
+    .create_user(
+      res.name,
+      res.email,
+      String::new(),
+      SaltString::generate(OsRng {}).to_string(),
+    )
+    .await?;
+
+  debug!("OIDC user authenticated: {}", user);
+  cookies = cookies.add(jwt.create_token(user)?);
+
+  Ok(("/", None, cookies))
 }

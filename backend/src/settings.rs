@@ -2,10 +2,14 @@ use axum::{
   Json, Router,
   routing::{get, post},
 };
-use centaurus::{db::init::Connection, error::Result};
+use centaurus::{
+  db::init::Connection,
+  error::{ErrorReportStatusExt, Result},
+};
+use http::StatusCode;
 
 use crate::{
-  auth::jwt_auth::JwtAuth,
+  auth::{jwt_auth::JwtAuth, oidc::OidcState},
   db::{
     DBTrait,
     settings::{MailSettings, Settings, UserSettings},
@@ -16,7 +20,7 @@ use crate::{
 pub fn router() -> Router {
   Router::new()
     .route("/user", get(get_settings::<UserSettings>))
-    .route("/user", post(save_settings::<UserSettings>))
+    .route("/user", post(save_user_settings))
     .route("/mail", get(get_settings::<MailSettings>))
     .route("/mail", post(save_settings::<MailSettings>))
 }
@@ -34,4 +38,24 @@ async fn save_settings<S: Settings>(
   settings: S,
 ) -> Result<()> {
   db.settings().save_settings(&settings).await
+}
+
+async fn save_user_settings(
+  _auth: JwtAuth<SettingsEdit>,
+  db: Connection,
+  state: OidcState,
+  settings: UserSettings,
+) -> Result<()> {
+  if let Some(oidc_settings) = &settings.oidc {
+    state.try_init(oidc_settings).await.status_context(
+      StatusCode::NOT_ACCEPTABLE,
+      "Failed to initialize OIDC state",
+    )?;
+  } else {
+    state.deactivate().await;
+  }
+
+  db.settings().save_settings(&settings).await?;
+
+  Ok(())
 }

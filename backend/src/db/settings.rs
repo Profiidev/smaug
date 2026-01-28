@@ -60,12 +60,28 @@ macro_rules! settings {
   };
 }
 
-settings!(UserSettings, 1);
+settings!(GeneralSettings, 1);
+#[derive(Serialize, Deserialize, FromRequest)]
+#[from_request(via(Json))]
+pub struct GeneralSettings {
+  pub site_url: Url,
+}
+
+impl Default for GeneralSettings {
+  fn default() -> Self {
+    Self {
+      site_url: Url::parse("http://localhost:8000").unwrap(),
+    }
+  }
+}
+
+settings!(UserSettings, 2);
 #[derive(Serialize, Deserialize, FromRequest)]
 #[from_request(via(Json))]
 pub struct UserSettings {
   pub oidc: Option<OidcSettings>,
   pub sso_instant_redirect: bool,
+  pub sso_create_user: bool,
 }
 
 impl Default for UserSettings {
@@ -73,20 +89,20 @@ impl Default for UserSettings {
     Self {
       oidc: None,
       sso_instant_redirect: true,
+      sso_create_user: true,
     }
   }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct OidcSettings {
-  pub app_url: Url,
   pub issuer: Url,
   pub client_id: String,
   pub client_secret: String,
   pub scopes: Vec<String>,
 }
 
-settings!(MailSettings, 2);
+settings!(MailSettings, 3);
 #[derive(Serialize, Deserialize, FromRequest, Default)]
 #[from_request(via(Json))]
 pub struct MailSettings {
