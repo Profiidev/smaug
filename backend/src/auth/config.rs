@@ -18,12 +18,12 @@ enum SSOType {
 }
 
 #[derive(Serialize)]
-struct SSOConfig {
+struct AuthConfig {
   sso_type: SSOType,
   instant_redirect: bool,
 }
 
-async fn config(oidc: OidcState, db: Connection) -> Result<Json<SSOConfig>> {
+async fn config(oidc: OidcState, db: Connection) -> Result<Json<AuthConfig>> {
   let sso_type = if oidc.is_enabled().await {
     SSOType::Oidc
   } else {
@@ -32,7 +32,7 @@ async fn config(oidc: OidcState, db: Connection) -> Result<Json<SSOConfig>> {
 
   let user_settings = db.settings().get_settings::<UserSettings>().await?;
 
-  Ok(Json(SSOConfig {
+  Ok(Json(AuthConfig {
     sso_type,
     instant_redirect: user_settings.sso_instant_redirect,
   }))

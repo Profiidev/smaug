@@ -18,13 +18,13 @@ use crate::{
   db::DBTrait,
 };
 
+mod config;
 pub mod jwt_auth;
 pub mod jwt_state;
 mod logout;
 pub mod oidc;
 mod password;
 mod res;
-mod sso;
 mod test_token;
 
 pub fn router() -> Router {
@@ -33,7 +33,7 @@ pub fn router() -> Router {
     .nest("/logout", logout::router())
     .nest("/test_token", test_token::router())
     .nest("/oidc", oidc::router())
-    .nest("/sso", sso::router())
+    .nest("/config", config::router())
 }
 
 pub async fn state(router: Router, config: &Config, db: &Connection) -> Router {

@@ -77,7 +77,7 @@
           onclick={async () => {
             if (!(await logout())) {
               disconnectWebsocket();
-              goto('/login');
+              goto('/login?skip=true');
             }
           }}
         >

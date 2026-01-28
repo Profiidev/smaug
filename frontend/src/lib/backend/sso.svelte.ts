@@ -5,15 +5,15 @@ export enum SSOType {
   Oidc = 'Oidc'
 }
 
-export interface SSOConfig {
+export interface AuthConfig {
   sso_type: SSOType;
   instant_redirect: boolean;
 }
 
-export const getSSOConfig = async (
+export const getAuthConfig = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let res = await get<SSOConfig>('/api/auth/sso', {
+  let res = await get<AuthConfig>('/api/auth/config', {
     res_type: ResponseType.Json,
     fetch
   });

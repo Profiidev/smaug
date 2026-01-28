@@ -9,5 +9,3 @@
 # rework notes edit layout
 
 # mail settings frontend
-
-# password show btn

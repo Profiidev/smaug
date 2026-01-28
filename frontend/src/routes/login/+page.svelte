@@ -12,10 +12,13 @@
   import { connectWebsocket } from '$lib/backend/updater.svelte';
   import { toast } from 'positron-components/components/util/general';
   import { SSOType } from '$lib/backend/sso.svelte';
+  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 
   let { data } = $props();
 
   $effect(() => {
+    const url = new URL(window.location.href);
+    let updated = false;
     if (data.error) {
       let error = '';
       switch (data.error) {
@@ -34,8 +37,14 @@
 
       toast.error(error);
 
-      const url = new URL(window.location.href);
       url.searchParams.delete('error');
+      updated = true;
+    }
+    if (data.skip) {
+      url.searchParams.delete('skip');
+      updated = true;
+    }
+    if (updated) {
       window.history.replaceState({}, '', url);
     }
   });
@@ -74,10 +83,9 @@
             placeholder="mail@example.com"
             key="email"
           />
-          <FormInput
+          <FormInputPassword
             {...props}
             label="Password"
-            type="password"
             placeholder="Your password"
             key="password"
           />
@@ -86,7 +94,7 @@
           {@render defaultBtn({ content: 'Login' })}
         {/snippet}
       </BaseForm>
-      {#if data.sso_config?.sso_type !== SSOType.None}
+      {#if data.config?.sso_type !== SSOType.None}
         <FieldSeparator
           class="*:data-[slot=field-separator-content]:bg-card my-4"
           >Or continue with</FieldSeparator

@@ -3,6 +3,7 @@
   import BaseForm from 'positron-components/components/form/base-form.svelte';
   import { adminUser } from './schema.svelte';
   import FormInput from 'positron-components/components/form/form-input.svelte';
+  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 
   let {
     initialValue,
@@ -35,11 +36,10 @@
       type="email"
       placeholder="Enter email"
     />
-    <FormInput
+    <FormInputPassword
       {...props}
       label="Password"
       key="password"
-      type="password"
       placeholder="Enter password"
     />
   {/snippet}

@@ -13,6 +13,7 @@
   import { RequestError } from 'positron-components/backend';
   import { Label } from 'positron-components/components/ui/label';
   import { Input } from 'positron-components/components/ui/input';
+  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 
   let { data } = $props();
 
@@ -77,12 +78,11 @@
             key="oidc_client_id"
             placeholder="your-client-id"
           />
-          <FormInput
+          <FormInputPassword
             {...props}
             label="OpenID Connect Client Secret"
             key="oidc_client_secret"
             placeholder="your-client-secret"
-            type="password"
           />
           <FormInput
             {...props}
