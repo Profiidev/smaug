@@ -16,6 +16,7 @@ use crate::{
   },
   config::Config,
   db::DBTrait,
+  rate_limit::RateLimiter,
 };
 
 mod config;
@@ -27,12 +28,12 @@ mod password;
 mod res;
 mod test_token;
 
-pub fn router() -> Router {
+pub fn router(rate_limiter: &mut RateLimiter) -> Router {
   Router::new()
-    .nest("/password", password::router())
+    .nest("/password", password::router(rate_limiter))
     .nest("/logout", logout::router())
     .nest("/test_token", test_token::router())
-    .nest("/oidc", oidc::router())
+    .nest("/oidc", oidc::router(rate_limiter))
     .nest("/config", config::router())
 }
 

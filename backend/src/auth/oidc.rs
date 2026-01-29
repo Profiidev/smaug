@@ -25,6 +25,7 @@ use reqwest::{Client, redirect::Policy};
 use rsa::rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
+use tower_governor::GovernorLayer;
 use tracing::{debug, info};
 use url::Url;
 use uuid::Uuid;
@@ -35,13 +36,15 @@ use crate::{
     DBTrait,
     settings::{GeneralSettings, OidcSettings, UserSettings},
   },
+  rate_limit::RateLimiter,
 };
 
 pub const OIDC_STATE: &str = "oidc_state";
 
-pub fn router() -> Router {
+pub fn router(rate_limiter: &mut RateLimiter) -> Router {
   Router::new()
     .route("/url", get(oidc_url))
+    .layer(GovernorLayer::new(rate_limiter.create_limiter()))
     .route("/callback", get(oidc_callback))
 }
 

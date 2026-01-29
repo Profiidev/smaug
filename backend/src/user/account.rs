@@ -5,18 +5,21 @@ use base64::prelude::*;
 use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
 use image::{ImageFormat, imageops::FilterType};
 use serde::Deserialize;
+use tower_governor::GovernorLayer;
 
 use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
+  rate_limit::RateLimiter,
   ws::state::{UpdateMessage, Updater},
 };
 
-pub fn router() -> Router {
+pub fn router(rate_limiter: &mut RateLimiter) -> Router {
   Router::new()
-    .route("/update", post(update_account))
     .route("/avatar", post(update_avatar))
     .route("/password", post(update_password))
+    .layer(GovernorLayer::new(rate_limiter.create_limiter()))
+    .route("/update", post(update_account))
 }
 
 #[derive(Deserialize, FromRequest)]

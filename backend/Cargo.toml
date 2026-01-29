@@ -75,6 +75,10 @@ image = { version = "0.25.9", default-features = false, features = [
   "webp",
 ] }
 base64 = "0.22.1"
+tower_governor = { version = "0.8.0", features = [
+  "axum",
+], default-features = false }
+governor = "0.10.4"
 
 [[bin]]
 name = "backend"

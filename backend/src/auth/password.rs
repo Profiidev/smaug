@@ -6,17 +6,20 @@ use axum::{
 use axum_extra::extract::CookieJar;
 use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
 use serde::{Deserialize, Serialize};
+use tower_governor::GovernorLayer;
 use tracing::debug;
 
 use crate::{
   auth::{jwt_state::JwtState, res::TokenRes},
   db::DBTrait,
+  rate_limit::RateLimiter,
 };
 
-pub fn router() -> Router {
+pub fn router(rate_limiter: &mut RateLimiter) -> Router {
   Router::new()
-    .route("/", get(key))
     .route("/", post(authenticate))
+    .layer(GovernorLayer::new(rate_limiter.create_limiter()))
+    .route("/", get(key))
 }
 
 #[derive(Serialize)]
