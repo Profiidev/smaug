@@ -35,7 +35,14 @@
 {#if noSidebarPaths.includes(page.url.pathname)}
   {@render children()}
 {:else}
-  <Sidebar user={data.user as UserInfo}>
+  <Sidebar
+    user={data.user ?? {
+      email: '',
+      name: '',
+      permissions: [],
+      uuid: ''
+    }}
+  >
     {@render children()}
   </Sidebar>
 {/if}

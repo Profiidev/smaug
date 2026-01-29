@@ -12,14 +12,10 @@ export interface UserInfo {
 export const getUserInfo = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<UserInfo>('/api/user/info', {
+  return await get<UserInfo>('/api/user/info', {
     res_type: ResponseType.Json,
     fetch
   });
-
-  if (typeof ret === 'object') {
-    return ret;
-  }
 };
 
 export interface AccountUpdate {
