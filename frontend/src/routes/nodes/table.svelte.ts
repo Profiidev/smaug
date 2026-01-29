@@ -65,7 +65,7 @@ export const columns = ({
       return DataTable.renderComponent(Actions, {
         edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
-        editHref: `/nodes/${row.original.id}`,
+        editHref: `/nodes/${row.original.id}/setup`,
         remove: () => deleteNode(row.original)
       });
     },

@@ -1,9 +1,9 @@
 import { nodeInfo } from '$lib/backend/node.svelte';
 import { RequestError } from 'positron-components/backend';
-import type { PageLoad } from './$types';
+import type { LayoutLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 
-export const load: PageLoad = async ({ params, fetch }) => {
+export const load: LayoutLoad = async ({ params, fetch }) => {
   let res = await nodeInfo(params.uuid, fetch);
 
   if (typeof res !== 'object') {

@@ -52,7 +52,7 @@
         .filter((_, i) => i < stages.length)
         .reduce((acc, s) => ({ ...acc, ...s.data }), {});
 
-      onsubmit(rawData);
+      return onsubmit(rawData);
     }
     return undefined;
   };

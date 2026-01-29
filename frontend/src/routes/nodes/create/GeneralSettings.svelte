@@ -1,12 +1,9 @@
 <script lang="ts">
   import BaseForm from 'positron-components/components/form/base-form.svelte';
-  import FormInput from 'positron-components/components/form/form-input.svelte';
-  import FormSwitch from 'positron-components/components/form/form-switch.svelte';
   import { type FormValue } from 'positron-components/components/form/types';
   import type { ComponentProps, Snippet } from 'svelte';
   import { generalSettings } from './schema.svelte';
-  import { Label } from 'positron-components/components/ui/dropdown-menu';
-  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import GeneralSettingsFields from './GeneralSettingsFields.svelte';
 
   interface Props {
     initialValue?: FormValue<typeof generalSettings>;
@@ -36,34 +33,6 @@
   bind:isLoading
 >
   {#snippet children({ props })}
-    <FormInput
-      {...props}
-      key="name"
-      label="Node Name"
-      placeholder="Enter name"
-      {readonly}
-    />
-    <FormInput
-      {...props}
-      key="address"
-      label="Node Address (include port if needed)"
-      placeholder="Enter address (e.g., IP or domain)"
-      {readonly}
-    />
-    {#if !secure}
-      <div class="flex items-center">
-        <Label class="p-0 font-medium text-orange-500"
-          >Only use HTTP on private networks!</Label
-        >
-        <TriangleAlert class="ml-auto text-orange-500" />
-      </div>
-    {/if}
-    <FormSwitch
-      {...props}
-      key="secure"
-      label="Use Secure Connection (HTTPS)"
-      onCheckedChange={(v) => (secure = v)}
-      disabled={readonly}
-    />
+    <GeneralSettingsFields {secure} {readonly} {...props} />
   {/snippet}
 </BaseForm>
