@@ -34,3 +34,7 @@ export const sendResetPassword = async (data: ResetPassword) => {
 
   return res;
 };
+
+export const sendTestEmail = async () => {
+  return await post(`/api/mail/test`);
+};

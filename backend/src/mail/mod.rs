@@ -6,9 +6,12 @@ use crate::mail::state::{Mailer, ResetPasswordState};
 mod reset;
 pub mod state;
 mod templates;
+mod test;
 
 pub fn router() -> Router {
-  Router::new().nest("/reset", reset::router())
+  Router::new()
+    .nest("/reset", reset::router())
+    .nest("/test", test::router())
 }
 
 pub async fn state(router: Router, db: &Connection) -> Router {

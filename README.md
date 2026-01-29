@@ -1,7 +1,5 @@
 # Smaug
 
-# test mail sending button
-
 # avatar
 
 # account settings

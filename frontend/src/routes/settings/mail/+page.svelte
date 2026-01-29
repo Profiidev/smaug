@@ -12,6 +12,8 @@
   import FormInput from 'positron-components/components/form/form-input.svelte';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
   import { RequestError } from 'positron-components/backend';
+  import Send from '@lucide/svelte/icons/send';
+  import { sendTestEmail } from '$lib/backend/mail.svelte';
 
   let { data } = $props();
 
@@ -23,6 +25,7 @@
   let readonly = $derived(
     !data.user?.permissions.includes(Permission.SETTINGS_EDIT)
   );
+  let isLoading = $state(false);
 
   const onsubmit = async (form: FormValue<typeof mailSettings>) => {
     let data = reformat(form);
@@ -47,6 +50,17 @@
     // do not trigger form reset
     return { error: '' };
   };
+
+  const testEmail = async () => {
+    isLoading = true;
+    let ret = await sendTestEmail();
+    isLoading = false;
+    if (ret) {
+      toast.error('Failed to send test email. Check SMTP settings.');
+    } else {
+      toast.success('Test email sent successfully.');
+    }
+  };
 </script>
 
 <h4 class="mb-2">Mail Settings</h4>
@@ -54,6 +68,7 @@
   schema={mailSettings}
   {onsubmit}
   initialValue={unReformat(data.settings ?? {})}
+  bind:isLoading
 >
   {#snippet children({ props })}
     <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -121,14 +136,26 @@
   {/snippet}
   {#snippet footer({ isLoading }: { isLoading: boolean })}
     <div class="mt-4 grid w-full grid-cols-1 lg:grid-cols-2">
-      <Button class="ml-auto cursor-pointer" type="submit" disabled={isLoading}>
-        {#if isLoading}
-          <Spinner />
-        {:else}
-          <Save />
+      <div class="flex">
+        {#if !readonly && smtpEnabled}
+          <Button disabled={isLoading} variant="secondary" onclick={testEmail}>
+            <Send />
+            Send Test Email
+          </Button>
         {/if}
-        Save Changes</Button
-      >
+        <Button
+          class="ml-auto cursor-pointer"
+          type="submit"
+          disabled={isLoading}
+        >
+          {#if isLoading}
+            <Spinner />
+          {:else}
+            <Save />
+          {/if}
+          Save Changes</Button
+        >
+      </div>
     </div>
   {/snippet}
 </BaseForm>
