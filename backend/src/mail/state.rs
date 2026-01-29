@@ -141,21 +141,15 @@ impl ResetPasswordState {
   pub async fn generate_token(&self, email: String) -> String {
     let token = Uuid::new_v4().to_string();
     let mut guard = self.tokens.lock().await;
-    guard.insert(email, token.clone());
+    guard.insert(token.clone(), email);
     token
   }
 
-  #[allow(unused)]
-  pub async fn validate_token(&self, email: &str, token: &str) -> bool {
+  pub async fn validate_token(&self, token: &str) -> Option<String> {
     let guard = self.tokens.lock().await;
-    if let Some(stored_token) = guard.get(email) {
-      stored_token == token
-    } else {
-      false
-    }
+    guard.get(token).cloned()
   }
 
-  #[allow(unused)]
   pub async fn invalidate_token(&self, email: &str) {
     let mut guard = self.tokens.lock().await;
     guard.remove(email);

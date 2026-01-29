@@ -1,5 +1,5 @@
 use entity::user;
-use sea_orm::{IntoActiveModel, prelude::*};
+use sea_orm::{IntoActiveModel, Set, prelude::*};
 
 pub struct UserTable<'db> {
   db: &'db DatabaseConnection,
@@ -56,5 +56,15 @@ impl<'db> UserTable<'db> {
         "User with id {} not found",
         id
       )))
+  }
+
+  pub async fn update_user_password(&self, id: Uuid, new_password: String) -> Result<(), DbErr> {
+    let mut user: user::ActiveModel = self.get_user_by_id(id).await?.into();
+
+    user.password = Set(new_password);
+
+    user.update(self.db).await?;
+
+    Ok(())
   }
 }

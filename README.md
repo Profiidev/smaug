@@ -1,7 +1,5 @@
 # Smaug
 
-# Forgot password reset form (remove unused for token validation)
-
 # test mail sending button
 
 # avatar

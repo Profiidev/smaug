@@ -91,7 +91,7 @@
           >
             {#if data.config?.mail_enabled}
               <a
-                href="/forgot-password"
+                href="/password/forgot"
                 class="ms-auto inline-block text-sm underline"
               >
                 Forgot your password?

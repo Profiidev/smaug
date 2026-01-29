@@ -1,5 +1,5 @@
 use axum::{Json, Router, extract::FromRequest, routing::post};
-use centaurus::db::init::Connection;
+use centaurus::{auth::pw::PasswordState, db::init::Connection};
 use serde::Deserialize;
 use tokio::spawn;
 use tracing::warn;
@@ -13,7 +13,9 @@ use crate::{
 };
 
 pub fn router() -> Router {
-  Router::new().route("/send", post(send_reset_link))
+  Router::new()
+    .route("/send", post(send_reset_link))
+    .route("/confirm", post(reset_password))
 }
 
 #[derive(FromRequest, Deserialize)]
@@ -49,7 +51,8 @@ async fn send_reset_link(
     let mut reset_link = settings.site_url.clone();
     if let Ok(segments) = &mut reset_link.path_segments_mut() {
       segments.pop_if_empty();
-      segments.push("reset-password");
+      segments.push("password");
+      segments.push("reset");
     }
     reset_link.query_pairs_mut().append_pair("token", &token);
 
@@ -64,6 +67,53 @@ async fn send_reset_link(
     {
       warn!("Failed to send password reset email to {}: {:?}", email, e);
     }
+  });
+
+  Ok(())
+}
+
+#[derive(FromRequest, Deserialize)]
+#[from_request(via(Json))]
+struct ResetPasswordPayload {
+  token: String,
+  new_password: String,
+}
+
+async fn reset_password(
+  db: Connection,
+  state: ResetPasswordState,
+  pw: PasswordState,
+  ResetPasswordPayload {
+    token,
+    new_password,
+  }: ResetPasswordPayload,
+) -> Result<(), ()> {
+  // Do reset async to avoid exposing timing information
+  spawn(async move {
+    let Some(email) = state.validate_token(&token).await else {
+      warn!("Invalid or expired password reset token used");
+      return;
+    };
+
+    let Some(user) = db.user().get_user_by_email(&email).await.ok() else {
+      warn!("Password reset attempted for non-existent email: {}", email);
+      return;
+    };
+
+    let Ok(hashed_password) = pw.pw_hash(&user.salt, &new_password) else {
+      warn!("Failed to hash new password for {}", email);
+      return;
+    };
+
+    if let Err(e) = db
+      .user()
+      .update_user_password(user.id, hashed_password)
+      .await
+    {
+      warn!("Failed to update password for {}: {:?}", email, e);
+    }
+
+    state.invalidate_token(&email).await;
   });
 
   Ok(())

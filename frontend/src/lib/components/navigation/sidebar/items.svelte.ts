@@ -30,6 +30,7 @@ export const items: NavItem[] = [
 export const noSidebarPaths = [
   '/login',
   '/setup',
-  '/forgot-password',
-  '/reset-password'
+  '/password',
+  '/password/forgot',
+  '/password/reset'
 ];

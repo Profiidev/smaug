@@ -38,7 +38,7 @@
           />
         {/snippet}
         {#snippet footer({ defaultBtn })}
-          {@render defaultBtn({ content: 'Reset Password' })}
+          {@render defaultBtn({ content: 'Send Reset Link' })}
         {/snippet}
       </BaseForm>
     </Card.Content>
