@@ -10,6 +10,7 @@
   import * as ImageCropper from 'positron-components/components/ui-extra/image-cropper';
   import { arrayBufferToBase64 } from 'positron-components/util/convert.svelte';
   import { updateAccount, updateAvatar } from '$lib/backend/user.svelte';
+  import { RequestError } from 'positron-components/backend';
 
   let { data } = $props();
 
@@ -43,7 +44,9 @@
             let file = await ImageCropper.getFileFromUrl(url);
             let data = arrayBufferToBase64(await file.arrayBuffer());
             let ret = await updateAvatar({ avatar: data });
-            if (ret) {
+            if (ret === RequestError.TooManyRequests) {
+              toast.error('Rate limit exceeded. Please try again later.');
+            } else if (ret) {
               toast.error('Failed to update avatar');
             } else {
               toast.success('Avatar updated successfully');

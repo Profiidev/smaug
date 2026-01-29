@@ -6,11 +6,14 @@
   import type { FormValue } from 'positron-components/components/form/types';
   import { sendResetLink } from '$lib/backend/mail.svelte';
   import { toast } from 'positron-components/components/util/general';
+  import { RequestError } from 'positron-components/backend';
 
   const onsubmit = async (data: FormValue<typeof forgotPassword>) => {
     let ret = await sendResetLink(data);
 
-    if (ret) {
+    if (ret === RequestError.TooManyRequests) {
+      return { error: 'Rate limit exceeded. Please try again later.' };
+    } else if (ret) {
       return { error: 'Failed to send reset link.' };
     } else {
       toast.success('Reset link sent to your email address.');

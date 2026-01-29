@@ -54,8 +54,10 @@
 
     if (ret === RequestError.Unauthorized) {
       return { error: 'Invalid email or password.' };
+    } else if (ret === RequestError.TooManyRequests) {
+      return { error: 'Rate limit exceeded. Please try again later.' };
     } else if (ret) {
-      return { error: 'Login failed. Please try again later.' };
+      return { error: 'Login failed. Please try again.' };
     } else {
       setTimeout(() => {
         connectWebsocket();

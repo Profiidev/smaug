@@ -8,6 +8,7 @@
   import { toast } from 'positron-components/components/util/general';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
   import { goto } from '$app/navigation';
+  import { RequestError } from 'positron-components/backend';
 
   let { data } = $props();
 
@@ -17,7 +18,9 @@
       new_password: data.new_password
     });
 
-    if (ret) {
+    if (ret === RequestError.TooManyRequests) {
+      return { error: 'Rate limit exceeded. Please try again later.' };
+    } else if (ret) {
       return { error: 'Failed to reset password.' };
     } else {
       toast.success(

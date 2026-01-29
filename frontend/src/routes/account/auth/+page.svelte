@@ -18,6 +18,8 @@
     if (ret) {
       if (ret === RequestError.Forbidden) {
         return { error: 'Old password is incorrect' };
+      } else if (ret === RequestError.TooManyRequests) {
+        return { error: 'Rate limit exceeded. Please try again later.' };
       } else {
         return { error: 'An unknown error occurred' };
       }

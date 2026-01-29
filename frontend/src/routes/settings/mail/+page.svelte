@@ -55,7 +55,9 @@
     isLoading = true;
     let ret = await sendTestEmail();
     isLoading = false;
-    if (ret) {
+    if (ret === RequestError.TooManyRequests) {
+      toast.error('Rate limit exceeded. Please try again later.');
+    } else if (ret) {
       toast.error('Failed to send test email. Check SMTP settings.');
     } else {
       toast.success('Test email sent successfully.');
