@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use axum::{Json, Router, extract::FromRequest, routing::post};
 use base64::prelude::*;
-use centaurus::{bail, db::init::Connection, error::Result};
+use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
 use image::{ImageFormat, imageops::FilterType};
 use serde::Deserialize;
 
@@ -16,6 +16,7 @@ pub fn router() -> Router {
   Router::new()
     .route("/update", post(update_account))
     .route("/avatar", post(update_avatar))
+    .route("/password", post(update_password))
 }
 
 #[derive(Deserialize, FromRequest)]
@@ -63,5 +64,32 @@ async fn update_avatar(
 
   db.user().update_user_avatar(auth.user_id, avatar).await?;
   updater.broadcast(UpdateMessage::Users).await;
+  Ok(())
+}
+
+#[derive(Deserialize, FromRequest)]
+#[from_request(via(Json))]
+struct PasswordUpdate {
+  old_password: String,
+  new_password: String,
+}
+
+async fn update_password(
+  auth: JwtAuth,
+  db: Connection,
+  state: PasswordState,
+  data: PasswordUpdate,
+) -> Result<()> {
+  let user = db.user().get_user_by_id(auth.user_id).await?;
+
+  let old_hash = state.pw_hash(&user.salt, &data.old_password)?;
+  if old_hash != user.password {
+    bail!(FORBIDDEN, "Old password is incorrect");
+  }
+
+  let new_hash = state.pw_hash(&user.salt, &data.new_password)?;
+  db.user()
+    .update_user_password(auth.user_id, new_hash)
+    .await?;
   Ok(())
 }

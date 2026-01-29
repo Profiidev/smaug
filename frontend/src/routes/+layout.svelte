@@ -8,7 +8,6 @@
   import { goto } from '$app/navigation';
   import Sidebar from '$lib/components/navigation/sidebar/Sidebar.svelte';
   import { page } from '$app/state';
-  import type { UserInfo } from '$lib/backend/user.svelte';
   import { noSidebarPaths } from '$lib/components/navigation/sidebar/items.svelte';
   import { setMode } from 'mode-watcher';
 

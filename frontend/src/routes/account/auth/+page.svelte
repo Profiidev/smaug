@@ -1,46 +1,56 @@
 <script lang="ts">
   import BaseForm from 'positron-components/components/form/base-form.svelte';
-  import { generalSettings } from './schema.svelte';
+  import { authSettings } from './schema.svelte';
   import type { FormValue } from 'positron-components/components/form/types';
   import { Button } from 'positron-components/components/ui/button';
   import { Spinner } from 'positron-components/components/ui/spinner';
   import Save from '@lucide/svelte/icons/save';
   import { toast } from 'positron-components/components/util/general';
-  import FormInputTooltip from '$lib/components/form/FormInputTooltip.svelte';
-  import { updateAccount } from '$lib/backend/user.svelte';
+  import { updatePassword } from '$lib/backend/user.svelte';
+  import { RequestError } from 'positron-components/backend';
+  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 
   let { data } = $props();
 
-  const onsubmit = async (form: FormValue<typeof generalSettings>) => {
-    let ret = await updateAccount(form);
+  const onsubmit = async (form: FormValue<typeof authSettings>) => {
+    let ret = await updatePassword(form);
 
     if (ret) {
-      toast.error('Failed to save general settings');
+      if (ret === RequestError.Forbidden) {
+        return { error: 'Old password is incorrect' };
+      } else {
+        return { error: 'An unknown error occurred' };
+      }
     } else {
-      toast.success('General settings saved successfully');
+      toast.success('Password updated successfully');
     }
     // do not trigger form reset
     return { error: '' };
   };
 </script>
 
-<h4 class="mb-2">General Settings</h4>
-<BaseForm
-  schema={generalSettings}
-  {onsubmit}
-  initialValue={{
-    username: data.user?.name || ''
-  }}
->
+<h4 class="mb-2">Authentication</h4>
+<BaseForm schema={authSettings} {onsubmit}>
   {#snippet children({ props })}
     <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
       <div class="flex flex-col gap-1">
-        <FormInputTooltip
+        <FormInputPassword
           {...props}
-          label="Username"
-          key="username"
-          tooltip="Your account username."
-          placeholder="Enter your username"
+          label="Old Password"
+          key="old_password"
+          placeholder="Enter your old password"
+        />
+        <FormInputPassword
+          {...props}
+          label="New Password"
+          key="new_password"
+          placeholder="Enter your new password"
+        />
+        <FormInputPassword
+          {...props}
+          label="Confirm New Password"
+          key="new_password_confirm"
+          placeholder="Enter your new password again"
         />
       </div>
     </div>
@@ -53,7 +63,7 @@
         {:else}
           <Save />
         {/if}
-        Save Changes</Button
+        Update Password</Button
       >
     </div>
   {/snippet}
