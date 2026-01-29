@@ -1,6 +1,7 @@
 use std::{
-  collections::{HashMap, HashSet},
+  collections::HashMap,
   sync::Arc,
+  time::{Duration, Instant},
 };
 
 use argon2::password_hash::SaltString;
@@ -24,7 +25,7 @@ use jsonwebtoken::{
 use reqwest::{Client, redirect::Policy};
 use rsa::rand_core::OsRng;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use tokio::{spawn, sync::Mutex, time::sleep};
 use tower_governor::GovernorLayer;
 use tracing::{debug, info};
 use url::Url;
@@ -54,8 +55,8 @@ pub struct OidcState(Arc<Mutex<Option<OidcConfig>>>);
 
 #[derive(Debug)]
 struct OidcConfig {
-  state: HashSet<Uuid>,
-  nonce: HashSet<Uuid>,
+  state: HashMap<Uuid, Instant>,
+  nonce: HashMap<Uuid, Instant>,
   issuer: String,
   authorization_endpoint: Url,
   token_endpoint: Url,
@@ -83,6 +84,28 @@ impl OidcState {
     if let Some(oidc_settings) = &settings.oidc {
       let _ = state.try_init(oidc_settings).await;
     }
+
+    spawn({
+      let state = state.clone();
+      async move {
+        let cleanup_interval = Duration::from_secs(600);
+        let expiration_duration = Duration::from_secs(600);
+        loop {
+          sleep(cleanup_interval).await;
+          let mut lock = state.0.lock().await;
+          if let Some(config) = lock.as_mut() {
+            let now = Instant::now();
+            config
+              .state
+              .retain(|_, &mut instant| now.duration_since(instant) < expiration_duration);
+            config
+              .nonce
+              .retain(|_, &mut instant| now.duration_since(instant) < expiration_duration);
+          }
+        }
+      }
+    });
+
     state
   }
 
@@ -194,7 +217,7 @@ impl OidcConfig {
     else {
       bail!(INTERNAL_SERVER_ERROR, "Missing nonce in JWK claims");
     };
-    if !self.nonce.remove(&nonce) {
+    if self.nonce.remove(&nonce).is_none() {
       bail!(INTERNAL_SERVER_ERROR, "Invalid nonce");
     }
 
@@ -249,10 +272,10 @@ async fn oidc_url(
       );
     };
 
-    config.state.insert(state);
+    config.state.insert(state, Instant::now());
     cookies = cookies.add(jwt.create_cookie(OIDC_STATE, state.to_string()));
 
-    config.nonce.insert(nonce);
+    config.nonce.insert(nonce, Instant::now());
 
     Ok((
       cookies,
@@ -296,7 +319,7 @@ async fn oidc_callback(
     bail!(BAD_REQUEST, "OIDC not configured");
   };
 
-  if !config.state.remove(&state) {
+  if config.state.remove(&state).is_none() {
     bail!(BAD_REQUEST, "Invalid OIDC state");
   }
   let Some(cookie) = cookies.get(OIDC_STATE) else {
