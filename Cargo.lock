@@ -465,6 +465,7 @@ dependencies = [
  "base64",
  "centaurus",
  "chrono",
+ "dashmap",
  "dotenv",
  "entity",
  "figment",
@@ -685,9 +686,9 @@ dependencies = [
 
 [[package]]
 name = "centaurus"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5329cdff36b44d478fc943f072ae2a7701dd436b89949811f50a685f397115f"
+checksum = "5620e1b1777445687ce7f15e5d7e0f058f5f228956f54d9866d69c23851fb2f4"
 dependencies = [
  "argon2",
  "async-trait",

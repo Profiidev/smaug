@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use axum::{Extension, extract::FromRequestParts};
 use centaurus::{
@@ -7,6 +7,7 @@ use centaurus::{
   error::{ErrorReportStatusExt, Result},
   eyre::Context,
 };
+use dashmap::DashMap;
 use http::StatusCode;
 use lettre::{
   AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -134,24 +135,21 @@ impl MailConfig {
 #[derive(Default, FromRequestParts, Clone)]
 #[from_request(via(Extension))]
 pub struct ResetPasswordState {
-  tokens: Arc<Mutex<HashMap<String, String>>>,
+  tokens: DashMap<String, String>,
 }
 
 impl ResetPasswordState {
   pub async fn generate_token(&self, email: String) -> String {
     let token = Uuid::new_v4().to_string();
-    let mut guard = self.tokens.lock().await;
-    guard.insert(token.clone(), email);
+    self.tokens.insert(token.clone(), email);
     token
   }
 
   pub async fn validate_token(&self, token: &str) -> Option<String> {
-    let guard = self.tokens.lock().await;
-    guard.get(token).cloned()
+    self.tokens.get(token).map(|entry| entry.value().clone())
   }
 
   pub async fn invalidate_token(&self, email: &str) {
-    let mut guard = self.tokens.lock().await;
-    guard.remove(email);
+    self.tokens.remove(email);
   }
 }

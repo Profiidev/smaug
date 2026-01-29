@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 shared = { path = "../shared" }
-centaurus = { version = "0.4.8", features = [
+centaurus = { version = "0.4.9", features = [
   "axum",
   "logging",
   "sea-orm",
@@ -79,6 +79,7 @@ tower_governor = { version = "0.8.0", features = [
   "axum",
 ], default-features = false }
 governor = "0.10.4"
+dashmap = "6.1.0"
 
 [[bin]]
 name = "backend"

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, atomic::AtomicI32};
 
 use axum::{Extension, extract::FromRequestParts};
 use axum_extra::extract::cookie::{Cookie, SameSite};
@@ -15,7 +15,6 @@ use rsa::{
   rand_core::OsRng,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 use tracing::info;
 use uuid::Uuid;
 
@@ -125,5 +124,5 @@ impl JwtState {
 #[derive(FromRequestParts, Clone, Default)]
 #[from_request(via(Extension))]
 pub struct JwtInvalidState {
-  pub count: Arc<Mutex<i32>>,
+  pub count: Arc<AtomicI32>,
 }

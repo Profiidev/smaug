@@ -31,14 +31,13 @@ async fn logout(
   let cookie = cookies
     .get(JWT_COOKIE_NAME)
     .status_context(StatusCode::UNAUTHORIZED, "Missing auth cookie")?;
-  let mut count = state.count.lock().await;
 
   db.invalid_jwt()
     .invalidate_jwt(
       cookie.value().to_string(),
       DateTime::from_timestamp(auth.exp, 0)
         .status_context(StatusCode::INTERNAL_SERVER_ERROR, "invalid timestamp")?,
-      &mut count,
+      state.count.clone(),
     )
     .await?;
 

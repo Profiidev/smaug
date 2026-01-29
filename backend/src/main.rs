@@ -2,7 +2,7 @@ use axum::{Extension, Router};
 use centaurus::{
   db::init::init_db,
   init::{
-    axum::{listener_setup, run_app},
+    axum::{listener_setup, run_app_connect_info},
     logging::init_logging,
     router::base_router,
   },
@@ -44,7 +44,7 @@ async fn main() {
   rate_limiter.init();
 
   info!("Starting application");
-  run_app(listener, app).await;
+  run_app_connect_info(listener, app).await;
 }
 
 fn api_router(rate_limiter: &mut RateLimiter) -> Router {
