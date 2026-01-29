@@ -4,11 +4,12 @@ import { sleep } from 'positron-components/util/interval.svelte';
 
 export enum UpdateType {
   Nodes = 'Nodes',
-  Settings = 'Settings'
+  Settings = 'Settings',
+  Users = 'Users'
 }
 
 export type UpdateMessage = {
-  type: UpdateType.Nodes | UpdateType.Settings;
+  type: UpdateType.Nodes | UpdateType.Settings | UpdateType.Users;
 };
 
 let updater: WebSocket | undefined | false = $state(browser && undefined);
@@ -65,6 +66,10 @@ const handleMessage = (msg: UpdateMessage) => {
     }
     case UpdateType.Settings: {
       invalidate((url) => url.pathname.startsWith('/api/settings'));
+      break;
+    }
+    case UpdateType.Users: {
+      invalidate((url) => url.pathname.startsWith('/api/user'));
       break;
     }
   }

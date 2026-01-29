@@ -19,6 +19,7 @@ centaurus = { version = "0.4.8", features = [
   "reqwest",
   "lettre",
   "url",
+  "image",
 ] }
 uuid = { version = "1.20.0", features = ["v4"] }
 entity = { path = "entity" }
@@ -67,6 +68,13 @@ lettre = { version = "0.11.19", default-features = false, features = [
   "ring",
   "tokio1-rustls",
 ] }
+md5 = "0.8.0"
+image = { version = "0.25.9", default-features = false, features = [
+  "png",
+  "jpeg",
+  "webp",
+] }
+base64 = "0.22.1"
 
 [[bin]]
 name = "backend"

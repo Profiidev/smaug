@@ -24,7 +24,11 @@
       <SidebarContent {items} {user} />
     </Sidebar.Content>
     <Sidebar.Footer>
-      <SidebarUser name={user.name} email={user.email} avatar="" />
+      <SidebarUser
+        name={user.name}
+        email={user.email}
+        avatar={`data:image/webp;base64,${user.avatar || ''}`}
+      />
     </Sidebar.Footer>
   </Sidebar.Root>
   <Sidebar.Inset>

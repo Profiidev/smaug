@@ -32,6 +32,7 @@ pub struct Updater(Sender<UpdateMessage>);
 pub enum UpdateMessage {
   Nodes,
   Settings,
+  Users,
 }
 
 impl UpdateState {

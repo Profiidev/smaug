@@ -16,6 +16,7 @@ use crate::config::Config;
 mod auth;
 mod config;
 mod db;
+mod gravatar;
 mod mail;
 mod nodes;
 mod permissions;

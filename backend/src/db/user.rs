@@ -16,13 +16,23 @@ impl<'db> UserTable<'db> {
     email: String,
     password: String,
     salt: String,
-  ) -> Result<Uuid, DbErr> {
+  ) -> centaurus::error::Result<Uuid> {
+    let url = crate::gravatar::get_gravatar_url(&email);
+    let data = match reqwest::get(&url).await {
+      Ok(response) => match response.bytes().await {
+        Ok(bytes) => Some(hex::encode(bytes)),
+        Err(_) => None,
+      },
+      Err(_) => None,
+    };
+
     let model = user::Model {
       id: Uuid::new_v4(),
       name: username,
       email,
       password,
       salt,
+      avatar: data,
     }
     .into_active_model();
 
@@ -62,6 +72,26 @@ impl<'db> UserTable<'db> {
     let mut user: user::ActiveModel = self.get_user_by_id(id).await?.into();
 
     user.password = Set(new_password);
+
+    user.update(self.db).await?;
+
+    Ok(())
+  }
+
+  pub async fn update_user_name(&self, id: Uuid, new_name: String) -> Result<(), DbErr> {
+    let mut user: user::ActiveModel = self.get_user_by_id(id).await?.into();
+
+    user.name = Set(new_name);
+
+    user.update(self.db).await?;
+
+    Ok(())
+  }
+
+  pub async fn update_user_avatar(&self, id: Uuid, new_avatar: String) -> Result<(), DbErr> {
+    let mut user: user::ActiveModel = self.get_user_by_id(id).await?.into();
+
+    user.avatar = Set(Some(new_avatar));
 
     user.update(self.db).await?;
 

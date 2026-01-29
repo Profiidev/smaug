@@ -4,7 +4,7 @@
 
 # account settings
 
-# rate limiting for auth and reset password endpoints
+# rate limiting for auth and reset password endpoints + image upload
 
 # user management
 
