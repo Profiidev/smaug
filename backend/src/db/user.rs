@@ -1,4 +1,8 @@
+use std::io::Cursor;
+
+use base64::prelude::*;
 use entity::user;
+use image::{ImageFormat, imageops::FilterType};
 use sea_orm::{IntoActiveModel, Set, prelude::*};
 
 pub struct UserTable<'db> {
@@ -20,7 +24,15 @@ impl<'db> UserTable<'db> {
     let url = crate::gravatar::get_gravatar_url(&email);
     let data = match reqwest::get(&url).await {
       Ok(response) => match response.bytes().await {
-        Ok(bytes) => Some(hex::encode(bytes)),
+        Ok(bytes) => {
+          let img = image::load_from_memory(&bytes)?;
+          let img = img.resize_exact(128, 128, FilterType::Lanczos3);
+
+          let mut buf = Cursor::new(Vec::new());
+          img.write_to(&mut buf, ImageFormat::WebP)?;
+          let avatar = BASE64_STANDARD.encode(buf.into_inner());
+          Some(avatar)
+        }
         Err(_) => None,
       },
       Err(_) => None,
