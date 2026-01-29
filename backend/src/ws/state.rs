@@ -1,26 +1,22 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use axum::{Extension, extract::FromRequestParts};
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use tokio::{
   spawn,
-  sync::{
-    Mutex,
-    mpsc::{self, Receiver, Sender},
-  },
+  sync::mpsc::{self, Receiver, Sender},
   task::JoinHandle,
 };
+use tracing::debug;
 use uuid::Uuid;
-
-pub type Sessions = Arc<Mutex<HashMap<Uuid, Sender<UpdateMessage>>>>;
 
 #[derive(Clone, FromRequestParts)]
 #[from_request(via(Extension))]
 pub struct UpdateState {
-  sessions: Sessions,
+  sessions: DashMap<Uuid, Sender<UpdateMessage>>,
   #[allow(dead_code)]
   update_proxy: Arc<JoinHandle<()>>,
-  updater: Updater,
 }
 
 #[derive(Clone, FromRequestParts)]
@@ -31,11 +27,13 @@ pub struct Updater(Sender<UpdateMessage>);
 #[serde(tag = "type")]
 pub enum UpdateMessage {
   Nodes,
+  Settings,
+  Users,
 }
 
 impl UpdateState {
   pub async fn init() -> (Self, Updater) {
-    let sessions: Sessions = Default::default();
+    let sessions: DashMap<Uuid, Sender<UpdateMessage>> = DashMap::default();
     let (sender, mut receiver) = mpsc::channel(100);
     let updater = Updater(sender);
 
@@ -43,8 +41,9 @@ impl UpdateState {
       let sessions = sessions.clone();
       async move {
         while let Some(message) = receiver.recv().await {
-          for sender in sessions.lock().await.values() {
-            sender.send(message.clone()).await.ok();
+          debug!("Broadcasting update message: {:?}", message);
+          for pair in sessions.iter() {
+            pair.value().send(message.clone()).await.ok();
           }
         }
       }
@@ -53,7 +52,6 @@ impl UpdateState {
     let state = Self {
       sessions,
       update_proxy: Arc::new(update_proxy),
-      updater: updater.clone(),
     };
 
     (state, updater)
@@ -62,20 +60,13 @@ impl UpdateState {
   pub async fn create_session(&self) -> (Uuid, Receiver<UpdateMessage>) {
     let (send, recv) = mpsc::channel(100);
     let uuid = Uuid::new_v4();
-
-    let mut lock = self.sessions.lock().await;
-    lock.insert(uuid, send);
+    self.sessions.insert(uuid, send);
 
     (uuid, recv)
   }
 
   pub async fn remove_session(&self, uuid: &Uuid) {
-    self.sessions.lock().await.remove(uuid);
-  }
-
-  #[allow(unused)]
-  pub async fn broadcast_message(&self, msg: UpdateMessage) {
-    self.updater.broadcast(msg).await;
+    self.sessions.remove(uuid);
   }
 }
 

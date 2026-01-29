@@ -3,15 +3,18 @@ import { invalidate } from '$app/navigation';
 import { sleep } from 'positron-components/util/interval.svelte';
 
 export enum UpdateType {
-  Nodes = 'Nodes'
+  Nodes = 'Nodes',
+  Settings = 'Settings',
+  Users = 'Users'
 }
 
 export type UpdateMessage = {
-  type: UpdateType.Nodes;
+  type: UpdateType.Nodes | UpdateType.Settings | UpdateType.Users;
 };
 
 let updater: WebSocket | undefined | false = $state(browser && undefined);
 let interval: number;
+let disconnect = false;
 
 export const connectWebsocket = () => {
   if (updater === false || updater) return;
@@ -28,6 +31,7 @@ const createWebsocket = () => {
 
   updater.onclose = async () => {
     clearInterval(interval);
+    if (disconnect) return;
     await sleep(1000);
     createWebsocket();
   };
@@ -46,10 +50,26 @@ const createWebsocket = () => {
   }, 10000) as unknown as number;
 };
 
+export const disconnectWebsocket = () => {
+  if (updater) {
+    disconnect = true;
+    updater.close();
+    updater = undefined;
+  }
+};
+
 const handleMessage = (msg: UpdateMessage) => {
   switch (msg.type) {
     case UpdateType.Nodes: {
-      invalidate((url) => url.pathname.startsWith('/api/admin/nodes'));
+      invalidate((url) => url.pathname.startsWith('/api/nodes'));
+      break;
+    }
+    case UpdateType.Settings: {
+      invalidate((url) => url.pathname.startsWith('/api/settings'));
+      break;
+    }
+    case UpdateType.Users: {
+      invalidate((url) => url.pathname.startsWith('/api/user'));
       break;
     }
   }

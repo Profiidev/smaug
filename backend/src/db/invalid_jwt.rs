@@ -1,3 +1,8 @@
+use std::sync::{
+  Arc,
+  atomic::{AtomicI32, Ordering},
+};
+
 use chrono::{DateTime, Utc};
 use entity::{invalid_jwt, prelude::*};
 use sea_orm::{ActiveValue::Set, prelude::*};
@@ -17,7 +22,7 @@ impl<'db> InvalidJwtTable<'db> {
     &self,
     token: String,
     exp: DateTime<Utc>,
-    invalid_count: &mut i32,
+    invalid_count: Arc<AtomicI32>,
   ) -> Result<(), DbErr> {
     let model = invalid_jwt::ActiveModel {
       token: Set(token),
@@ -26,11 +31,11 @@ impl<'db> InvalidJwtTable<'db> {
     };
     model.insert(self.db).await?;
 
-    if *invalid_count > 1000 {
+    if invalid_count.load(Ordering::Relaxed) > 1000 {
       self.remove_expired().await?;
-      *invalid_count = 0;
+      invalid_count.store(0, Ordering::Relaxed);
     } else {
-      *invalid_count += 1;
+      invalid_count.fetch_add(1, Ordering::Relaxed);
     }
 
     Ok(())

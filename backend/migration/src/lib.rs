@@ -4,6 +4,10 @@ mod m20250301_215149_create_key_table;
 mod m20260123_144736_invalid_jwt;
 mod m20260123_144752_user;
 mod m20260123_145152_node;
+mod m20260126_155842_group;
+mod m20260126_160754_setup;
+mod m20260127_211643_settings;
+mod m20260129_154755_user_avatar;
 
 pub struct Migrator;
 
@@ -15,6 +19,10 @@ impl MigratorTrait for Migrator {
       Box::new(m20260123_144736_invalid_jwt::Migration),
       Box::new(m20260123_144752_user::Migration),
       Box::new(m20260123_145152_node::Migration),
+      Box::new(m20260126_155842_group::Migration),
+      Box::new(m20260126_160754_setup::Migration),
+      Box::new(m20260127_211643_settings::Migration),
+      Box::new(m20260129_154755_user_avatar::Migration),
     ]
   }
 }

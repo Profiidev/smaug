@@ -1,21 +1,29 @@
 use centaurus::db::init::Connection;
 
+use crate::db::group::GroupTable;
 use crate::db::invalid_jwt::InvalidJwtTable;
 use crate::db::key::KeyTable;
 use crate::db::node::NodeTable;
+use crate::db::settings::SettingsTable;
+use crate::db::setup::SetupTable;
+use crate::db::user::UserTable;
 
-#[allow(unused)]
+pub mod group;
 pub mod invalid_jwt;
-#[allow(unused)]
 pub mod key;
 pub mod node;
+pub mod settings;
+pub mod setup;
+pub mod user;
 
 pub trait DBTrait {
-  #[allow(unused)]
   fn key(&self) -> KeyTable<'_>;
-  #[allow(unused)]
   fn invalid_jwt(&self) -> InvalidJwtTable<'_>;
   fn node(&self) -> NodeTable<'_>;
+  fn setup(&self) -> SetupTable<'_>;
+  fn group(&self) -> GroupTable<'_>;
+  fn user(&self) -> UserTable<'_>;
+  fn settings(&self) -> SettingsTable<'_>;
 }
 
 impl DBTrait for Connection {
@@ -29,5 +37,21 @@ impl DBTrait for Connection {
 
   fn node(&self) -> NodeTable<'_> {
     NodeTable::new(self)
+  }
+
+  fn setup(&self) -> SetupTable<'_> {
+    SetupTable::new(self)
+  }
+
+  fn group(&self) -> GroupTable<'_> {
+    GroupTable::new(self)
+  }
+
+  fn user(&self) -> UserTable<'_> {
+    UserTable::new(self)
+  }
+
+  fn settings(&self) -> SettingsTable<'_> {
+    SettingsTable::new(self)
   }
 }

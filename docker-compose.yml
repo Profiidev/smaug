@@ -20,6 +20,7 @@ services:
     image: ghcr.io/profiidev/images/rust-musl-watch:main
     restart: unless-stopped
     volumes:
+      - ./.cargo:/app/.cargo
       - ./backend:/app
       - ./shared:/shared
     networks:
