@@ -10,10 +10,12 @@
   import { page } from '$app/state';
   import type { UserInfo } from '$lib/backend/user.svelte';
   import { noSidebarPaths } from '$lib/components/navigation/sidebar/items.svelte';
+  import { setMode } from 'mode-watcher';
 
   let { children, data } = $props();
 
   onMount(() => {
+    setMode('dark');
     testToken().then((valid) => {
       // can also be undefined if there was an error
       if (valid === false) {

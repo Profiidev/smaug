@@ -23,7 +23,7 @@
           <div
             class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
           >
-            <Dragon class="size-4" />
+            <Dragon class="size-4 text-orange-400" />
           </div>
           <div class="flex flex-col gap-0.5 leading-none">
             <span class="font-medium text-nowrap">Smaug</span>
