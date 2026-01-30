@@ -17,6 +17,7 @@ mod auth;
 mod config;
 mod db;
 mod gravatar;
+mod group;
 mod mail;
 mod nodes;
 mod permissions;
@@ -56,6 +57,7 @@ fn api_router(rate_limiter: &mut RateLimiter) -> Router {
     .nest("/user", user::router(rate_limiter))
     .nest("/settings", settings::router())
     .nest("/mail", mail::router(rate_limiter))
+    .nest("/group", group::router())
 }
 
 async fn state(router: Router, config: Config) -> Router {

@@ -16,6 +16,7 @@
   import AdvancedSettingsFields from '../../create/AdvancedSettingsFields.svelte';
   import { updateNode } from '$lib/backend/node.svelte.js';
   import { RequestError } from 'positron-components/backend';
+  import { Separator } from 'positron-components/components/ui/separator';
 
   const schema = generalSettings.extend(advancedSettings.shape);
 
@@ -48,7 +49,7 @@
 <h4 class="mb-2">Settings</h4>
 <BaseForm {schema} {onsubmit} initialValue={undoReformatData(data.node)}>
   {#snippet children({ props })}
-    <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_1fr]">
       <div>
         {/* @ts-ignore */ null}
         <GeneralSettingsFields
@@ -57,6 +58,7 @@
           secure={data.node.secure}
         />
       </div>
+      <Separator orientation="vertical" class="hidden lg:block" />
       <div>
         {/* @ts-ignore */ null}
         <AdvancedSettingsFields

@@ -32,7 +32,7 @@
       } else if (res === RequestError.BadRequest) {
         return { error: 'Invalid node address.' };
       } else {
-        return { error: 'Error creating deployment.' };
+        return { error: 'Error creating node.' };
       }
     } else {
       toast.success('Node created successfully.');

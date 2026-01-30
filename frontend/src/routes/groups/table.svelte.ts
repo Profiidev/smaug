@@ -1,0 +1,48 @@
+import type { ColumnDef } from '@tanstack/table-core';
+import * as DataTable from 'positron-components/components/ui/data-table';
+import { createColumn } from 'positron-components/components/table/helpers.svelte';
+import Actions from '$lib/components/table/Actions.svelte';
+import { Permission } from '$lib/permissions.svelte';
+import type { GroupInfo, SimpleUserInfo } from '$lib/backend/groups.svelte';
+import type { UserInfo } from '$lib/backend/user.svelte';
+
+export const columns = ({
+  deleteGroup,
+  user,
+  admin_group
+}: {
+  deleteGroup: (group: GroupInfo) => void;
+  user?: UserInfo;
+  admin_group?: string;
+}): ColumnDef<GroupInfo>[] => [
+  createColumn('name', 'Name'),
+  createColumn(
+    'permissions',
+    'Permissions',
+    (permissions: string[]) => permissions.join(', ') || 'No Permissions'
+  ),
+  createColumn(
+    'users',
+    'Users',
+    (users: SimpleUserInfo[]) =>
+      users.map((u) => u.name).join(', ') || 'No Users'
+  ),
+  createColumn('id', 'UUID'),
+  {
+    accessorKey: 'actions',
+    header: () => {},
+    cell: ({ row }) => {
+      return DataTable.renderComponent(Actions, {
+        edit_disabled:
+          !user?.permissions.includes(Permission.GROUP_EDIT) ||
+          row.original.id === admin_group,
+        delete_disabled:
+          !user?.permissions.includes(Permission.GROUP_EDIT) ||
+          row.original.id === admin_group,
+        editHref: `/groups/${row.original.id}`,
+        remove: () => deleteGroup(row.original)
+      });
+    },
+    enableHiding: false
+  }
+];
