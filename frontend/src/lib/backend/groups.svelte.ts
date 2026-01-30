@@ -1,4 +1,10 @@
-import { delete_, get, post, ResponseType } from 'positron-components/backend';
+import {
+  delete_,
+  get,
+  post,
+  put,
+  ResponseType
+} from 'positron-components/backend';
 
 export interface GroupInfo {
   id: string;
@@ -63,6 +69,19 @@ export interface GroupDeleteRequest {
 
 export const deleteGroup = async (data: GroupDeleteRequest) => {
   return await delete_('/api/group', {
+    body: data
+  });
+};
+
+export interface GroupEditRequest {
+  uuid: string;
+  name: string;
+  permissions: string[];
+  users: string[];
+}
+
+export const editGroup = async (data: GroupEditRequest) => {
+  return await put<void>('/api/group', {
     body: data
   });
 };

@@ -32,13 +32,16 @@ export const columns = ({
     accessorKey: 'actions',
     header: () => {},
     cell: ({ row }) => {
+      let disabled =
+        !user?.permissions.includes(Permission.GROUP_EDIT) ||
+        row.original.id === admin_group ||
+        row.original.permissions.some(
+          (p) => !user?.permissions.includes(p as Permission)
+        );
+
       return DataTable.renderComponent(Actions, {
-        edit_disabled:
-          !user?.permissions.includes(Permission.GROUP_EDIT) ||
-          row.original.id === admin_group,
-        delete_disabled:
-          !user?.permissions.includes(Permission.GROUP_EDIT) ||
-          row.original.id === admin_group,
+        edit_disabled: disabled,
+        delete_disabled: disabled,
         editHref: `/groups/${row.original.id}`,
         remove: () => deleteGroup(row.original)
       });

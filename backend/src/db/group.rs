@@ -1,5 +1,5 @@
 use entity::{group, group_permission, group_user, user};
-use sea_orm::{IntoActiveModel, JoinType, QuerySelect, prelude::*};
+use sea_orm::{IntoActiveModel, JoinType, QuerySelect, Set, prelude::*};
 use serde::{Deserialize, Serialize};
 
 pub struct GroupTable<'db> {
@@ -191,5 +191,38 @@ impl<'db> GroupTable<'db> {
       .await?;
 
     Ok(group.map(|g| g.id))
+  }
+
+  pub async fn edit_group(
+    &self,
+    uuid: Uuid,
+    name: String,
+    permissions: Vec<String>,
+    users: Vec<Uuid>,
+  ) -> Result<(), DbErr> {
+    // Update group name
+    let mut group_model = group::Entity::find_by_id(uuid)
+      .one(self.db)
+      .await?
+      .ok_or(DbErr::RecordNotFound("Group not found".to_string()))?
+      .into_active_model();
+    group_model.name = Set(name);
+    group_model.update(self.db).await?;
+
+    // Clear existing permissions and users
+    group_permission::Entity::delete_many()
+      .filter(group_permission::Column::GroupId.eq(uuid))
+      .exec(self.db)
+      .await?;
+    group_user::Entity::delete_many()
+      .filter(group_user::Column::GroupId.eq(uuid))
+      .exec(self.db)
+      .await?;
+
+    // Add new permissions and users
+    self.add_permissions_to_group(uuid, permissions).await?;
+    self.add_user_to_groups(uuid, users).await?;
+
+    Ok(())
   }
 }

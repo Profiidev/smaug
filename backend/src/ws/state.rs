@@ -29,6 +29,7 @@ pub enum UpdateMessage {
   Nodes,
   Settings,
   Users,
+  Groups,
 }
 
 impl UpdateState {
