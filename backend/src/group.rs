@@ -9,7 +9,10 @@ use uuid::Uuid;
 
 use crate::{
   auth::jwt_auth::JwtAuth,
-  db::{DBTrait, group::GroupInfo},
+  db::{
+    DBTrait,
+    group::{GroupInfo, SimpleUserInfo},
+  },
   permissions::{GroupEdit, GroupView},
   ws::state::{UpdateMessage, Updater},
 };
@@ -21,6 +24,7 @@ pub fn router() -> Router {
     .route("/", delete(delete_group))
     .route("/", put(edit_group))
     .route("/{uuid}", get(group_info))
+    .route("/users", get(list_users_simple))
 }
 
 #[derive(Serialize)]
@@ -160,4 +164,12 @@ async fn edit_group(
   updater.broadcast(UpdateMessage::Groups).await;
 
   Ok(())
+}
+
+async fn list_users_simple(
+  _auth: JwtAuth<GroupView>,
+  db: Connection,
+) -> Result<Json<Vec<SimpleUserInfo>>> {
+  let users = db.user().list_users_simple().await?;
+  Ok(Json(users))
 }

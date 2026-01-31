@@ -5,6 +5,8 @@ use entity::user;
 use image::{ImageFormat, imageops::FilterType};
 use sea_orm::{IntoActiveModel, Set, prelude::*};
 
+use crate::db::group::SimpleUserInfo;
+
 pub struct UserTable<'db> {
   db: &'db DatabaseConnection,
 }
@@ -108,5 +110,19 @@ impl<'db> UserTable<'db> {
     user.update(self.db).await?;
 
     Ok(())
+  }
+
+  pub async fn list_users_simple(&self) -> Result<Vec<SimpleUserInfo>, DbErr> {
+    let users = user::Entity::find().all(self.db).await?;
+
+    Ok(
+      users
+        .into_iter()
+        .map(|u| SimpleUserInfo {
+          id: u.id,
+          name: u.name,
+        })
+        .collect(),
+    )
   }
 }

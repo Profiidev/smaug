@@ -85,3 +85,16 @@ export const editGroup = async (data: GroupEditRequest) => {
     body: data
   });
 };
+
+export const simpleUserList = async (
+  fetch: typeof window.fetch = window.fetch
+) => {
+  let ret = await get<SimpleUserInfo[]>('/api/group/users', {
+    res_type: ResponseType.Json,
+    fetch
+  });
+
+  if (ret && Array.isArray(ret)) {
+    return ret;
+  }
+};

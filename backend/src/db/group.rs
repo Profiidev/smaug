@@ -102,6 +102,21 @@ impl<'db> GroupTable<'db> {
     Ok(())
   }
 
+  pub async fn add_users_to_group(&self, group_id: Uuid, user_ids: Vec<Uuid>) -> Result<(), DbErr> {
+    let mut models = Vec::new();
+
+    for user_id in user_ids {
+      let model = group_user::Model { user_id, group_id }.into_active_model();
+      models.push(model);
+    }
+
+    group_user::Entity::insert_many(models)
+      .exec(self.db)
+      .await?;
+
+    Ok(())
+  }
+
   pub async fn user_hash_permissions(
     &self,
     user_id: Uuid,
@@ -224,7 +239,7 @@ impl<'db> GroupTable<'db> {
       self.add_permissions_to_group(uuid, permissions).await?;
     }
     if !users.is_empty() {
-      self.add_user_to_groups(uuid, users).await?;
+      self.add_users_to_group(uuid, users).await?;
     }
 
     Ok(())

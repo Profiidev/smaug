@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 export const groupSettings = z.object({
   name: z.string().min(1, 'Group name is required'),
+  users: z.array(z.string()),
   node_view: z.boolean().default(false),
   node_edit: z.boolean().default(false),
   settings_view: z.boolean().default(false),
@@ -28,7 +29,7 @@ export const reformatData = (
     uuid,
     name: data.name,
     permissions,
-    users: [] // Users should be set elsewhere
+    users: data.users || []
   };
 };
 
@@ -42,7 +43,8 @@ export const formatData = (
     settings_view: false,
     settings_edit: false,
     group_view: false,
-    group_edit: false
+    group_edit: false,
+    users: group.users.map((user) => user.id)
   };
 
   for (const permission of group.permissions) {

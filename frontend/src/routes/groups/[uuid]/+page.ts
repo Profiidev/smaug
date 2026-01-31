@@ -1,10 +1,13 @@
 import { RequestError } from 'positron-components/backend';
 import type { PageLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { getGroupInfo } from '$lib/backend/groups.svelte';
+import { getGroupInfo, simpleUserList } from '$lib/backend/groups.svelte';
 
 export const load: PageLoad = async ({ params, fetch }) => {
-  let res = await getGroupInfo(params.uuid, fetch);
+  let resPromise = getGroupInfo(params.uuid, fetch);
+  let usersPromise = simpleUserList(fetch);
+
+  let [res, users] = await Promise.all([resPromise, usersPromise]);
 
   if (typeof res !== 'object') {
     if (res === RequestError.NotFound) {
@@ -16,6 +19,7 @@ export const load: PageLoad = async ({ params, fetch }) => {
 
   return {
     uuid: params.uuid,
-    group: res
+    group: res,
+    users
   };
 };

@@ -17,6 +17,7 @@
   import Save from '@lucide/svelte/icons/save';
   import { Spinner } from 'positron-components/components/ui/spinner';
   import FormCheckbox from '$lib/components/form/FormCheckbox.svelte';
+  import FormSelect from 'positron-components/components/form/form-select.svelte';
 
   const { data } = $props();
 
@@ -96,6 +97,15 @@
                 placeholder="Enter group name"
                 {readonly}
               />
+              <FormSelect
+                {...props}
+                key="users"
+                label="Group Members"
+                data={data.users?.map((user) => ({
+                  label: user.name,
+                  value: user.id
+                })) || []}
+              />
               <h5>Permissions</h5>
               <div class="ml-4">
                 {#if data.user?.permissions.includes(Permission.NODE_VIEW) || data.user?.permissions.includes(Permission.NODE_EDIT)}
@@ -166,18 +176,20 @@
           </div>
         {/snippet}
         {#snippet footer({ isLoading }: { isLoading: boolean })}
-          <Button
-            class="ml-auto cursor-pointer"
-            type="submit"
-            disabled={isLoading}
-          >
-            {#if isLoading}
-              <Spinner />
-            {:else}
-              <Save />
-            {/if}
-            Save Changes</Button
-          >
+          <div class="mt-4 grid w-full grid-cols-1 lg:grid-cols-2">
+            <Button
+              class="ml-auto cursor-pointer"
+              type="submit"
+              disabled={isLoading}
+            >
+              {#if isLoading}
+                <Spinner />
+              {:else}
+                <Save />
+              {/if}
+              Save Changes</Button
+            >
+          </div>
         {/snippet}
       </BaseForm>
     </div>
