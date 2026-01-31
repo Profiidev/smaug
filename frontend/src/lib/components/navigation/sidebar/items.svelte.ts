@@ -4,6 +4,7 @@ import House from '@lucide/svelte/icons/house';
 import { Permission } from '$lib/permissions.svelte';
 import type { Component } from 'svelte';
 import Users from '@lucide/svelte/icons/users';
+import User from '@lucide/svelte/icons/user';
 
 export interface NavItem {
   label: string;
@@ -25,6 +26,12 @@ export const items: NavItem[] = [
     href: '/nodes',
     icon: Server,
     requiredPermission: Permission.NODE_VIEW
+  },
+  {
+    label: 'Users',
+    href: '/users',
+    icon: User,
+    requiredPermission: Permission.USER_VIEW
   },
   {
     label: 'Groups',

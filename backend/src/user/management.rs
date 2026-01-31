@@ -19,7 +19,11 @@ use uuid::Uuid;
 
 use crate::{
   auth::jwt_auth::JwtAuth,
-  db::{DBTrait, settings::GeneralSettings, user::UserInfo},
+  db::{
+    DBTrait,
+    settings::GeneralSettings,
+    user::{SimpleGroupInfo, UserInfo},
+  },
   mail::{state::Mailer, templates},
   permissions::{UserEdit, UserView},
   ws::state::{UpdateMessage, Updater},
@@ -34,6 +38,7 @@ pub fn router() -> Router {
     .route("/", delete(delete_user))
     .route("/{uuid}", get(user_info))
     .route("/mail", get(mail_active))
+    .route("/groups", get(list_groups_simple))
 }
 
 async fn list_users(_auth: JwtAuth<UserView>, db: Connection) -> Result<Json<Vec<UserInfo>>> {
@@ -116,7 +121,7 @@ async fn create_user(
   };
 
   let salt = SaltString::generate(OsRng {}).to_string();
-  let password_hash = state.pw_hash(&salt, &password)?;
+  let password_hash = state.pw_hash_raw(&salt, &password)?;
 
   let user_id = db
     .user()
@@ -154,4 +159,12 @@ async fn delete_user(
   updater.broadcast(UpdateMessage::Users).await;
 
   Ok(())
+}
+
+async fn list_groups_simple(
+  _auth: JwtAuth<UserView>,
+  db: Connection,
+) -> Result<Json<Vec<SimpleGroupInfo>>> {
+  let groups = db.group().list_groups_simple().await?;
+  Ok(Json(groups))
 }

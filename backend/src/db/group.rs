@@ -2,6 +2,8 @@ use entity::{group, group_permission, group_user, user};
 use sea_orm::{IntoActiveModel, JoinType, QuerySelect, Set, prelude::*};
 use serde::{Deserialize, Serialize};
 
+use crate::db::user::SimpleGroupInfo;
+
 pub struct GroupTable<'db> {
   db: &'db DatabaseConnection,
 }
@@ -243,5 +245,19 @@ impl<'db> GroupTable<'db> {
     }
 
     Ok(())
+  }
+
+  pub async fn list_groups_simple(&self) -> Result<Vec<SimpleGroupInfo>, DbErr> {
+    let groups = group::Entity::find()
+      .all(self.db)
+      .await?
+      .into_iter()
+      .map(|g| SimpleGroupInfo {
+        uuid: g.id,
+        name: g.name,
+      })
+      .collect();
+
+    Ok(groups)
   }
 }

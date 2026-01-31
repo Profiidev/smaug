@@ -113,10 +113,14 @@ export const getListUserInfo = async (
 export const getMailStatus = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  return await get<{ active: boolean }>('/api/user/management/mail', {
+  let ret = await get<{ active: boolean }>('/api/user/management/mail', {
     res_type: ResponseType.Json,
     fetch
   });
+
+  if (ret && typeof ret === 'object') {
+    return ret;
+  }
 };
 
 export const deleteUser = async (uuid: string) => {
@@ -132,8 +136,47 @@ export interface CreateUserRequest {
 }
 
 export const createUser = async (data: CreateUserRequest) => {
-  return await post<{ uuid: string }>('/api/user/management', {
+  let encrypt = getEncrypt();
+  if (!encrypt) {
+    return RequestError.Other;
+  }
+
+  let encrypted_password = encrypt.encrypt(data.password || '');
+  data.password = encrypted_password || '';
+
+  let res = await post<{ uuid: string }>('/api/user/management', {
     body: data,
     res_type: ResponseType.Json
+  });
+
+  if (res === RequestError.Unauthorized) {
+    fetchKey();
+  }
+
+  return res;
+};
+
+export const simpleGroupList = async (
+  fetch: typeof window.fetch = window.fetch
+) => {
+  let ret = await get<SimpleGroupInfo[]>('/api/user/management/groups', {
+    res_type: ResponseType.Json,
+    fetch
+  });
+
+  if (ret && Array.isArray(ret)) {
+    return ret;
+  }
+};
+
+export interface UserEditRequest {
+  uuid: string;
+  name: string;
+  groups: string[];
+}
+
+export const editUser = async (data: UserEditRequest) => {
+  return await post(`/api/user/management/edit`, {
+    body: data
   });
 };

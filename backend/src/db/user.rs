@@ -41,18 +41,24 @@ impl<'db> UserTable<'db> {
   ) -> centaurus::error::Result<Uuid> {
     let url = crate::gravatar::get_gravatar_url(&email);
     let data = match reqwest::get(&url).await {
-      Ok(response) => match response.bytes().await {
-        Ok(bytes) => {
-          let img = image::load_from_memory(&bytes)?;
-          let img = img.resize_exact(128, 128, FilterType::Lanczos3);
+      Ok(response) => {
+        if response.status().is_success() {
+          match response.bytes().await {
+            Ok(bytes) => {
+              let img = image::load_from_memory(&bytes)?;
+              let img = img.resize_exact(128, 128, FilterType::Lanczos3);
 
-          let mut buf = Cursor::new(Vec::new());
-          img.write_to(&mut buf, ImageFormat::WebP)?;
-          let avatar = BASE64_STANDARD.encode(buf.into_inner());
-          Some(avatar)
+              let mut buf = Cursor::new(Vec::new());
+              img.write_to(&mut buf, ImageFormat::WebP)?;
+              let avatar = BASE64_STANDARD.encode(buf.into_inner());
+              Some(avatar)
+            }
+            Err(_) => None,
+          }
+        } else {
+          None
         }
-        Err(_) => None,
-      },
+      }
       Err(_) => None,
     };
 
