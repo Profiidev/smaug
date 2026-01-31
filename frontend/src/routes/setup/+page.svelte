@@ -63,4 +63,5 @@
   {data}
   submitLabel="Finish"
   submitIcon={CheckIcon}
+  cancelHref="/"
 />

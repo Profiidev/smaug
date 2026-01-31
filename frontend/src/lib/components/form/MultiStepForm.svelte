@@ -23,6 +23,7 @@
     data?: T;
     submitLabel?: string;
     submitIcon?: Component;
+    cancelHref: string;
   }
 
   let {
@@ -30,7 +31,8 @@
     onsubmit,
     data = undefined as T,
     submitLabel = 'Create',
-    submitIcon: SubmitIcon = Plus
+    submitIcon: SubmitIcon = Plus,
+    cancelHref
   }: Props<T> = $props();
 
   let stage = $state(0);
@@ -111,7 +113,7 @@
               class="ml-auto cursor-pointer"
               variant="outline"
               disabled={isLoading}
-              href="/nodes"
+              href={cancelHref}
             >
               <Ban />
               Cancel

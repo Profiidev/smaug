@@ -26,8 +26,7 @@
       (!anyData.password || anyData.password.length < 6)
     ) {
       return {
-        error:
-          'Password must be at least 6 characters long when email service is not configured.',
+        error: 'Password must be at least 6 characters long.',
         path: 'password'
       };
     }
@@ -56,4 +55,5 @@
   {stages}
   onsubmit={submit}
   data={{ mailActive: data.mailActive }}
+  cancelHref="/users"
 />

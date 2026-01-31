@@ -36,4 +36,4 @@
   };
 </script>
 
-<MultiStepForm {stages} onsubmit={submit} />
+<MultiStepForm {stages} onsubmit={submit} cancelHref="/groups" />
