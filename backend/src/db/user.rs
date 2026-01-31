@@ -1,14 +1,30 @@
 use std::io::Cursor;
 
 use base64::prelude::*;
-use entity::user;
+use entity::{group, group_user, user};
 use image::{ImageFormat, imageops::FilterType};
 use sea_orm::{IntoActiveModel, Set, prelude::*};
+use serde::{Deserialize, Serialize};
 
 use crate::db::group::SimpleUserInfo;
 
 pub struct UserTable<'db> {
   db: &'db DatabaseConnection,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserInfo {
+  pub uuid: Uuid,
+  pub name: String,
+  pub email: String,
+  pub avatar: Option<String>,
+  pub groups: Vec<SimpleGroupInfo>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SimpleGroupInfo {
+  pub uuid: Uuid,
+  pub name: String,
 }
 
 impl<'db> UserTable<'db> {
@@ -124,5 +140,72 @@ impl<'db> UserTable<'db> {
         })
         .collect(),
     )
+  }
+
+  pub async fn list_users(&self) -> Result<Vec<UserInfo>, DbErr> {
+    let users = user::Entity::find().all(self.db).await?;
+    let group_user = users
+      .load_many_to_many(group::Entity, group_user::Entity, self.db)
+      .await?;
+
+    let result = users
+      .into_iter()
+      .zip(group_user.into_iter())
+      .map(|(user, groups)| UserInfo {
+        uuid: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        groups: groups
+          .into_iter()
+          .map(|group| SimpleGroupInfo {
+            uuid: group.id,
+            name: group.name,
+          })
+          .collect(),
+      })
+      .collect();
+
+    Ok(result)
+  }
+
+  pub async fn get_user_groups(&self, user_id: Uuid) -> Result<Vec<SimpleGroupInfo>, DbErr> {
+    let groups = group_user::Entity::find()
+      .filter(group_user::Column::UserId.eq(user_id))
+      .find_also_related(group::Entity)
+      .all(self.db)
+      .await?
+      .into_iter()
+      .filter_map(|(_, group)| {
+        group.map(|g| SimpleGroupInfo {
+          uuid: g.id,
+          name: g.name,
+        })
+      })
+      .collect();
+
+    Ok(groups)
+  }
+
+  pub async fn user_info(&self, user_id: Uuid) -> Result<Option<UserInfo>, DbErr> {
+    let user = user::Entity::find_by_id(user_id).one(self.db).await?;
+    let Some(user) = user else {
+      return Ok(None);
+    };
+
+    let groups = self.get_user_groups(user_id).await?;
+
+    Ok(Some(UserInfo {
+      uuid: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      groups,
+    }))
+  }
+
+  pub async fn delete_user(&self, user_id: Uuid) -> Result<(), DbErr> {
+    user::Entity::delete_by_id(user_id).exec(self.db).await?;
+    Ok(())
   }
 }

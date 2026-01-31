@@ -1,5 +1,6 @@
 import type { Permission } from '$lib/permissions.svelte';
 import {
+  delete_,
   get,
   post,
   RequestError,
@@ -69,4 +70,70 @@ export const updatePassword = async (payload: UpdatePassword) => {
   }
 
   return res;
+};
+
+export interface UserListInfo {
+  uuid: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  groups: SimpleGroupInfo[];
+}
+
+export interface SimpleGroupInfo {
+  uuid: string;
+  name: string;
+}
+
+export const listUsers = async (fetch: typeof window.fetch = window.fetch) => {
+  let ret = await get<UserListInfo[]>('/api/user/management', {
+    res_type: ResponseType.Json,
+    fetch
+  });
+
+  if (ret && Array.isArray(ret)) {
+    return ret;
+  }
+};
+
+export const getListUserInfo = async (
+  uuid: string,
+  fetch: typeof window.fetch = window.fetch
+) => {
+  let ret = await get<UserListInfo>(`/api/user/management/${uuid}`, {
+    res_type: ResponseType.Json,
+    fetch
+  });
+
+  if (ret && typeof ret === 'object') {
+    return ret;
+  }
+};
+
+export const getMailStatus = async (
+  fetch: typeof window.fetch = window.fetch
+) => {
+  return await get<{ active: boolean }>('/api/user/management/mail', {
+    res_type: ResponseType.Json,
+    fetch
+  });
+};
+
+export const deleteUser = async (uuid: string) => {
+  return await delete_(`/api/user/management`, {
+    body: { uuid }
+  });
+};
+
+export interface CreateUserRequest {
+  name: string;
+  email: string;
+  password?: string;
+}
+
+export const createUser = async (data: CreateUserRequest) => {
+  return await post<{ uuid: string }>('/api/user/management', {
+    body: data,
+    res_type: ResponseType.Json
+  });
 };

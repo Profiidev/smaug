@@ -9,7 +9,7 @@ use crate::{
 
 mod reset;
 pub mod state;
-mod templates;
+pub mod templates;
 mod test;
 
 pub fn router(rate_limiter: &mut RateLimiter) -> Router {
