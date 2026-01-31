@@ -139,7 +139,7 @@ impl MailConfig {
 #[derive(FromRequestParts, Clone)]
 #[from_request(via(Extension))]
 pub struct ResetPasswordState {
-  tokens: DashMap<String, (String, Instant)>,
+  tokens: Arc<DashMap<String, (String, Instant)>>,
 }
 
 impl ResetPasswordState {
@@ -160,7 +160,7 @@ impl ResetPasswordState {
 
 impl Default for ResetPasswordState {
   fn default() -> Self {
-    let map = DashMap::new();
+    let map = Arc::new(DashMap::new());
 
     spawn({
       let map = map.clone();

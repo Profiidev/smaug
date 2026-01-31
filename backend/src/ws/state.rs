@@ -14,7 +14,7 @@ use uuid::Uuid;
 #[derive(Clone, FromRequestParts)]
 #[from_request(via(Extension))]
 pub struct UpdateState {
-  sessions: DashMap<Uuid, Sender<UpdateMessage>>,
+  sessions: Arc<DashMap<Uuid, Sender<UpdateMessage>>>,
   #[allow(dead_code)]
   update_proxy: Arc<JoinHandle<()>>,
 }
@@ -34,7 +34,7 @@ pub enum UpdateMessage {
 
 impl UpdateState {
   pub async fn init() -> (Self, Updater) {
-    let sessions: DashMap<Uuid, Sender<UpdateMessage>> = DashMap::default();
+    let sessions: Arc<DashMap<Uuid, Sender<UpdateMessage>>> = Arc::new(DashMap::default());
     let (sender, mut receiver) = mpsc::channel(100);
     let updater = Updater(sender);
 

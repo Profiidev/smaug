@@ -220,8 +220,12 @@ impl<'db> GroupTable<'db> {
       .await?;
 
     // Add new permissions and users
-    self.add_permissions_to_group(uuid, permissions).await?;
-    self.add_user_to_groups(uuid, users).await?;
+    if !permissions.is_empty() {
+      self.add_permissions_to_group(uuid, permissions).await?;
+    }
+    if !users.is_empty() {
+      self.add_user_to_groups(uuid, users).await?;
+    }
 
     Ok(())
   }
