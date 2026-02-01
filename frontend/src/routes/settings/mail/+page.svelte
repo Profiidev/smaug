@@ -137,7 +137,7 @@
     </div>
   {/snippet}
   {#snippet footer({ isLoading }: { isLoading: boolean })}
-    <div class="mt-4 grid w-full grid-cols-1 lg:grid-cols-2">
+    <div class="mt-4 grid w-full grid-cols-1 gap-8 lg:grid-cols-2">
       <div class="flex">
         {#if !readonly && smtpEnabled}
           <Button disabled={isLoading} variant="secondary" onclick={testEmail}>

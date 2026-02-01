@@ -2,7 +2,7 @@ use argon2::password_hash::SaltString;
 use axum::{
   Json, Router,
   extract::{FromRequest, FromRequestParts, Path},
-  routing::{delete, get, post},
+  routing::{delete, get, post, put},
 };
 use base64::prelude::*;
 use centaurus::{
@@ -22,7 +22,7 @@ use crate::{
   db::{
     DBTrait,
     settings::GeneralSettings,
-    user::{SimpleGroupInfo, UserInfo},
+    user::{DetailUserInfo, SimpleGroupInfo, UserInfo},
   },
   mail::{state::Mailer, templates},
   permissions::{UserEdit, UserView},
@@ -36,9 +36,11 @@ pub fn router() -> Router {
     .route("/", get(list_users))
     .route("/", post(create_user))
     .route("/", delete(delete_user))
+    .route("/", put(edit_user))
     .route("/{uuid}", get(user_info))
     .route("/mail", get(mail_active))
     .route("/groups", get(list_groups_simple))
+    .route("/avatar", delete(reset_user_avatar))
 }
 
 async fn list_users(_auth: JwtAuth<UserView>, db: Connection) -> Result<Json<Vec<UserInfo>>> {
@@ -56,7 +58,7 @@ async fn user_info(
   _auth: JwtAuth<UserView>,
   db: Connection,
   path: UserViewPath,
-) -> Result<Json<UserInfo>> {
+) -> Result<Json<DetailUserInfo>> {
   let info = db.user().user_info(path.uuid).await?;
   let Some(info) = info else {
     bail!(NOT_FOUND, "User not found");
@@ -167,4 +169,73 @@ async fn list_groups_simple(
 ) -> Result<Json<Vec<SimpleGroupInfo>>> {
   let groups = db.group().list_groups_simple().await?;
   Ok(Json(groups))
+}
+
+#[derive(Deserialize, FromRequest)]
+#[from_request(via(Json))]
+struct UserEditReq {
+  uuid: Uuid,
+  name: String,
+  groups: Vec<Uuid>,
+}
+
+async fn edit_user(
+  auth: JwtAuth<UserEdit>,
+  db: Connection,
+  updater: Updater,
+  req: UserEditReq,
+) -> Result<()> {
+  let self_permissions = db.group().get_user_permissions(auth.user_id).await?;
+  let target_permissions = db
+    .group()
+    .get_groups_permissions(req.groups.clone())
+    .await?;
+
+  if target_permissions
+    .iter()
+    .any(|p| !self_permissions.contains(p))
+  {
+    tracing::warn!(
+      "User {:?} tried to assign permissions {:?} which they do not have themselves {:?}",
+      req.uuid,
+      target_permissions,
+      self_permissions
+    );
+
+    bail!(
+      FORBIDDEN,
+      "Cannot assign permissions that the editor does not have"
+    );
+  }
+
+  let Some(admin_group) = db.setup().get_admin_group_id().await? else {
+    bail!(INTERNAL_SERVER_ERROR, "Admin group is not set up");
+  };
+
+  if !req.groups.contains(&admin_group) && db.group().is_last_admin(admin_group, req.uuid).await? {
+    bail!(CONFLICT, "Cannot remove the last user from the admin group");
+  }
+
+  db.user().edit_user(req.uuid, req.name, req.groups).await?;
+  updater.broadcast(UpdateMessage::Users).await;
+
+  Ok(())
+}
+
+#[derive(Deserialize, FromRequest)]
+#[from_request(via(Json))]
+struct UserAvatarResetRequest {
+  uuid: Uuid,
+}
+
+async fn reset_user_avatar(
+  _auth: JwtAuth<UserEdit>,
+  db: Connection,
+  updater: Updater,
+  req: UserAvatarResetRequest,
+) -> Result<()> {
+  db.user().reset_avatar(req.uuid).await?;
+  updater.broadcast(UpdateMessage::Users).await;
+
+  Ok(())
 }

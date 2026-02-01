@@ -260,4 +260,31 @@ impl<'db> GroupTable<'db> {
 
     Ok(groups)
   }
+
+  pub async fn is_last_admin(&self, admin_group: Uuid, user_id: Uuid) -> Result<bool, DbErr> {
+    let admin_users = group_user::Entity::find()
+      .filter(group_user::Column::GroupId.eq(admin_group))
+      .all(self.db)
+      .await?;
+
+    if admin_users.len() == 1 && admin_users[0].user_id == user_id {
+      Ok(true)
+    } else {
+      Ok(false)
+    }
+  }
+
+  pub async fn get_groups_permissions(&self, group_ids: Vec<Uuid>) -> Result<Vec<String>, DbErr> {
+    let group_permissions = group_permission::Entity::find()
+      .filter(group_permission::Column::GroupId.is_in(group_ids))
+      .all(self.db)
+      .await?;
+
+    let permissions = group_permissions
+      .into_iter()
+      .map(|gp| gp.permission)
+      .collect();
+
+    Ok(permissions)
+  }
 }

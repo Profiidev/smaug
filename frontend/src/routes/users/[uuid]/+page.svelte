@@ -16,7 +16,13 @@
   import Save from '@lucide/svelte/icons/save';
   import { Spinner } from 'positron-components/components/ui/spinner';
   import FormSelect from 'positron-components/components/form/form-select.svelte';
-  import { deleteUser, editUser } from '$lib/backend/user.svelte.js';
+  import {
+    deleteUser,
+    editUser,
+    resetUserAvatar
+  } from '$lib/backend/user.svelte.js';
+  import SimpleAvatar from 'positron-components/components/util/simple-avatar.svelte';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 
   const { data } = $props();
 
@@ -24,6 +30,11 @@
   let isLoading = $state(false);
   let readonly = $derived(
     !data.user?.permissions.includes(Permission.USER_EDIT)
+  );
+  let allowSpecialEdit = $derived(
+    data.userInfo.permissions.every((perm) =>
+      data.user?.permissions.includes(perm)
+    )
   );
 
   const deleteItemConfirm = async () => {
@@ -47,7 +58,9 @@
 
     if (res) {
       if (res === RequestError.Conflict) {
-        return { error: 'This user name is already in use', field: 'name' };
+        return { error: 'Cannot remove the last user from the admin group' };
+      } else if (res === RequestError.Forbidden) {
+        return { error: 'Cannot assign permissions that you do not have' };
       } else {
         return { error: 'Failed to update user' };
       }
@@ -89,6 +102,26 @@
         {#snippet children({ props })}
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_1fr]">
             <div>
+              <div class="mb-2 flex items-center">
+                <SimpleAvatar
+                  src={data.userInfo.avatar ?? ''}
+                  class="size-14"
+                />
+                <Button
+                  variant="secondary"
+                  class="ml-auto cursor-pointer"
+                  onclick={async () => {
+                    if (await resetUserAvatar(data.userInfo.uuid)) {
+                      toast.error('Failed to reset avatar');
+                    } else {
+                      toast.success('Avatar reset successfully');
+                    }
+                  }}
+                >
+                  <RotateCcw class="mr-2 size-4" />
+                  Reset Avatar</Button
+                >
+              </div>
               <FormInput
                 {...props}
                 key="name"
@@ -100,6 +133,7 @@
                 {...props}
                 key="groups"
                 label="Group Membership"
+                disabled={readonly || !allowSpecialEdit}
                 data={data.groups?.map((group) => ({
                   label: group.name,
                   value: group.uuid
@@ -109,7 +143,7 @@
           </div>
         {/snippet}
         {#snippet footer({ isLoading }: { isLoading: boolean })}
-          <div class="mt-4 grid w-full grid-cols-1 lg:grid-cols-2">
+          <div class="mt-4 grid w-full grid-cols-1 gap-8 lg:grid-cols-2">
             <Button
               class="ml-auto cursor-pointer"
               type="submit"

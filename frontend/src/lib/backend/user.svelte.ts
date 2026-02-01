@@ -3,6 +3,7 @@ import {
   delete_,
   get,
   post,
+  put,
   RequestError,
   ResponseType
 } from 'positron-components/backend';
@@ -96,11 +97,15 @@ export const listUsers = async (fetch: typeof window.fetch = window.fetch) => {
   }
 };
 
+export type DetailUserInfo = UserListInfo & {
+  permissions: Permission[];
+};
+
 export const getListUserInfo = async (
   uuid: string,
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<UserListInfo>(`/api/user/management/${uuid}`, {
+  let ret = await get<DetailUserInfo>(`/api/user/management/${uuid}`, {
     res_type: ResponseType.Json,
     fetch
   });
@@ -176,7 +181,13 @@ export interface UserEditRequest {
 }
 
 export const editUser = async (data: UserEditRequest) => {
-  return await post(`/api/user/management/edit`, {
+  return await put(`/api/user/management`, {
     body: data
+  });
+};
+
+export const resetUserAvatar = async (uuid: string) => {
+  return await delete_(`/api/user/management/avatar`, {
+    body: { uuid }
   });
 };
