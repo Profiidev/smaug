@@ -1,12 +1,40 @@
 use std::io::Cursor;
 
 use base64::prelude::*;
-use entity::user;
+use entity::{group, group_user, user};
 use image::{ImageFormat, imageops::FilterType};
 use sea_orm::{IntoActiveModel, Set, prelude::*};
+use serde::{Deserialize, Serialize};
+
+use crate::db::group::{GroupTable, SimpleUserInfo};
 
 pub struct UserTable<'db> {
   db: &'db DatabaseConnection,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserInfo {
+  pub uuid: Uuid,
+  pub name: String,
+  pub email: String,
+  pub avatar: Option<String>,
+  pub groups: Vec<SimpleGroupInfo>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DetailUserInfo {
+  pub uuid: Uuid,
+  pub name: String,
+  pub email: String,
+  pub avatar: Option<String>,
+  pub groups: Vec<SimpleGroupInfo>,
+  pub permissions: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SimpleGroupInfo {
+  pub uuid: Uuid,
+  pub name: String,
 }
 
 impl<'db> UserTable<'db> {
@@ -23,18 +51,24 @@ impl<'db> UserTable<'db> {
   ) -> centaurus::error::Result<Uuid> {
     let url = crate::gravatar::get_gravatar_url(&email);
     let data = match reqwest::get(&url).await {
-      Ok(response) => match response.bytes().await {
-        Ok(bytes) => {
-          let img = image::load_from_memory(&bytes)?;
-          let img = img.resize_exact(128, 128, FilterType::Lanczos3);
+      Ok(response) => {
+        if response.status().is_success() {
+          match response.bytes().await {
+            Ok(bytes) => {
+              let img = image::load_from_memory(&bytes)?;
+              let img = img.resize_exact(128, 128, FilterType::Lanczos3);
 
-          let mut buf = Cursor::new(Vec::new());
-          img.write_to(&mut buf, ImageFormat::WebP)?;
-          let avatar = BASE64_STANDARD.encode(buf.into_inner());
-          Some(avatar)
+              let mut buf = Cursor::new(Vec::new());
+              img.write_to(&mut buf, ImageFormat::WebP)?;
+              let avatar = BASE64_STANDARD.encode(buf.into_inner());
+              Some(avatar)
+            }
+            Err(_) => None,
+          }
+        } else {
+          None
         }
-        Err(_) => None,
-      },
+      }
       Err(_) => None,
     };
 
@@ -104,6 +138,128 @@ impl<'db> UserTable<'db> {
     let mut user: user::ActiveModel = self.get_user_by_id(id).await?.into();
 
     user.avatar = Set(Some(new_avatar));
+
+    user.update(self.db).await?;
+
+    Ok(())
+  }
+
+  pub async fn list_users_simple(&self) -> Result<Vec<SimpleUserInfo>, DbErr> {
+    let users = user::Entity::find().all(self.db).await?;
+
+    Ok(
+      users
+        .into_iter()
+        .map(|u| SimpleUserInfo {
+          id: u.id,
+          name: u.name,
+        })
+        .collect(),
+    )
+  }
+
+  pub async fn list_users(&self) -> Result<Vec<UserInfo>, DbErr> {
+    let users = user::Entity::find().all(self.db).await?;
+    let group_user = users
+      .load_many_to_many(group::Entity, group_user::Entity, self.db)
+      .await?;
+
+    let result = users
+      .into_iter()
+      .zip(group_user.into_iter())
+      .map(|(user, groups)| UserInfo {
+        uuid: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        groups: groups
+          .into_iter()
+          .map(|group| SimpleGroupInfo {
+            uuid: group.id,
+            name: group.name,
+          })
+          .collect(),
+      })
+      .collect();
+
+    Ok(result)
+  }
+
+  pub async fn get_user_groups(&self, user_id: Uuid) -> Result<Vec<SimpleGroupInfo>, DbErr> {
+    let groups = group_user::Entity::find()
+      .filter(group_user::Column::UserId.eq(user_id))
+      .find_also_related(group::Entity)
+      .all(self.db)
+      .await?
+      .into_iter()
+      .filter_map(|(_, group)| {
+        group.map(|g| SimpleGroupInfo {
+          uuid: g.id,
+          name: g.name,
+        })
+      })
+      .collect();
+
+    Ok(groups)
+  }
+
+  pub async fn user_info(&self, user_id: Uuid) -> Result<Option<DetailUserInfo>, DbErr> {
+    let user = user::Entity::find_by_id(user_id).one(self.db).await?;
+    let Some(user) = user else {
+      return Ok(None);
+    };
+
+    let groups = self.get_user_groups(user_id).await?;
+    let permissions = GroupTable::new(self.db)
+      .get_user_permissions(user_id)
+      .await?;
+
+    Ok(Some(DetailUserInfo {
+      uuid: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      groups,
+      permissions,
+    }))
+  }
+
+  pub async fn delete_user(&self, user_id: Uuid) -> Result<(), DbErr> {
+    user::Entity::delete_by_id(user_id).exec(self.db).await?;
+    Ok(())
+  }
+
+  pub async fn edit_user(
+    &self,
+    user_id: Uuid,
+    new_name: String,
+    new_groups: Vec<Uuid>,
+  ) -> Result<(), DbErr> {
+    let mut user: user::ActiveModel = self.get_user_by_id(user_id).await?.into();
+
+    user.name = Set(new_name);
+
+    user.update(self.db).await?;
+
+    // Update groups
+    group_user::Entity::delete_many()
+      .filter(group_user::Column::UserId.eq(user_id))
+      .exec(self.db)
+      .await?;
+
+    if !new_groups.is_empty() {
+      GroupTable::new(self.db)
+        .add_user_to_groups(user_id, new_groups)
+        .await?;
+    }
+
+    Ok(())
+  }
+
+  pub async fn reset_avatar(&self, user_id: Uuid) -> Result<(), DbErr> {
+    let mut user: user::ActiveModel = self.get_user_by_id(user_id).await?.into();
+
+    user.avatar = Set(None);
 
     user.update(self.db).await?;
 

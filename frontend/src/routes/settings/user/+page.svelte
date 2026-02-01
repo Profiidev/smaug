@@ -15,6 +15,7 @@
   import { Input } from 'positron-components/components/ui/input';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
   import { Permission } from '$lib/permissions.svelte';
+  import { Separator } from 'positron-components/components/ui/separator';
 
   let { data } = $props();
 
@@ -60,7 +61,7 @@
   )}
 >
   {#snippet children({ props })}
-    <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_1fr]">
       <div class="flex flex-col gap-1">
         <FormSwitch
           {...props}
@@ -108,6 +109,7 @@
           />
         {/if}
       </div>
+      <Separator orientation="vertical" class="hidden lg:block" />
       <div class="flex flex-col gap-1">
         <FormSwitch
           {...props}

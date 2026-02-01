@@ -11,14 +11,14 @@ use crate::{db::DBTrait, nodes::connection::WingsConnection, ws::state::Updater}
 #[derive(Clone, FromRequestParts)]
 #[from_request(via(Extension))]
 pub struct Wings {
-  wings: DashMap<Uuid, Arc<Mutex<WingsConnection>>>,
+  wings: Arc<DashMap<Uuid, Arc<Mutex<WingsConnection>>>>,
   updater: Updater,
 }
 
 impl Wings {
   pub async fn new(db: &Connection, updater: Updater) -> Result<Self> {
     let nodes = db.node().list_nodes().await?;
-    let wings = DashMap::new();
+    let wings = Arc::new(DashMap::new());
 
     for node in nodes {
       let conn = WingsConnection::new(
