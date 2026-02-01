@@ -14,13 +14,13 @@
     "lint": "prettier --check ."
   },
   "devDependencies": {
-    "@sveltejs/adapter-node": "^5.4.0",
-    "@sveltejs/kit": "^2.49.5",
+    "@sveltejs/adapter-node": "^5.5.2",
+    "@sveltejs/kit": "^2.50.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.0",
     "@tailwindcss/vite": "4.1.18",
-    "@types/node": "^25.0.10",
-    "svelte": "^5.46.4",
-    "svelte-check": "^4.3.5",
+    "@types/node": "^25.1.0",
+    "svelte": "^5.49.1",
+    "svelte-check": "^4.3.6",
     "tailwindcss": "^4.1.18",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5.9.3",
@@ -29,9 +29,9 @@
   "dependencies": {
     "@lucide/svelte": "^0.563.1",
     "@sveltejs/enhanced-img": "0.9.3",
-    "isomorphic-dompurify": "2.25.0",
+    "isomorphic-dompurify": "2.35.0",
     "jsencrypt": "^3.5.4",
-    "positron-components": "^1.14.0",
+    "positron-components": "^1.14.1",
     "valibot": "^1.2.0"
   }
 }
