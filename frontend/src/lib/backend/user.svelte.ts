@@ -191,3 +191,28 @@ export const resetUserAvatar = async (uuid: string) => {
     body: { uuid }
   });
 };
+
+export interface ResetUserPasswordRequest {
+  uuid: string;
+  new_password: string;
+}
+
+export const resetUserPassword = async (data: ResetUserPasswordRequest) => {
+  let encrypt = getEncrypt();
+  if (!encrypt) {
+    return RequestError.Other;
+  }
+
+  let encrypted_password = encrypt.encrypt(data.new_password);
+  data.new_password = encrypted_password || '';
+
+  let res = await put('/api/user/management/password', {
+    body: data
+  });
+
+  if (res === RequestError.Unauthorized) {
+    fetchKey();
+  }
+
+  return res;
+};

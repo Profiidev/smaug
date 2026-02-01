@@ -9,7 +9,12 @@
   import { toast } from 'positron-components/components/util/general';
   import { goto } from '$app/navigation';
   import BaseForm from 'positron-components/components/form/base-form.svelte';
-  import { formatData, userSettings, reformatData } from './schema.svelte.js';
+  import {
+    formatData,
+    userSettings,
+    reformatData,
+    resetPassword
+  } from './schema.svelte.js';
   import type { FormValue } from 'positron-components/components/form/types';
   import { RequestError } from 'positron-components/backend';
   import FormInput from 'positron-components/components/form/form-input.svelte';
@@ -19,13 +24,16 @@
   import {
     deleteUser,
     editUser,
-    resetUserAvatar
+    resetUserAvatar,
+    resetUserPassword
   } from '$lib/backend/user.svelte.js';
   import SimpleAvatar from 'positron-components/components/util/simple-avatar.svelte';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 
   const { data } = $props();
 
+  let resetOpen = $state(false);
   let deleteOpen = $state(false);
   let isLoading = $state(false);
   let readonly = $derived(
@@ -70,6 +78,25 @@
       return { error: '' };
     }
   };
+
+  const resetPasswordSubmit = async (form: FormValue<typeof resetPassword>) => {
+    let res = await resetUserPassword({
+      uuid: data.userInfo.uuid,
+      new_password: form.new_password
+    });
+
+    if (res) {
+      if (res === RequestError.Forbidden) {
+        return { error: 'You do not have permission to reset this password' };
+      } else {
+        return { error: 'Failed to reset password' };
+      }
+    } else {
+      toast.success(
+        `Password for user ${data.userInfo.name} reset successfully`
+      );
+    }
+  };
 </script>
 
 <div class="flex h-full w-full flex-col space-y-6 p-4">
@@ -78,8 +105,20 @@
       <ArrowLeft class="size-5" />
     </Button>
     <h3 class="text-xl font-medium">User: {data.userInfo.name}</h3>
+    {#if !data.mailActive && allowSpecialEdit}
+      <Button
+        variant="secondary"
+        class="mr-2 ml-auto cursor-pointer"
+        onclick={() => (resetOpen = true)}
+        disabled={readonly}
+      >
+        <RotateCcw />
+        Reset Password
+      </Button>
+    {/if}
     <Button
-      class="ml-auto cursor-pointer"
+      class={'cursor-pointer' +
+        (data.mailActive || !allowSpecialEdit ? ' ml-auto' : '')}
       onclick={() => (deleteOpen = true)}
       variant="destructive"
       disabled={readonly}
@@ -110,6 +149,7 @@
                 <Button
                   variant="secondary"
                   class="ml-auto cursor-pointer"
+                  disabled={readonly}
                   onclick={async () => {
                     if (await resetUserAvatar(data.userInfo.uuid)) {
                       toast.error('Failed to reset avatar');
@@ -118,7 +158,7 @@
                     }
                   }}
                 >
-                  <RotateCcw class="mr-2 size-4" />
+                  <RotateCcw />
                   Reset Avatar</Button
                 >
               </div>
@@ -172,3 +212,21 @@
   bind:isLoading
   schema={z.object({})}
 />
+<FormDialog
+  title={`Reset Password`}
+  description={`Do you really want to reset the password for user ${data.userInfo.name}?`}
+  confirm="Reset"
+  onsubmit={resetPasswordSubmit}
+  bind:open={resetOpen}
+  bind:isLoading
+  schema={resetPassword}
+>
+  {#snippet children({ props })}
+    <FormInputPassword
+      {...props}
+      key="new_password"
+      label="New Password"
+      placeholder="Enter new password"
+    />
+  {/snippet}
+</FormDialog>

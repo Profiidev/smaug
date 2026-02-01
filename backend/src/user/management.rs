@@ -41,6 +41,7 @@ pub fn router() -> Router {
     .route("/mail", get(mail_active))
     .route("/groups", get(list_groups_simple))
     .route("/avatar", delete(reset_user_avatar))
+    .route("/password", put(reset_user_password))
 }
 
 async fn list_users(_auth: JwtAuth<UserView>, db: Connection) -> Result<Json<Vec<UserInfo>>> {
@@ -190,18 +191,15 @@ async fn edit_user(
     .group()
     .get_groups_permissions(req.groups.clone())
     .await?;
+  let current_user_permissions = db.group().get_user_permissions(req.uuid).await?;
 
   if target_permissions
     .iter()
     .any(|p| !self_permissions.contains(p))
+    || current_user_permissions
+      .iter()
+      .any(|p| !self_permissions.contains(p))
   {
-    tracing::warn!(
-      "User {:?} tried to assign permissions {:?} which they do not have themselves {:?}",
-      req.uuid,
-      target_permissions,
-      self_permissions
-    );
-
     bail!(
       FORBIDDEN,
       "Cannot assign permissions that the editor does not have"
@@ -236,6 +234,47 @@ async fn reset_user_avatar(
 ) -> Result<()> {
   db.user().reset_avatar(req.uuid).await?;
   updater.broadcast(UpdateMessage::Users).await;
+
+  Ok(())
+}
+
+#[derive(Deserialize, FromRequest)]
+#[from_request(via(Json))]
+struct ResetUserPassword {
+  uuid: Uuid,
+  new_password: String,
+}
+
+async fn reset_user_password(
+  auth: JwtAuth<UserEdit>,
+  db: Connection,
+  state: PasswordState,
+  mailer: Mailer,
+  req: ResetUserPassword,
+) -> Result<()> {
+  if mailer.is_active().await {
+    bail!(
+      BAD_REQUEST,
+      "Cannot reset password when mail service is active"
+    );
+  }
+
+  let self_permissions = db.group().get_user_permissions(auth.user_id).await?;
+  let target_permissions = db.group().get_user_permissions(req.uuid).await?;
+
+  if target_permissions
+    .iter()
+    .any(|p| !self_permissions.contains(p))
+  {
+    bail!(
+      FORBIDDEN,
+      "Cannot assign permissions that the editor does not have"
+    );
+  }
+
+  let user = db.user().get_user_by_id(req.uuid).await?;
+  let hash = state.pw_hash(&user.salt, &req.new_password)?;
+  db.user().update_user_password(req.uuid, hash).await?;
 
   Ok(())
 }

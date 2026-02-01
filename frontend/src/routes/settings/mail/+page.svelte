@@ -140,7 +140,12 @@
     <div class="mt-4 grid w-full grid-cols-1 gap-8 lg:grid-cols-2">
       <div class="flex">
         {#if !readonly && smtpEnabled}
-          <Button disabled={isLoading} variant="secondary" onclick={testEmail}>
+          <Button
+            disabled={isLoading}
+            variant="secondary"
+            onclick={testEmail}
+            class="cursor-pointer"
+          >
             <Send />
             Send Test Email
           </Button>
