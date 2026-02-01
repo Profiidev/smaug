@@ -171,6 +171,27 @@
                     {/if}
                   </div>
                 {/if}
+                {#if data.user?.permissions.includes(Permission.USER_VIEW) || data.user?.permissions.includes(Permission.USER_EDIT)}
+                  <h6>Users</h6>
+                  <div class="ml-4">
+                    {#if data.user?.permissions.includes(Permission.USER_VIEW)}
+                      <FormCheckbox
+                        {...props}
+                        key="user_view"
+                        label="View Users"
+                        disabled={readonly}
+                      />
+                    {/if}
+                    {#if data.user?.permissions.includes(Permission.USER_EDIT)}
+                      <FormCheckbox
+                        {...props}
+                        key="user_edit"
+                        label="Edit Users"
+                        disabled={readonly}
+                      />
+                    {/if}
+                  </div>
+                {/if}
               </div>
             </div>
           </div>

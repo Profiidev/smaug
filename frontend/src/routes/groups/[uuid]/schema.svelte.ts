@@ -10,7 +10,9 @@ export const groupSettings = z.object({
   settings_view: z.boolean().default(false),
   settings_edit: z.boolean().default(false),
   group_view: z.boolean().default(false),
-  group_edit: z.boolean().default(false)
+  group_edit: z.boolean().default(false),
+  user_view: z.boolean().default(false),
+  user_edit: z.boolean().default(false)
 });
 
 export const reformatData = (
@@ -44,6 +46,8 @@ export const formatData = (
     settings_edit: false,
     group_view: false,
     group_edit: false,
+    user_view: false,
+    user_edit: false,
     users: group.users.map((user) => user.id)
   };
 
