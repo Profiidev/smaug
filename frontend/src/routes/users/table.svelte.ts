@@ -8,6 +8,7 @@ import {
   type UserInfo,
   type UserListInfo
 } from '$lib/backend/user.svelte';
+import SimpleAvatar from 'positron-components/components/util/simple-avatar.svelte';
 
 export const columns = ({
   deleteUser,
@@ -16,6 +17,17 @@ export const columns = ({
   deleteUser: (user: UserListInfo) => void;
   user?: UserInfo;
 }): ColumnDef<UserListInfo>[] => [
+  {
+    accessorKey: 'avatar',
+    header: () => {},
+    cell: ({ row }) => {
+      return DataTable.renderComponent(SimpleAvatar, {
+        src: row.getValue('avatar') as string,
+        class: 'size-8'
+      });
+    },
+    size: 10
+  },
   createColumn('name', 'Name'),
   createColumn('email', 'Email'),
   createColumn(
