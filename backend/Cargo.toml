@@ -58,7 +58,7 @@ async-trait = "0.1.89"
 rsa = "0.9.10"
 argon2 = "0.5.3"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
-time = "0.3.46"
+time = "0.3.47"
 url = { version = "2.5.8", features = ["serde"] }
 lettre = { version = "0.11.19", default-features = false, features = [
   "smtp-transport",
