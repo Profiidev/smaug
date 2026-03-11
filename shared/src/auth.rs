@@ -5,7 +5,7 @@ use centaurus::{
 use chrono::Utc;
 use hmac::Mac;
 use http::{HeaderMap, StatusCode};
-use rand::RngCore;
+use rand::Rng;
 
 type HmacSha3_512 = hmac::Hmac<sha3::Sha3_512>;
 

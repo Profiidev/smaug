@@ -5,14 +5,14 @@ edition = "2024"
 
 [dependencies]
 shared = { path = "../shared" }
-centaurus = { version = "0.4.7", features = [
+centaurus = { version = "0.4.11", features = [
   "axum",
   "logging",
   "metrics",
   "uuid",
   "hmac",
 ], default-features = false }
-uuid = { version = "1.19.0", features = ["v4"] }
+uuid = { version = "1.21.0", features = ["v4"] }
 axum = { version = "0.8.8", features = ["macros", "ws", "tracing"] }
 axum-extra = { version = "0.12.5", features = ["cookie", "typed-header"] }
 tracing = "0.1.44"
@@ -23,7 +23,7 @@ http = "1.4.0"
 dotenv = "0.15.0"
 serde = { version = "1.0.228", features = ["derive"] }
 figment = { version = "0.10.19", features = ["env"] }
-hyper-util = { version = "0.1.19", features = ["client-legacy"] }
+hyper-util = { version = "0.1.20", features = ["client-legacy"] }
 serde_json = "1.0.149"
 
 [[bin]]

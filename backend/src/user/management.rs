@@ -12,7 +12,7 @@ use centaurus::{
   error::{ErrorReportStatusExt, Result},
 };
 use http::StatusCode;
-use rand::Rng;
+use rand::RngExt;
 use rsa::rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
