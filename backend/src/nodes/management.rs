@@ -9,7 +9,7 @@ use centaurus::{
   error::{ErrorReportStatusExt, Result},
 };
 use http::{StatusCode, Uri};
-use rand::RngCore;
+use rand::Rng;
 use sea_orm::{IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use tracing::info;
