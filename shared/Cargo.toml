@@ -9,7 +9,7 @@ centaurus = { version = "0.4.13", default-features = false, features = [
 ] }
 chrono = "0.4.44"
 hex = "0.4.3"
-hmac = "0.13.0"
+hmac = "0.12.1"
 http = "1.4.0"
 rand = "0.10.0"
 serde = { version = "1.0.228", features = ["derive"] }
