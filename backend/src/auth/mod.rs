@@ -1,5 +1,7 @@
 use axum::{Extension, Router};
-use centaurus::{auth::pw::PasswordState, db::init::Connection};
+use centaurus::{
+  auth::pw::PasswordState, backend::rate_limiter::RateLimiter, db::init::Connection,
+};
 use rsa::{
   RsaPrivateKey,
   pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey},
@@ -16,7 +18,6 @@ use crate::{
   },
   config::Config,
   db::DBTrait,
-  rate_limit::RateLimiter,
 };
 
 mod config;

@@ -1,6 +1,5 @@
 use axum::Router;
-
-use crate::rate_limit::RateLimiter;
+use centaurus::backend::rate_limiter::RateLimiter;
 
 mod account;
 mod info;

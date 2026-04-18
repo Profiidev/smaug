@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-centaurus = { version = "0.4.13", default-features = false, features = [
+centaurus = { version = "0.5.0", default-features = false, features = [
   "error",
 ] }
+centaurus-derive = "0.1.0"
 chrono = "0.4.44"
 hex = "0.4.3"
 hmac = "0.12.1"

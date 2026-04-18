@@ -1,6 +1,7 @@
 use centaurus::{
   bail,
   error::{ErrorReportStatusExt, Result},
+  eyre::Context,
 };
 use chrono::Utc;
 use hmac::Mac;
@@ -103,7 +104,7 @@ fn get_header_value(headers: &HeaderMap, key: &str) -> Result<String> {
 }
 
 fn hmac(data: &str, key: &str) -> Result<String> {
-  let mut mac = HmacSha3_512::new_from_slice(key.as_bytes())?;
+  let mut mac = HmacSha3_512::new_from_slice(key.as_bytes()).context("hamc error")?;
   mac.update(data.as_bytes());
   Ok(hex::encode(mac.finalize().into_bytes()))
 }
