@@ -12,6 +12,7 @@ use axum::{
 };
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use centaurus::{
+  backend::rate_limiter::RateLimiter,
   bail,
   db::init::Connection,
   error::{ErrorReportStatusExt, Result},
@@ -37,7 +38,6 @@ use crate::{
     DBTrait,
     settings::{GeneralSettings, OidcSettings, UserSettings},
   },
-  rate_limit::RateLimiter,
 };
 
 pub const OIDC_STATE: &str = "oidc_state";

@@ -2,7 +2,10 @@ use std::io::Cursor;
 
 use axum::{Json, Router, extract::FromRequest, routing::post};
 use base64::prelude::*;
-use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
+use centaurus::{
+  auth::pw::PasswordState, backend::rate_limiter::RateLimiter, bail, db::init::Connection,
+  error::Result,
+};
 use image::{ImageFormat, imageops::FilterType};
 use serde::Deserialize;
 use tower_governor::GovernorLayer;
@@ -10,7 +13,6 @@ use tower_governor::GovernorLayer;
 use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
-  rate_limit::RateLimiter,
   ws::state::{UpdateMessage, Updater},
 };
 

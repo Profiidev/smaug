@@ -1,8 +1,11 @@
 use axum::{Extension, Router};
-use centaurus::init::{
-  axum::{listener_setup, run_app},
+use centaurus::{
+  backend::{
+    init::{listener_setup, run_app},
+    rate_limiter::RateLimiter,
+    router::build_router,
+  },
   logging::init_logging,
-  router::base_router,
 };
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
@@ -25,19 +28,17 @@ async fn main() {
 
   let listener = listener_setup(config.base.port).await;
 
-  let mut router = api_router();
-  router = base_router(router, &config.base, &config.metrics).await;
-  let app = state(router, config);
+  let app = build_router(router, state, config).await;
 
   info!("Starting application");
   run_app(listener, app).await;
 }
 
-fn api_router() -> Router {
+fn router(_limiter: &mut RateLimiter) -> Router {
   dummy::router().merge(ws::router())
 }
 
-fn state(router: Router, config: Config) -> Router {
+async fn state(router: Router, config: Config) -> Router {
   let router = auth::state(router, &config);
   let router = dummy::state(router);
   router.layer(Extension(config))

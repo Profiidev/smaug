@@ -1,11 +1,8 @@
 use axum::{Extension, Router};
-use centaurus::db::init::Connection;
+use centaurus::{backend::rate_limiter::RateLimiter, db::init::Connection};
 use tower_governor::GovernorLayer;
 
-use crate::{
-  mail::state::{Mailer, ResetPasswordState},
-  rate_limit::RateLimiter,
-};
+use crate::mail::state::{Mailer, ResetPasswordState};
 
 mod reset;
 pub mod state;

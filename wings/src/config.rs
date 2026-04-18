@@ -1,4 +1,7 @@
-use centaurus::config::{BaseConfig, MetricsConfig};
+use centaurus::{
+  Config,
+  backend::config::{BaseConfig, MetricsConfig},
+};
 use figment::{
   Figment,
   providers::{Env, Serialized},
@@ -6,11 +9,13 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Config)]
 pub struct Config {
   #[serde(flatten)]
+  #[base]
   pub base: BaseConfig,
   #[serde(flatten)]
+  #[metrics]
   pub metrics: MetricsConfig,
 
   pub token: String,

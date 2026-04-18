@@ -1,17 +1,18 @@
 use axum::{Extension, Router};
 use centaurus::{
-  db::init::init_db,
-  init::{
-    axum::{listener_setup, run_app_connect_info},
-    logging::init_logging,
-    router::base_router,
+  backend::{
+    init::{listener_setup, run_app_connect_info},
+    rate_limiter::RateLimiter,
+    router::build_router,
   },
+  db::init::init_db,
+  logging::init_logging,
 };
 #[cfg(debug_assertions)]
 use dotenv::dotenv;
 use tracing::info;
 
-use crate::{config::Config, rate_limit::RateLimiter};
+use crate::config::Config;
 
 mod auth;
 mod config;
@@ -21,7 +22,6 @@ mod group;
 mod mail;
 mod nodes;
 mod permissions;
-mod rate_limit;
 mod settings;
 mod setup;
 mod user;
@@ -36,19 +36,13 @@ async fn main() {
   init_logging(config.base.log_level);
 
   let listener = listener_setup(config.base.port).await;
-  let mut rate_limiter = RateLimiter::default();
-
-  let mut router = api_router(&mut rate_limiter);
-  router = base_router(router, &config.base, &config.metrics).await;
-  let app = state(router, config).await;
-
-  rate_limiter.init();
+  let app = build_router(router, state, config).await;
 
   info!("Starting application");
   run_app_connect_info(listener, app).await;
 }
 
-fn api_router(rate_limiter: &mut RateLimiter) -> Router {
+fn router(rate_limiter: &mut RateLimiter) -> Router {
   Router::new()
     .nest("/nodes", nodes::router())
     .nest("/ws", ws::router())
