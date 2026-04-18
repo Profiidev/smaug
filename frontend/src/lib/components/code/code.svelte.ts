@@ -114,8 +114,10 @@ const overflowCtx = new Context<CodeOverflowState>('code-overflow-state');
 
 const ctx = new Context<CodeRootState>('code-root-state');
 
-export const useCodeOverflow = (props: CodeOverflowStateProps) => overflowCtx.set(new CodeOverflowState(props));
+export const useCodeOverflow = (props: CodeOverflowStateProps) =>
+  overflowCtx.set(new CodeOverflowState(props));
 
-export const useCode = (props: CodeRootStateProps) => ctx.set(new CodeRootState(props, overflowCtx.getOr(undefined)));
+export const useCode = (props: CodeRootStateProps) =>
+  ctx.set(new CodeRootState(props, overflowCtx.getOr(undefined)));
 
 export const useCodeCopyButton = () => new CodeCopyButtonState(ctx.get());

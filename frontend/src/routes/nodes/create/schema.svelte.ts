@@ -14,24 +14,23 @@ export const units = {
   TiB: 1024 * 1024 * 1024 * 1024
 };
 
-const convertToMB = (amount: number, unitArray: string[]) => (
-    (amount * (units as Record<string, number>)[unitArray[0]]) / (1000 * 1000)
-  );
+const convertToMB = (amount: number, unitArray: string[]) =>
+  (amount * (units as Record<string, number>)[unitArray[0]]) / (1000 * 1000);
 
 export const reformatData = (
   data: FormValue<typeof generalSettings> & FormValue<typeof advancedSettings>
 ): CreateNode => ({
-    address: data.address,
-    cpu_limit: data.cpu_unlimit ? undefined : data.cpu_limit,
-    disk_limit_mb: data.storage_unlimit
-      ? undefined
-      : convertToMB(data.storage_size, data.storage_size_unit),
-    memory_limit_mb: data.memory_unlimit
-      ? undefined
-      : convertToMB(data.memory_limit, data.memory_limit_unit),
-    name: data.name,
-    secure: data.secure
-  });
+  address: data.address,
+  cpu_limit: data.cpu_unlimit ? undefined : data.cpu_limit,
+  disk_limit_mb: data.storage_unlimit
+    ? undefined
+    : convertToMB(data.storage_size, data.storage_size_unit),
+  memory_limit_mb: data.memory_unlimit
+    ? undefined
+    : convertToMB(data.memory_limit, data.memory_limit_unit),
+  name: data.name,
+  secure: data.secure
+});
 
 const selectUnit = (mb: number): [number, string[]] => {
   const bytes = mb * 1000 * 1000;

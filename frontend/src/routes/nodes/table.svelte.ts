@@ -35,14 +35,14 @@ export const columns = ({
     ...createColumnHeader('address', 'Address'),
     cell: ({ row }) => {
       const address = row.getValue<string>('address');
-      const {port} = row.original;
+      const { port } = row.original;
       const value = `${address}:${port}`;
 
       return DataTable.renderSnippet(
         createRawSnippet(() => ({
-            render: () =>
-              `<div class="ml-4 truncate h-full w-full text-wrap">${value}</div>`
-          }))
+          render: () =>
+            `<div class="ml-4 truncate h-full w-full text-wrap">${value}</div>`
+        }))
       );
     }
   },
@@ -58,7 +58,8 @@ export const columns = ({
   createColumn('id', 'UUID'),
   {
     accessorKey: 'actions',
-    cell: ({ row }) => DataTable.renderComponent(Actions, {
+    cell: ({ row }) =>
+      DataTable.renderComponent(Actions, {
         delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         editHref: `/nodes/${row.original.id}/setup`,
         edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),

@@ -3,8 +3,8 @@ import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import { createHighlighterCore } from 'shiki/core';
 
 const bundledLanguages = {
-  bash:  async () => import('@shikijs/langs/bash'),
-  yaml:  async () => import('@shikijs/langs/yaml')
+  bash: async () => import('@shikijs/langs/bash'),
+  yaml: async () => import('@shikijs/langs/yaml')
 };
 
 /** The languages configured for the highlighter */
