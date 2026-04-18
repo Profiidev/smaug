@@ -31,7 +31,7 @@
     "@sveltejs/enhanced-img": "0.10.4",
     "isomorphic-dompurify": "3.7.1",
     "jsencrypt": "^3.5.4",
-    "positron-components": "^1.14.2",
+    "@profidev/pleiades": "^1.7.1",
     "valibot": "^1.3.1"
   }
 }

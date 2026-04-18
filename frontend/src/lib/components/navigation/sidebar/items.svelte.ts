@@ -20,42 +20,42 @@ export interface NavItem {
 
 export const items: NavGroup[] = [
   {
-    label: 'General',
-    items: [{ label: 'Overview', href: '/', icon: House }]
+    items: [{ href: '/', icon: House, label: 'Overview' }],
+    label: 'General'
   },
   {
-    label: 'Servers',
     items: [
       {
-        label: 'Nodes',
         href: '/nodes',
         icon: Server,
+        label: 'Nodes',
         requiredPermission: Permission.NODE_VIEW
       }
-    ]
+    ],
+    label: 'Servers'
   },
   {
-    label: 'Administration',
     items: [
       {
-        label: 'Users',
         href: '/users',
         icon: User,
+        label: 'Users',
         requiredPermission: Permission.USER_VIEW
       },
       {
-        label: 'Groups',
         href: '/groups',
         icon: Users,
+        label: 'Groups',
         requiredPermission: Permission.GROUP_VIEW
       },
       {
-        label: 'Settings',
         href: '/settings',
         icon: Settings,
+        label: 'Settings',
         requiredPermission: Permission.SETTINGS_VIEW
       }
-    ]
+    ],
+    label: 'Administration'
   }
 ];
 

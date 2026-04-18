@@ -1,10 +1,10 @@
 <script lang="ts">
-  import BaseForm from 'positron-components/components/form/base-form.svelte';
-  import type { FormValue } from 'positron-components/components/form/types';
-  import { Button } from 'positron-components/components/ui/button';
-  import { Spinner } from 'positron-components/components/ui/spinner';
+  import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
+  import type { FormValue } from '@profidev/pleiades/components/form/types';
+  import { Button } from '@profidev/pleiades/components/ui/button';
+  import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import Save from '@lucide/svelte/icons/save';
-  import { toast } from 'positron-components/components/util/general';
+  import { toast } from '@profidev/pleiades/components/util/general';
   import { Permission } from '$lib/permissions.svelte';
   import {
     advancedSettings,
@@ -15,8 +15,8 @@
   import GeneralSettingsFields from '../../create/GeneralSettingsFields.svelte';
   import AdvancedSettingsFields from '../../create/AdvancedSettingsFields.svelte';
   import { updateNode } from '$lib/backend/node.svelte.js';
-  import { RequestError } from 'positron-components/backend';
-  import { Separator } from 'positron-components/components/ui/separator';
+  import { RequestError } from '@profidev/pleiades/backend';
+  import { Separator } from '@profidev/pleiades/components/ui/separator';
 
   const schema = generalSettings.extend(advancedSettings.shape);
 

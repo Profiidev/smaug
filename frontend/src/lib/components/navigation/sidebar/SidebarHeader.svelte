@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as Sidebar from 'positron-components/components/ui/sidebar';
+  import * as Sidebar from '@profidev/pleiades/components/ui/sidebar';
   import Dragon from '$lib/components/icons/Dragon.svelte';
   import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open';
   import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';

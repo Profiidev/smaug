@@ -1,24 +1,22 @@
 import type JSEncrypt from 'jsencrypt';
 import {
-  ResponseType,
   RequestError,
+  ResponseType,
   get,
   post
-} from 'positron-components/backend';
+} from '@profidev/pleiades/backend';
 import { browser } from '$app/environment';
 
 let encrypt: false | undefined | JSEncrypt = $state(browser && undefined);
 
-export const getEncrypt = () => {
-  return encrypt;
-};
+export const getEncrypt = () => encrypt;
 
 export const fetchKey = async () => {
   if (encrypt === false) {
     return RequestError.Other;
   }
 
-  let key = await get<{ key: string }>('/api/auth/password', {
+  const key = await get<{ key: string }>('/api/auth/password', {
     res_type: ResponseType.Json
   });
 
@@ -26,20 +24,21 @@ export const fetchKey = async () => {
     return key;
   }
 
-  const JSEncrypt = (await import('jsencrypt')).JSEncrypt;
+  const { JSEncrypt } = await import('jsencrypt');
 
   encrypt = new JSEncrypt({ default_key_size: '4096' });
   encrypt.setPublicKey(key.key);
+  return undefined;
 };
-fetchKey();
+const _ = fetchKey();
 
 export const passwordLogin = async (email: string, password: string) => {
   if (!encrypt) {
     return RequestError.Other;
   }
 
-  let encrypted_password = encrypt.encrypt(password);
-  let res = await post('/api/auth/password', {
+  const encrypted_password = encrypt.encrypt(password);
+  const res = await post('/api/auth/password', {
     body: {
       email,
       password: encrypted_password
@@ -47,23 +46,24 @@ export const passwordLogin = async (email: string, password: string) => {
   });
 
   if (res === RequestError.Unauthorized) {
-    fetchKey();
+    const _f = fetchKey();
   }
   return res;
 };
 
 export const logout = async () => {
-  let res = await post('/api/auth/logout');
+  const res = await post('/api/auth/logout');
 
   return res;
 };
 
 export const testToken = async () => {
-  let res = await get<boolean>('/api/auth/test_token', {
+  const res = await get<boolean>('/api/auth/test_token', {
     res_type: ResponseType.Json
   });
 
   if (typeof res === 'boolean') {
     return res;
   }
+  return undefined;
 };

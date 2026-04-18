@@ -1,7 +1,7 @@
 <script lang="ts">
-  import * as Sidebar from 'positron-components/components/ui/sidebar';
-  import * as DropdownMenu from 'positron-components/components/ui/dropdown-menu';
-  import * as Avatar from 'positron-components/components/ui/avatar';
+  import * as Sidebar from '@profidev/pleiades/components/ui/sidebar';
+  import * as DropdownMenu from '@profidev/pleiades/components/ui/dropdown-menu';
+  import * as Avatar from '@profidev/pleiades/components/ui/avatar';
   import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
   import LogOutIcon from '@lucide/svelte/icons/log-out';
   import SettingsIcon from '@lucide/svelte/icons/settings';

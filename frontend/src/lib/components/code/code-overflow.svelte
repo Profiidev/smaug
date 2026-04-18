@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { Button } from 'positron-components/components/ui/button';
+  import { Button } from '@profidev/pleiades/components/ui/button';
   import { useCodeOverflow } from './code.svelte.js';
   import { box } from 'svelte-toolbelt';
   import type { CodeOverflowProps } from './types';
-  import { cn } from 'positron-components/utils';
+  import { cn } from '@profidev/pleiades/utils';
 
   let {
     collapsed = $bindable(true),

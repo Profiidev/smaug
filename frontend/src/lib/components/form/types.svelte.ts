@@ -1,4 +1,4 @@
-import type BaseForm from 'positron-components/components/form/base-form.svelte';
+import type BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
 import type { Component, ComponentProps, Snippet } from 'svelte';
 
 export interface StageProps<T = undefined> {

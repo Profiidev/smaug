@@ -3,7 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
-  let status = await getSetupStatus(fetch);
+  const status = await getSetupStatus(fetch);
 
   if (status?.is_setup) {
     redirect(302, '/');

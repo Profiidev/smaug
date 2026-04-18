@@ -1,4 +1,4 @@
-import { tv, type VariantProps } from 'tailwind-variants';
+import { type VariantProps, tv } from 'tailwind-variants';
 // @ts-ignore
 import Root from './code.svelte';
 import Overflow from './code-overflow.svelte';

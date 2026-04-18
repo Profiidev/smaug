@@ -1,7 +1,7 @@
 <script lang="ts">
   import Trash from '@lucide/svelte/icons/trash';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import { Button } from 'positron-components/components/ui/button';
+  import { Button } from '@profidev/pleiades/components/ui/button';
 
   interface Props {
     edit_disabled: boolean;

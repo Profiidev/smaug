@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { Separator } from 'positron-components/components/ui/separator';
-  import SimpleSidebar from 'positron-components/components/nav/simple-sidebar.svelte';
-  import { Button } from 'positron-components/components/ui/button';
+  import { Separator } from '@profidev/pleiades/components/ui/separator';
+  import SimpleSidebar from '@profidev/pleiades/components/nav/simple-sidebar.svelte';
+  import { Button } from '@profidev/pleiades/components/ui/button';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Trash from '@lucide/svelte/icons/trash';
   import { Permission } from '$lib/permissions.svelte';
-  import FormDialog from 'positron-components/components/form/form-dialog.svelte';
+  import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import { z } from 'zod';
   import { deleteNode } from '$lib/backend/node.svelte';
-  import { toast } from 'positron-components/components/util/general';
+  import { toast } from '@profidev/pleiades/components/util/general';
   import { goto } from '$app/navigation';
 
   const { children, data } = $props();

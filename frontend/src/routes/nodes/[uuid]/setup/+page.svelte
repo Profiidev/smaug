@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Label } from 'positron-components/components/ui/label';
-  import { CopyButton } from 'positron-components/components/ui-extra/copy-button';
-  import * as Select from 'positron-components/components/ui/select';
+  import { Label } from '@profidev/pleiades/components/ui/label';
+  import { CopyButton } from '@profidev/pleiades/components/ui-extra/copy-button';
+  import * as Select from '@profidev/pleiades/components/ui/select';
   import * as Code from '$lib/components/code';
   import { dockerCompose, dockerRun } from './code.svelte';
 

@@ -31,24 +31,31 @@ type CodeRootStateProps = ReadableBoxedValues<{
 }>;
 
 class CodeRootState {
-  highlighter: HighlighterCore | null = $state(null);
+  highlighter: HighlighterCore | null = $state(null); // oxlint-disable-line no-null
 
   constructor(
     readonly opts: CodeRootStateProps,
     readonly overflow?: CodeOverflowState
   ) {
-    highlighter.then((hl) => (this.highlighter = hl));
+    const _ = highlighter.then((hl) => (this.highlighter = hl));
   }
 
   highlight(code: string) {
     return this.highlighter?.codeToHtml(code, {
       lang: this.opts.lang.current,
       themes: {
-        light: 'github-light-default',
-        dark: 'github-dark-default'
+        dark: 'github-dark-default',
+        light: 'github-light-default'
       },
       transformers: [
         {
+          line: (node, line) => {
+            if (within(line, this.opts.highlight.current)) {
+              node.properties.class += ' line--highlighted';
+            }
+
+            return node;
+          },
           pre: (el) => {
             el.properties.style = '';
 
@@ -57,14 +64,6 @@ class CodeRootState {
             }
 
             return el;
-          },
-          line: (node, line) => {
-            if (within(line, this.opts.highlight.current)) {
-              node.properties.class =
-                node.properties.class + ' line--highlighted';
-            }
-
-            return node;
           }
         }
       ]
@@ -78,28 +77,30 @@ class CodeRootState {
   highlighted = $derived(DOMPurify.sanitize(this.highlight(this.code) ?? ''));
 }
 
-function within(num: number, range: CodeRootProps['highlight']) {
-  if (!range) return false;
+const within = (num: number, range: CodeRootProps['highlight']) => {
+  if (!range) {
+    return false;
+  }
 
-  let within = false;
+  let isWithin = false;
 
   for (const r of range) {
     if (typeof r === 'number') {
       if (num === r) {
-        within = true;
+        isWithin = true;
         break;
       }
       continue;
     }
 
     if (r[0] <= num && num <= r[1]) {
-      within = true;
+      isWithin = true;
       break;
     }
   }
 
-  return within;
-}
+  return isWithin;
+};
 
 class CodeCopyButtonState {
   constructor(readonly root: CodeRootState) {}
@@ -113,14 +114,10 @@ const overflowCtx = new Context<CodeOverflowState>('code-overflow-state');
 
 const ctx = new Context<CodeRootState>('code-root-state');
 
-export function useCodeOverflow(props: CodeOverflowStateProps) {
-  return overflowCtx.set(new CodeOverflowState(props));
-}
+export const useCodeOverflow = (props: CodeOverflowStateProps) =>
+  overflowCtx.set(new CodeOverflowState(props));
 
-export function useCode(props: CodeRootStateProps) {
-  return ctx.set(new CodeRootState(props, overflowCtx.getOr(undefined)));
-}
+export const useCode = (props: CodeRootStateProps) =>
+  ctx.set(new CodeRootState(props, overflowCtx.getOr(undefined)));
 
-export function useCodeCopyButton() {
-  return new CodeCopyButtonState(ctx.get());
-}
+export const useCodeCopyButton = () => new CodeCopyButtonState(ctx.get());

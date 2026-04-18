@@ -5,10 +5,10 @@
   import DatabaseSetup from './DatabaseSetup.svelte';
   import type { PageData } from './$types';
   import CheckIcon from '@lucide/svelte/icons/check';
-  import type { FormValue } from 'positron-components/components/form/types';
+  import type { FormValue } from '@profidev/pleiades/components/form/types';
   import type { adminUser } from './schema.svelte';
   import { performSetup } from '$lib/backend/setup.svelte';
-  import { RequestError } from 'positron-components/backend';
+  import { RequestError } from '@profidev/pleiades/backend';
   import { goto } from '$app/navigation';
   import { connectWebsocket } from '$lib/backend/updater.svelte';
 

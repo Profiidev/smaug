@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as Sidebar from 'positron-components/components/ui/sidebar';
+  import * as Sidebar from '@profidev/pleiades/components/ui/sidebar';
   import SidebarHeader from './SidebarHeader.svelte';
   import SidebarContent from './SidebarContent.svelte';
   import SidebarUser from './SidebarUser.svelte';

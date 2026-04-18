@@ -1,12 +1,12 @@
 <script lang="ts">
-  import FormInput from 'positron-components/components/form/form-input.svelte';
-  import FormSelect from 'positron-components/components/form/form-select.svelte';
-  import FormSwitch from 'positron-components/components/form/form-switch.svelte';
+  import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
+  import FormSelect from '@profidev/pleiades/components/form/form-select.svelte';
+  import FormSwitch from '@profidev/pleiades/components/form/form-switch.svelte';
   import { advancedSettings, units } from './schema.svelte';
   import type {
     FormValue,
     SuperForm
-  } from 'positron-components/components/form/types';
+  } from '@profidev/pleiades/components/form/types';
 
   interface Props {
     cpuUnlimit: boolean;

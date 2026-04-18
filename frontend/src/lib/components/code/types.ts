@@ -2,16 +2,16 @@ import type { WithChildren, WithoutChildren } from 'bits-ui';
 import type { CodeVariant } from '.';
 import type { SupportedLanguage } from './shiki';
 import type { HTMLAttributes } from 'svelte/elements';
+import type { ButtonProps } from '@profidev/pleiades/components/ui/button';
 import type { Snippet } from 'svelte';
-import type { ButtonPropsWithoutHTML } from 'positron-components/components/ui-extra/button';
-import type { UseClipboard } from 'positron-components/blocks/use-clipboard.svelte';
+
 export type CopyButtonPropsWithoutHTML = WithChildren<
-  Pick<ButtonPropsWithoutHTML, 'size' | 'variant'> & {
+  Pick<ButtonProps, 'size' | 'variant'> & {
     ref?: HTMLButtonElement | null;
     text: string;
-    icon?: Snippet<[]>;
+    icon?: Snippet;
     animationDuration?: number;
-    onCopy?: (status: UseClipboard['status']) => void;
+    onCopy?: (status: 'success' | 'failure' | undefined) => void;
   }
 >;
 

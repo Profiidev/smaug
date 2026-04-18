@@ -166,7 +166,7 @@ impl<'db> UserTable<'db> {
 
     let result = users
       .into_iter()
-      .zip(group_user.into_iter())
+      .zip(group_user)
       .map(|(user, groups)| UserInfo {
         uuid: user.id,
         name: user.name,
