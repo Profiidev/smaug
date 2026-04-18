@@ -80,6 +80,7 @@ tower_governor = { version = "0.8.0", features = [
 ], default-features = false }
 governor = "0.10.4"
 dashmap = "6.1.0"
+aide = { version = "0.16.0-alpha.4", features = ["axum"] }
 
 [[bin]]
 name = "backend"

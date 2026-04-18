@@ -494,6 +494,7 @@ dependencies = [
 name = "backend"
 version = "0.1.0"
 dependencies = [
+ "aide",
  "argon2",
  "async-trait",
  "axum",
@@ -5777,6 +5778,7 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
 name = "wings"
 version = "0.1.0"
 dependencies = [
+ "aide",
  "axum",
  "axum-extra",
  "centaurus",

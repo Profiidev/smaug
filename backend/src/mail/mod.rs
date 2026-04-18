@@ -1,5 +1,5 @@
 use axum::{Extension, Router};
-use centaurus::{backend::rate_limiter::RateLimiter, db::init::Connection};
+use centaurus::{backend::middleware::rate_limiter::RateLimiter, db::init::Connection};
 use tower_governor::GovernorLayer;
 
 use crate::mail::state::{Mailer, ResetPasswordState};

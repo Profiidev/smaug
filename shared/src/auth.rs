@@ -4,7 +4,7 @@ use centaurus::{
   eyre::Context,
 };
 use chrono::Utc;
-use hmac::Mac;
+use hmac::{KeyInit, Mac};
 use http::{HeaderMap, StatusCode};
 use rand::Rng;
 

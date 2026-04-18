@@ -12,7 +12,7 @@ use axum::{
 };
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use centaurus::{
-  backend::rate_limiter::RateLimiter,
+  backend::middleware::rate_limiter::RateLimiter,
   bail,
   db::init::Connection,
   error::{ErrorReportStatusExt, Result},
