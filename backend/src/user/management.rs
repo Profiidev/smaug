@@ -6,7 +6,7 @@ use axum::{
 };
 use base64::prelude::*;
 use centaurus::{
-  auth::pw::PasswordState,
+  backend::auth::pw_state::PasswordState,
   bail,
   db::init::Connection,
   error::{ErrorReportStatusExt, Result},

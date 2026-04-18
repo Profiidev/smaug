@@ -1,6 +1,6 @@
 use centaurus::{
   Config,
-  backend::config::{BaseConfig, MetricsConfig},
+  backend::config::{BaseConfig, MetricsConfig, SiteConfig},
   db::config::DBConfig,
 };
 use figment::{
@@ -20,6 +20,9 @@ pub struct Config {
   #[serde(flatten)]
   #[metrics]
   pub metrics: MetricsConfig,
+  #[serde(flatten)]
+  #[site]
+  pub site: SiteConfig,
 
   pub db_url: String,
 
@@ -37,6 +40,9 @@ impl Default for Config {
       metrics: MetricsConfig {
         metrics_name: "smaug".to_string(),
         ..Default::default()
+      },
+      site: SiteConfig {
+        site_url: "http://localhost:3000".parse().unwrap(),
       },
       auth_pepper: "__SMAUG_PEPPER__".to_string(),
       auth_issuer: "smaug_auth".to_string(),

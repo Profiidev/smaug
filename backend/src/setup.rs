@@ -5,7 +5,9 @@ use axum::{
   routing::{get, post},
 };
 use axum_extra::extract::CookieJar;
-use centaurus::{auth::pw::PasswordState, bail, db::init::Connection, error::Result};
+use centaurus::{
+  backend::auth::pw_state::PasswordState, bail, db::init::Connection, error::Result,
+};
 use rsa::rand_core::OsRng;
 use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};

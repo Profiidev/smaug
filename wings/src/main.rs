@@ -1,8 +1,9 @@
-use axum::{Extension, Router};
+use aide::axum::ApiRouter;
+use axum::Extension;
 use centaurus::{
   backend::{
     init::{listener_setup, run_app},
-    rate_limiter::RateLimiter,
+    middleware::rate_limiter::RateLimiter,
     router::build_router,
   },
   logging::init_logging,
@@ -34,12 +35,12 @@ async fn main() {
   run_app(listener, app).await;
 }
 
-fn router(_limiter: &mut RateLimiter) -> Router {
-  dummy::router().merge(ws::router())
+fn router(_limiter: &mut RateLimiter) -> ApiRouter {
+  dummy::router().merge(ws::router()).into()
 }
 
-async fn state(router: Router, config: Config) -> Router {
-  let router = auth::state(router, &config);
+async fn state(router: ApiRouter, config: Config) -> ApiRouter {
+  let router = auth::state(router.into(), &config);
   let router = dummy::state(router);
-  router.layer(Extension(config))
+  router.layer(Extension(config)).into()
 }

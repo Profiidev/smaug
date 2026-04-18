@@ -3,7 +3,9 @@ use std::io::Cursor;
 use axum::{Json, Router, extract::FromRequest, routing::post};
 use base64::prelude::*;
 use centaurus::{
-  auth::pw::PasswordState, backend::rate_limiter::RateLimiter, bail, db::init::Connection,
+  backend::{auth::pw_state::PasswordState, middleware::rate_limiter::RateLimiter},
+  bail,
+  db::init::Connection,
   error::Result,
 };
 use image::{ImageFormat, imageops::FilterType};

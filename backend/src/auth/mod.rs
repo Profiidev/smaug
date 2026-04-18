@@ -1,6 +1,7 @@
 use axum::{Extension, Router};
 use centaurus::{
-  auth::pw::PasswordState, backend::rate_limiter::RateLimiter, db::init::Connection,
+  backend::{auth::pw_state::PasswordState, middleware::rate_limiter::RateLimiter},
+  db::init::Connection,
 };
 use rsa::{
   RsaPrivateKey,

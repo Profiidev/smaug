@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 shared = { path = "../shared" }
-centaurus = { version = "0.5.0", features = [
+centaurus = { version = "0.9.0", features = [
   "axum",
   "logging",
   "metrics",
@@ -25,6 +25,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 figment = { version = "0.10.19", features = ["env"] }
 hyper-util = { version = "0.1.20", features = ["client-legacy"] }
 serde_json = "1.0.149"
+aide = { version = "0.16.0-alpha.4", features = [ "axum" ] }
 
 [[bin]]
 name = "wings"

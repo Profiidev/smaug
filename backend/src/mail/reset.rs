@@ -1,5 +1,5 @@
 use axum::{Json, Router, extract::FromRequest, routing::post};
-use centaurus::{auth::pw::PasswordState, db::init::Connection};
+use centaurus::{backend::auth::pw_state::PasswordState, db::init::Connection};
 use serde::Deserialize;
 use tokio::spawn;
 use tracing::warn;

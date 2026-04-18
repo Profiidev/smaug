@@ -5,7 +5,9 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use centaurus::{
-  auth::pw::PasswordState, backend::rate_limiter::RateLimiter, bail, db::init::Connection,
+  backend::{auth::pw_state::PasswordState, middleware::rate_limiter::RateLimiter},
+  bail,
+  db::init::Connection,
   error::Result,
 };
 use serde::{Deserialize, Serialize};

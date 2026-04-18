@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use centaurus::{
-  auth::jwt::jwt_from_request, bail, db::init::Connection, error::ErrorReport,
+  backend::auth::jwt::jwt_from_request, bail, db::init::Connection, error::ErrorReport,
   state::extract::StateExtractExt,
 };
 use http::request::Parts;
