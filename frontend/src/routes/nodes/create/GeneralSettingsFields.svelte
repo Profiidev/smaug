@@ -1,12 +1,12 @@
 <script lang="ts">
-  import FormInput from 'positron-components/components/form/form-input.svelte';
-  import FormSwitch from 'positron-components/components/form/form-switch.svelte';
-  import { Label } from 'positron-components/components/ui/dropdown-menu';
+  import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
+  import FormSwitch from '@profidev/pleiades/components/form/form-switch.svelte';
+  import { Label } from '@profidev/pleiades/components/ui/dropdown-menu';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import type {
     FormValue,
     SuperForm
-  } from 'positron-components/components/form/types';
+  } from '@profidev/pleiades/components/form/types';
   import type { generalSettings } from './schema.svelte';
 
   interface Props {

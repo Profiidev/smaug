@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import type { UserInfo } from '$lib/backend/user.svelte';
-  import * as Sidebar from 'positron-components/components/ui/sidebar';
+  import * as Sidebar from '@profidev/pleiades/components/ui/sidebar';
   import type { NavGroup, NavItem } from './items.svelte';
 
   interface Props {

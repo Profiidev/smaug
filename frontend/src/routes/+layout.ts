@@ -3,7 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import type { LayoutLoad } from './$types';
 import { getUserInfo, type UserInfo } from '$lib/backend/user.svelte';
 import { noSidebarPaths } from '$lib/components/navigation/sidebar/items.svelte';
-import { RequestError } from 'positron-components/backend';
+import { RequestError } from '@profidev/pleiades/backend';
 
 export const load: LayoutLoad = async ({ fetch, url }) => {
   let status = await getSetupStatus(fetch);

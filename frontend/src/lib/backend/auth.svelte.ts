@@ -4,7 +4,7 @@ import {
   RequestError,
   get,
   post
-} from 'positron-components/backend';
+} from '@profidev/pleiades/backend';
 import { browser } from '$app/environment';
 
 let encrypt: false | undefined | JSEncrypt = $state(browser && undefined);

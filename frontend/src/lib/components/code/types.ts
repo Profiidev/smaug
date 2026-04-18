@@ -3,8 +3,8 @@ import type { CodeVariant } from '.';
 import type { SupportedLanguage } from './shiki';
 import type { HTMLAttributes } from 'svelte/elements';
 import type { Snippet } from 'svelte';
-import type { ButtonPropsWithoutHTML } from 'positron-components/components/ui-extra/button';
-import type { UseClipboard } from 'positron-components/blocks/use-clipboard.svelte';
+import type { ButtonPropsWithoutHTML } from '@profidev/pleiades/components/ui-extra/button';
+import type { UseClipboard } from '@profidev/pleiades/blocks/use-clipboard.svelte';
 export type CopyButtonPropsWithoutHTML = WithChildren<
   Pick<ButtonPropsWithoutHTML, 'size' | 'variant'> & {
     ref?: HTMLButtonElement | null;

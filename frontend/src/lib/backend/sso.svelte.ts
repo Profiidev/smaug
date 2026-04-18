@@ -1,4 +1,4 @@
-import { get, ResponseType } from 'positron-components/backend';
+import { get, ResponseType } from '@profidev/pleiades/backend';
 
 export enum SSOType {
   None = 'None',

@@ -1,8 +1,8 @@
 <script lang="ts" generics="S extends FormRecord = FormRecord">
-  import * as Form from 'positron-components/components/ui/form';
+  import * as Form from '@profidev/pleiades/components/ui/form';
   import { type FormPath, type SuperForm } from 'sveltekit-superforms';
-  import * as Password from 'positron-components/components/ui-extra/password';
-  import type { FormRecord } from 'positron-components/components/form/types';
+  import * as Password from '@profidev/pleiades/components/ui-extra/password';
+  import type { FormRecord } from '@profidev/pleiades/components/form/types';
   import type { Snippet } from 'svelte';
 
   interface Props {

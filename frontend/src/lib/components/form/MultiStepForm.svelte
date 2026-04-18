@@ -4,14 +4,14 @@
   import Ban from '@lucide/svelte/icons/ban';
   import CheckIcon from '@lucide/svelte/icons/check';
   import Plus from '@lucide/svelte/icons/plus';
-  import { Badge } from 'positron-components/components/ui/badge';
-  import { Button } from 'positron-components/components/ui/button';
-  import * as Card from 'positron-components/components/ui/card';
-  import { Spinner } from 'positron-components/components/ui/spinner';
+  import { Badge } from '@profidev/pleiades/components/ui/badge';
+  import { Button } from '@profidev/pleiades/components/ui/button';
+  import * as Card from '@profidev/pleiades/components/ui/card';
+  import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import {
     type Error,
     type FormRecord
-  } from 'positron-components/components/form/types';
+  } from '@profidev/pleiades/components/form/types';
   import type { Component, SvelteComponent } from 'svelte';
   import type { Stage } from './types.svelte';
 

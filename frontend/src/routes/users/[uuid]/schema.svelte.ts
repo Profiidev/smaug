@@ -1,5 +1,5 @@
 import type { UserEditRequest, UserListInfo } from '$lib/backend/user.svelte';
-import type { FormValue } from 'positron-components/components/form/types';
+import type { FormValue } from '@profidev/pleiades/components/form/types';
 import { z } from 'zod';
 
 export const userSettings = z.object({

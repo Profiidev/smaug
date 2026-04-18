@@ -4,7 +4,7 @@ import {
   post,
   put,
   ResponseType
-} from 'positron-components/backend';
+} from '@profidev/pleiades/backend';
 
 export interface GroupInfo {
   id: string;

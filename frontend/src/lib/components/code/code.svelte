@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from 'positron-components/utils';
+  import { cn } from '@profidev/pleiades/utils';
   import { codeVariants } from '.';
   import type { CodeRootProps } from './types';
   import { useCode } from './code.svelte.js';

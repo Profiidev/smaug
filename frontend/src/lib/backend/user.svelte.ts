@@ -6,7 +6,7 @@ import {
   put,
   RequestError,
   ResponseType
-} from 'positron-components/backend';
+} from '@profidev/pleiades/backend';
 import { fetchKey, getEncrypt } from './auth.svelte';
 
 export interface UserInfo {

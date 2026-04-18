@@ -1,4 +1,4 @@
-import { RequestError } from 'positron-components/backend';
+import { RequestError } from '@profidev/pleiades/backend';
 import type { PageLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { getGroupInfo, simpleUserList } from '$lib/backend/groups.svelte';

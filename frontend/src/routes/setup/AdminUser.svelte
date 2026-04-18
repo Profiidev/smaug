@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { StageProps } from '$lib/components/form/types.svelte';
-  import BaseForm from 'positron-components/components/form/base-form.svelte';
+  import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { adminUser } from './schema.svelte';
-  import FormInput from 'positron-components/components/form/form-input.svelte';
+  import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 
   let {

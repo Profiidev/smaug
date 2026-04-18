@@ -1,12 +1,12 @@
 <script lang="ts">
-  import BaseForm from 'positron-components/components/form/base-form.svelte';
+  import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { generalSettings } from './schema.svelte';
-  import type { FormValue } from 'positron-components/components/form/types';
-  import { Button } from 'positron-components/components/ui/button';
-  import { Spinner } from 'positron-components/components/ui/spinner';
+  import type { FormValue } from '@profidev/pleiades/components/form/types';
+  import { Button } from '@profidev/pleiades/components/ui/button';
+  import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import Save from '@lucide/svelte/icons/save';
   import { saveGeneralSettings } from '$lib/backend/settings.svelte';
-  import { toast } from 'positron-components/components/util/general';
+  import { toast } from '@profidev/pleiades/components/util/general';
   import FormInputTooltip from '$lib/components/form/FormInputTooltip.svelte';
   import { Permission } from '$lib/permissions.svelte';
 

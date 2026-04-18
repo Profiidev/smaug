@@ -1,12 +1,12 @@
 <script lang="ts" generics="S extends FormRecord = FormRecord">
-  import { Checkbox } from 'positron-components/components/ui/checkbox';
-  import * as Form from 'positron-components/components/ui/form';
+  import { Checkbox } from '@profidev/pleiades/components/ui/checkbox';
+  import * as Form from '@profidev/pleiades/components/ui/form';
   import type {
     FormPath,
     SuperForm,
     FormRecord
-  } from 'positron-components/components/form/types';
-  import type { WithoutChildrenOrChild } from 'positron-components/utils';
+  } from '@profidev/pleiades/components/form/types';
+  import type { WithoutChildrenOrChild } from '@profidev/pleiades/utils';
   import { Checkbox as CheckboxPrimitive } from 'bits-ui';
 
   interface Props {

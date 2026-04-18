@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as Tooltip from 'positron-components/components/ui/tooltip';
+  import * as Tooltip from '@profidev/pleiades/components/ui/tooltip';
   import HeartPulse from '@lucide/svelte/icons/heart-pulse';
   import HeartCrack from '@lucide/svelte/icons/heart-crack';
 

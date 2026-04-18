@@ -2,11 +2,11 @@ import type { NodeInfo } from '$lib/backend/node.svelte';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
 import type { ColumnDef } from '@tanstack/table-core';
-import * as DataTable from 'positron-components/components/ui/data-table';
+import * as DataTable from '@profidev/pleiades/components/ui/data-table';
 import {
   createColumn,
   createColumnHeader
-} from 'positron-components/components/table/helpers.svelte';
+} from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '$lib/components/table/Actions.svelte';
 import { createRawSnippet } from 'svelte';
 import Status from '$lib/components/table/Status.svelte';

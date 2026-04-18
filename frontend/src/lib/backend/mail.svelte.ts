@@ -1,4 +1,4 @@
-import { post, RequestError } from 'positron-components/backend';
+import { post, RequestError } from '@profidev/pleiades/backend';
 import { fetchKey, getEncrypt } from './auth.svelte';
 
 export interface ForgotPassword {

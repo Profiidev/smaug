@@ -1,21 +1,21 @@
 <script lang="ts">
-  import BaseForm from 'positron-components/components/form/base-form.svelte';
+  import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { reformat, unReformat, userSettings } from './schema.svelte';
-  import type { FormValue } from 'positron-components/components/form/types';
-  import { Button } from 'positron-components/components/ui/button';
-  import { Spinner } from 'positron-components/components/ui/spinner';
+  import type { FormValue } from '@profidev/pleiades/components/form/types';
+  import { Button } from '@profidev/pleiades/components/ui/button';
+  import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import Save from '@lucide/svelte/icons/save';
   import { saveUserSettings } from '$lib/backend/settings.svelte';
-  import { toast } from 'positron-components/components/util/general';
+  import { toast } from '@profidev/pleiades/components/util/general';
   import FormInputTooltip from '$lib/components/form/FormInputTooltip.svelte';
-  import FormSwitch from 'positron-components/components/form/form-switch.svelte';
-  import FormInput from 'positron-components/components/form/form-input.svelte';
-  import { RequestError } from 'positron-components/backend';
-  import { Label } from 'positron-components/components/ui/label';
-  import { Input } from 'positron-components/components/ui/input';
+  import FormSwitch from '@profidev/pleiades/components/form/form-switch.svelte';
+  import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
+  import { RequestError } from '@profidev/pleiades/backend';
+  import { Label } from '@profidev/pleiades/components/ui/label';
+  import { Input } from '@profidev/pleiades/components/ui/input';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
   import { Permission } from '$lib/permissions.svelte';
-  import { Separator } from 'positron-components/components/ui/separator';
+  import { Separator } from '@profidev/pleiades/components/ui/separator';
 
   let { data } = $props();
 
@@ -103,7 +103,7 @@
           <Label for="callback-url">Callback URL</Label>
           <Input
             id="callback-url"
-            value={`${data.generalSettings?.site_url}/api/auth/oidc/callback`}
+            value={`${data.generalSettings?.site_url}api/auth/oidc/callback`}
             readonly
             class="mt-2"
           />

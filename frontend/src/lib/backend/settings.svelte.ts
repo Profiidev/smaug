@@ -1,4 +1,4 @@
-import { get, post, ResponseType } from 'positron-components/backend';
+import { get, post, ResponseType } from '@profidev/pleiades/backend';
 
 const getSettings = async <T>(name: string, fetch: typeof window.fetch) => {
   let res = await get<T>(`/api/settings/${name}`, {

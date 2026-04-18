@@ -1,16 +1,16 @@
 <script lang="ts">
-  import BaseForm from 'positron-components/components/form/base-form.svelte';
-  import FormInput from 'positron-components/components/form/form-input.svelte';
-  import { Button } from 'positron-components/components/ui/button';
-  import * as Card from 'positron-components/components/ui/card';
-  import { FieldSeparator } from 'positron-components/components/ui/field';
+  import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
+  import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
+  import { Button } from '@profidev/pleiades/components/ui/button';
+  import * as Card from '@profidev/pleiades/components/ui/card';
+  import { FieldSeparator } from '@profidev/pleiades/components/ui/field';
   import { login } from './schema.svelte';
-  import type { FormValue } from 'positron-components/components/form/types';
+  import type { FormValue } from '@profidev/pleiades/components/form/types';
   import { passwordLogin } from '$lib/backend/auth.svelte';
-  import { RequestError } from 'positron-components/backend';
+  import { RequestError } from '@profidev/pleiades/backend';
   import { goto } from '$app/navigation';
   import { connectWebsocket } from '$lib/backend/updater.svelte';
-  import { toast } from 'positron-components/components/util/general';
+  import { toast } from '@profidev/pleiades/components/util/general';
   import { SSOType } from '$lib/backend/sso.svelte';
   import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
 

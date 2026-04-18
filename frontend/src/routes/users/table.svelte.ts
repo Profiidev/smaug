@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/table-core';
-import * as DataTable from 'positron-components/components/ui/data-table';
-import { createColumn } from 'positron-components/components/table/helpers.svelte';
+import * as DataTable from '@profidev/pleiades/components/ui/data-table';
+import { createColumn } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '$lib/components/table/Actions.svelte';
 import { Permission } from '$lib/permissions.svelte';
 import {
@@ -8,7 +8,7 @@ import {
   type UserInfo,
   type UserListInfo
 } from '$lib/backend/user.svelte';
-import SimpleAvatar from 'positron-components/components/util/simple-avatar.svelte';
+import SimpleAvatar from '@profidev/pleiades/components/util/simple-avatar.svelte';
 
 export const columns = ({
   deleteUser,

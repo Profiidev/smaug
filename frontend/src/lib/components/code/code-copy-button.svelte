@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CopyButton } from 'positron-components/components/ui-extra/copy-button';
-  import { cn } from 'positron-components/utils';
+  import { CopyButton } from '@profidev/pleiades/components/ui-extra/copy-button';
+  import { cn } from '@profidev/pleiades/utils';
   import { useCodeCopyButton } from './code.svelte.js';
   import type { CodeCopyButtonProps } from './types.js';
 

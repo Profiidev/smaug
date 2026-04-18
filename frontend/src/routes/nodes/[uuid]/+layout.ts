@@ -1,5 +1,5 @@
 import { nodeInfo } from '$lib/backend/node.svelte';
-import { RequestError } from 'positron-components/backend';
+import { RequestError } from '@profidev/pleiades/backend';
 import type { LayoutLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 

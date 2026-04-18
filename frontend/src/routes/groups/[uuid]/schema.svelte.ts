@@ -1,5 +1,5 @@
 import type { GroupEditRequest, GroupInfo } from '$lib/backend/groups.svelte';
-import type { FormValue } from 'positron-components/components/form/types';
+import type { FormValue } from '@profidev/pleiades/components/form/types';
 import { z } from 'zod';
 
 export const groupSettings = z.object({

@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { invalidate } from '$app/navigation';
-import { sleep } from 'positron-components/util/interval.svelte';
+import { sleep } from '@profidev/pleiades/util/interval.svelte';
 
 export enum UpdateType {
   Nodes = 'Nodes',

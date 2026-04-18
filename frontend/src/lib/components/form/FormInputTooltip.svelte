@@ -1,14 +1,14 @@
 <script lang="ts" generics="S extends FormRecord = FormRecord">
-  import * as Form from 'positron-components/components/ui/form';
+  import * as Form from '@profidev/pleiades/components/ui/form';
   import { type FormPath, type SuperForm } from 'sveltekit-superforms';
-  import { Input } from 'positron-components/components/ui/input';
+  import { Input } from '@profidev/pleiades/components/ui/input';
   import type {
     HTMLInputAttributes,
     HTMLInputTypeAttribute
   } from 'svelte/elements';
   import type { WithElementRef } from 'bits-ui';
-  import type { FormRecord } from 'positron-components/components/form/types';
-  import * as Tooltip from 'positron-components/components/ui/tooltip';
+  import type { FormRecord } from '@profidev/pleiades/components/form/types';
+  import * as Tooltip from '@profidev/pleiades/components/ui/tooltip';
   import Info from '@lucide/svelte/icons/info';
 
   type InputType = Exclude<HTMLInputTypeAttribute, 'file'>;
