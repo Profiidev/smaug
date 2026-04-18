@@ -4,7 +4,7 @@ ARG FRONTEND_DIR=/app/frontend
 ARG FRONTEND_URL="http://localhost:3000"
 ARG BACKEND_URL="http://localhost:8000"
 
-FROM node:24-alpine AS frontend-builder
+FROM node:24-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -22,7 +22,7 @@ COPY frontend/static ./static
 
 RUN npm run build
 
-FROM ghcr.io/profiidev/images/rust-gnu-builder:main AS backend-planner
+FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:34cee96885e1080da4e0a9a8a86dd8db503796bfc140a13b4e1a0f72784644ab AS backend-planner
 
 ARG TARGET
 ARG RUSTFLAGS
@@ -40,7 +40,7 @@ RUN \
   --mount=type=cache,target=/app/target \
   cargo chef prepare --recipe-path recipe.json --bin backend
 
-FROM ghcr.io/profiidev/images/rust-gnu-builder:main AS backend-builder
+FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:34cee96885e1080da4e0a9a8a86dd8db503796bfc140a13b4e1a0f72784644ab AS backend-builder
 
 ARG TARGET
 ARG RUSTFLAGS
@@ -71,7 +71,7 @@ RUN \
   cd backend && cargo build --release --target $TARGET \
   && mv ../target/$TARGET/release/backend ../app
 
-FROM node:24-alpine
+FROM node:24-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f
 
 ARG FRONTEND_DIR
 

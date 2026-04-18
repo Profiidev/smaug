@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/profiidev/images/node-alpine-dev:main
+    image: ghcr.io/profiidev/images/node-alpine-dev:main@sha256:a9021d8b424f81e5c3d4a5eef98041b011fd2054c303e7e687acc60167f18f2a
     restart: unless-stopped
     volumes:
       - ./frontend:/app/frontend
@@ -17,7 +17,7 @@ services:
     #command: npm i
 
   backend:
-    image: ghcr.io/profiidev/images/rust-musl-watch:main
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:e65645871b5e1c970f7417189d9b0747dc8d0ad7bf7844ce8f394e2be64e1598
     restart: unless-stopped
     volumes:
       - ./.cargo:/app/.cargo
@@ -35,7 +35,7 @@ services:
         condition: service_healthy
 
   wings:
-    image: ghcr.io/profiidev/images/rust-musl-watch:main
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:e65645871b5e1c970f7417189d9b0747dc8d0ad7bf7844ce8f394e2be64e1598
     restart: unless-stopped
     volumes:
       - ./wings:/app
@@ -49,7 +49,7 @@ services:
     command: ['cargo', 'watch', '-x', 'run']
 
   postgres:
-    image: postgres:17
+    image: postgres:17@sha256:7ad98329d513dd497293b951c195ca354274a77f12ddbbbbf85e68a811823d72
     restart: unless-stopped
     volumes:
       - ./postgres:/var/lib/postgresql/data
