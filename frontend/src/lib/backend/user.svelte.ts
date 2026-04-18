@@ -1,11 +1,11 @@
 import type { Permission } from '$lib/permissions.svelte';
 import {
+  RequestError,
+  ResponseType,
   delete_,
   get,
   post,
-  put,
-  RequestError,
-  ResponseType
+  put
 } from '@profidev/pleiades/backend';
 import { fetchKey, getEncrypt } from './auth.svelte';
 
@@ -17,34 +17,29 @@ export interface UserInfo {
   avatar?: string;
 }
 
-export const getUserInfo = async (
-  fetch: typeof window.fetch = window.fetch
-) => {
-  return await get<UserInfo>('/api/user/info', {
-    res_type: ResponseType.Json,
-    fetch
+export const getUserInfo = async (fetch: typeof window.fetch = window.fetch) =>
+  await get<UserInfo>('/api/user/info', {
+    fetch,
+    res_type: ResponseType.Json
   });
-};
 
 export interface AccountUpdate {
   username: string;
 }
 
-export const updateAccount = async (data: AccountUpdate) => {
-  return await post('/api/user/account/update', {
+export const updateAccount = async (data: AccountUpdate) =>
+  await post('/api/user/account/update', {
     body: data
   });
-};
 
 export interface AvatarUpdate {
   avatar: string;
 }
 
-export const updateAvatar = async (data: AvatarUpdate) => {
-  return await post('/api/user/account/avatar', {
+export const updateAvatar = async (data: AvatarUpdate) =>
+  await post('/api/user/account/avatar', {
     body: data
   });
-};
 
 export interface UpdatePassword {
   old_password: string;
@@ -52,7 +47,7 @@ export interface UpdatePassword {
 }
 
 export const updatePassword = async (payload: UpdatePassword) => {
-  let encrypt = getEncrypt();
+  const encrypt = getEncrypt();
   if (!encrypt) {
     return RequestError.Other;
   }
@@ -62,12 +57,12 @@ export const updatePassword = async (payload: UpdatePassword) => {
   encrypted_password = encrypt.encrypt(payload.new_password);
   payload.new_password = encrypted_password || '';
 
-  let res = await post('/api/user/account/password', {
+  const res = await post('/api/user/account/password', {
     body: payload
   });
 
   if (res === RequestError.Unauthorized) {
-    fetchKey();
+    const _ = fetchKey();
   }
 
   return res;
@@ -87,14 +82,16 @@ export interface SimpleGroupInfo {
 }
 
 export const listUsers = async (fetch: typeof window.fetch = window.fetch) => {
-  let ret = await get<UserListInfo[]>('/api/user/management', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<UserListInfo[]>('/api/user/management', {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && Array.isArray(ret)) {
     return ret;
   }
+
+  return undefined;
 };
 
 export type DetailUserInfo = UserListInfo & {
@@ -105,34 +102,36 @@ export const getListUserInfo = async (
   uuid: string,
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<DetailUserInfo>(`/api/user/management/${uuid}`, {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<DetailUserInfo>(`/api/user/management/${uuid}`, {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && typeof ret === 'object') {
     return ret;
   }
+
+  return undefined;
 };
 
 export const getMailStatus = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<{ active: boolean }>('/api/user/management/mail', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<{ active: boolean }>('/api/user/management/mail', {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && typeof ret === 'object') {
     return ret;
   }
+  return undefined;
 };
 
-export const deleteUser = async (uuid: string) => {
-  return await delete_(`/api/user/management`, {
+export const deleteUser = async (uuid: string) =>
+  await delete_(`/api/user/management`, {
     body: { uuid }
   });
-};
 
 export interface CreateUserRequest {
   name: string;
@@ -141,21 +140,21 @@ export interface CreateUserRequest {
 }
 
 export const createUser = async (data: CreateUserRequest) => {
-  let encrypt = getEncrypt();
+  const encrypt = getEncrypt();
   if (!encrypt) {
     return RequestError.Other;
   }
 
-  let encrypted_password = encrypt.encrypt(data.password || '');
+  const encrypted_password = encrypt.encrypt(data.password || '');
   data.password = encrypted_password || '';
 
-  let res = await post<{ uuid: string }>('/api/user/management', {
+  const res = await post<{ uuid: string }>('/api/user/management', {
     body: data,
     res_type: ResponseType.Json
   });
 
   if (res === RequestError.Unauthorized) {
-    fetchKey();
+    const _ = fetchKey();
   }
 
   return res;
@@ -164,14 +163,15 @@ export const createUser = async (data: CreateUserRequest) => {
 export const simpleGroupList = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<SimpleGroupInfo[]>('/api/user/management/groups', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<SimpleGroupInfo[]>('/api/user/management/groups', {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && Array.isArray(ret)) {
     return ret;
   }
+  return undefined;
 };
 
 export interface UserEditRequest {
@@ -180,17 +180,15 @@ export interface UserEditRequest {
   groups: string[];
 }
 
-export const editUser = async (data: UserEditRequest) => {
-  return await put(`/api/user/management`, {
+export const editUser = async (data: UserEditRequest) =>
+  await put(`/api/user/management`, {
     body: data
   });
-};
 
-export const resetUserAvatar = async (uuid: string) => {
-  return await delete_(`/api/user/management/avatar`, {
+export const resetUserAvatar = async (uuid: string) =>
+  await delete_(`/api/user/management/avatar`, {
     body: { uuid }
   });
-};
 
 export interface ResetUserPasswordRequest {
   uuid: string;
@@ -198,20 +196,20 @@ export interface ResetUserPasswordRequest {
 }
 
 export const resetUserPassword = async (data: ResetUserPasswordRequest) => {
-  let encrypt = getEncrypt();
+  const encrypt = getEncrypt();
   if (!encrypt) {
     return RequestError.Other;
   }
 
-  let encrypted_password = encrypt.encrypt(data.new_password);
+  const encrypted_password = encrypt.encrypt(data.new_password);
   data.new_password = encrypted_password || '';
 
-  let res = await put('/api/user/management/password', {
+  const res = await put('/api/user/management/password', {
     body: data
   });
 
   if (res === RequestError.Unauthorized) {
-    fetchKey();
+    const _ = fetchKey();
   }
 
   return res;

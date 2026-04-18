@@ -4,7 +4,7 @@ import type { LayoutLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 
 export const load: LayoutLoad = async ({ params, fetch }) => {
-  let res = await nodeInfo(params.uuid, fetch);
+  const res = await nodeInfo(params.uuid, fetch);
 
   if (typeof res !== 'object') {
     if (res === RequestError.NotFound) {
@@ -15,7 +15,7 @@ export const load: LayoutLoad = async ({ params, fetch }) => {
   }
 
   return {
-    uuid: params.uuid,
-    node: res
+    node: res,
+    uuid: params.uuid
   };
 };

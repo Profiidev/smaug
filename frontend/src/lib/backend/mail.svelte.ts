@@ -1,15 +1,14 @@
-import { post, RequestError } from '@profidev/pleiades/backend';
+import { RequestError, post } from '@profidev/pleiades/backend';
 import { fetchKey, getEncrypt } from './auth.svelte';
 
 export interface ForgotPassword {
   email: string;
 }
 
-export const sendResetLink = async (data: ForgotPassword) => {
-  return await post(`/api/mail/reset/send`, {
+export const sendResetLink = async (data: ForgotPassword) =>
+  await post(`/api/mail/reset/send`, {
     body: data
   });
-};
 
 export interface ResetPassword {
   token: string;
@@ -17,24 +16,22 @@ export interface ResetPassword {
 }
 
 export const sendResetPassword = async (data: ResetPassword) => {
-  let encrypt = getEncrypt();
+  const encrypt = getEncrypt();
   if (!encrypt) {
     return RequestError.Other;
   }
 
-  let encrypted_password = encrypt.encrypt(data.new_password);
+  const encrypted_password = encrypt.encrypt(data.new_password);
   data.new_password = encrypted_password || '';
 
-  let res = await post(`/api/mail/reset/confirm`, {
+  const res = await post(`/api/mail/reset/confirm`, {
     body: data
   });
   if (res === RequestError.Unauthorized) {
-    fetchKey();
+    const _ = fetchKey();
   }
 
   return res;
 };
 
-export const sendTestEmail = async () => {
-  return await post(`/api/mail/test`);
-};
+export const sendTestEmail = async () => await post(`/api/mail/test`);

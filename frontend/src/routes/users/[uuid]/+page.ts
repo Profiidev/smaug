@@ -8,11 +8,11 @@ import {
 } from '$lib/backend/user.svelte';
 
 export const load: PageLoad = async ({ params, fetch }) => {
-  let resPromise = getListUserInfo(params.uuid, fetch);
-  let groupsPromise = simpleGroupList(fetch);
-  let mailPromise = getMailStatus(fetch);
+  const resPromise = getListUserInfo(params.uuid, fetch);
+  const groupsPromise = simpleGroupList(fetch);
+  const mailPromise = getMailStatus(fetch);
 
-  let [res, groups, mail] = await Promise.all([
+  const [res, groups, mail] = await Promise.all([
     resPromise,
     groupsPromise,
     mailPromise
@@ -27,9 +27,9 @@ export const load: PageLoad = async ({ params, fetch }) => {
   }
 
   return {
-    uuid: params.uuid,
-    userInfo: res,
     groups,
-    mailActive: mail?.active ?? false
+    mailActive: mail?.active ?? false,
+    userInfo: res,
+    uuid: params.uuid
   };
 };

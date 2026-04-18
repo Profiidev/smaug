@@ -1,9 +1,9 @@
 import {
+  ResponseType,
   delete_,
   get,
   post,
-  put,
-  ResponseType
+  put
 } from '@profidev/pleiades/backend';
 
 export interface GroupInfo {
@@ -24,28 +24,30 @@ export interface GroupListResponse {
 }
 
 export const listGroups = async (fetch: typeof window.fetch = window.fetch) => {
-  let ret = await get<GroupListResponse>('/api/group', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<GroupListResponse>('/api/group', {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && typeof ret === 'object') {
     return ret;
   }
+  return undefined;
 };
 
 export const getGroupInfo = async (
   uuid: string,
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<GroupInfo>(`/api/group/${uuid}`, {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<GroupInfo>(`/api/group/${uuid}`, {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && typeof ret === 'object') {
     return ret;
   }
+  return undefined;
 };
 
 export interface GroupCreateRequest {
@@ -56,22 +58,20 @@ export interface GroupCreateResponse {
   uuid: string;
 }
 
-export const createGroup = async (data: GroupCreateRequest) => {
-  return await post<GroupCreateResponse>('/api/group', {
+export const createGroup = async (data: GroupCreateRequest) =>
+  await post<GroupCreateResponse>('/api/group', {
     body: data,
     res_type: ResponseType.Json
   });
-};
 
 export interface GroupDeleteRequest {
   uuid: string;
 }
 
-export const deleteGroup = async (data: GroupDeleteRequest) => {
-  return await delete_('/api/group', {
+export const deleteGroup = async (data: GroupDeleteRequest) =>
+  await delete_('/api/group', {
     body: data
   });
-};
 
 export interface GroupEditRequest {
   uuid: string;
@@ -80,21 +80,21 @@ export interface GroupEditRequest {
   users: string[];
 }
 
-export const editGroup = async (data: GroupEditRequest) => {
-  return await put<void>('/api/group', {
+export const editGroup = async (data: GroupEditRequest) =>
+  await put('/api/group', {
     body: data
   });
-};
 
 export const simpleUserList = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<SimpleUserInfo[]>('/api/group/users', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<SimpleUserInfo[]>('/api/group/users', {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (ret && Array.isArray(ret)) {
     return ret;
   }
+  return undefined;
 };

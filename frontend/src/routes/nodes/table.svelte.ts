@@ -22,36 +22,34 @@ export const columns = ({
 }): ColumnDef<NodeInfo>[] => [
   {
     accessorKey: 'connected',
-    header: () => {},
     cell: ({ row }) => {
-      let connected = row.getValue<boolean>('connected');
+      const connected = row.getValue<boolean>('connected');
       return DataTable.renderComponent(Status, {
         connected
       });
-    }
+    },
+    header: () => {}
   },
   createColumn('name', 'Name'),
   {
     ...createColumnHeader('address', 'Address'),
     cell: ({ row }) => {
-      let address = row.getValue<string>('address');
-      let port = row.original.port;
-      let value = `${address}:${port}`;
+      const address = row.getValue<string>('address');
+      const {port} = row.original;
+      const value = `${address}:${port}`;
 
       return DataTable.renderSnippet(
-        createRawSnippet(() => {
-          return {
+        createRawSnippet(() => ({
             render: () =>
               `<div class="ml-4 truncate h-full w-full text-wrap">${value}</div>`
-          };
-        })
+          }))
       );
     }
   },
   {
     ...createColumnHeader('secure', 'Secure'),
     cell: ({ row }) => {
-      let secure = row.getValue<boolean>('secure');
+      const secure = row.getValue<boolean>('secure');
       return DataTable.renderComponent(secure ? Lock : LockOpen, {
         class: `ml-3 ${secure ? 'text-green-500' : 'text-orange-500'}`
       });
@@ -60,15 +58,13 @@ export const columns = ({
   createColumn('id', 'UUID'),
   {
     accessorKey: 'actions',
-    header: () => {},
-    cell: ({ row }) => {
-      return DataTable.renderComponent(Actions, {
-        edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
+    cell: ({ row }) => DataTable.renderComponent(Actions, {
         delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         editHref: `/nodes/${row.original.id}/setup`,
+        edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         remove: () => deleteNode(row.original)
-      });
-    },
-    enableHiding: false
+      }),
+    enableHiding: false,
+    header: () => {}
   }
 ];

@@ -4,41 +4,37 @@ import z from 'zod';
 
 export const units = {
   B: 1,
+  GB: 1000 * 1000 * 1000,
+  GiB: 1024 * 1024 * 1024,
   KB: 1000,
   KiB: 1024,
   MB: 1000 * 1000,
   MiB: 1024 * 1024,
-  GB: 1000 * 1000 * 1000,
-  GiB: 1024 * 1024 * 1024,
   TB: 1000 * 1000 * 1000 * 1000,
   TiB: 1024 * 1024 * 1024 * 1024
 };
 
-const convertToMB = (amount: number, unitArray: string[]) => {
-  return (
+const convertToMB = (amount: number, unitArray: string[]) => (
     (amount * (units as Record<string, number>)[unitArray[0]]) / (1000 * 1000)
   );
-};
 
 export const reformatData = (
   data: FormValue<typeof generalSettings> & FormValue<typeof advancedSettings>
-): CreateNode => {
-  return {
-    name: data.name,
+): CreateNode => ({
     address: data.address,
-    secure: data.secure,
     cpu_limit: data.cpu_unlimit ? undefined : data.cpu_limit,
+    disk_limit_mb: data.storage_unlimit
+      ? undefined
+      : convertToMB(data.storage_size, data.storage_size_unit),
     memory_limit_mb: data.memory_unlimit
       ? undefined
       : convertToMB(data.memory_limit, data.memory_limit_unit),
-    disk_limit_mb: data.storage_unlimit
-      ? undefined
-      : convertToMB(data.storage_size, data.storage_size_unit)
-  };
-};
+    name: data.name,
+    secure: data.secure
+  });
 
 const selectUnit = (mb: number): [number, string[]] => {
-  let bytes = mb * 1000 * 1000;
+  const bytes = mb * 1000 * 1000;
   let unit = 'B';
   let unit_amount = bytes;
 
@@ -55,31 +51,31 @@ const selectUnit = (mb: number): [number, string[]] => {
 export const undoReformatData = (
   node: NodeInfo
 ): FormValue<typeof generalSettings> & FormValue<typeof advancedSettings> => {
-  let [storage_size, storage_unit] = selectUnit(
-    node.disk_limit_mb ?? (100 * units['GiB']) / units['MB']
+  const [storage_size, storage_unit] = selectUnit(
+    node.disk_limit_mb ?? (100 * units.GiB) / units.MB
   );
-  let [memory_limit, memory_unit] = selectUnit(
-    node.memory_limit_mb ?? (2 * units['GiB']) / units['MB']
+  const [memory_limit, memory_unit] = selectUnit(
+    node.memory_limit_mb ?? (2 * units.GiB) / units.MB
   );
 
   return {
-    name: node.name,
     address: `${node.address}:${node.port}`,
-    secure: node.secure,
-    cpu_unlimit: !node.cpu_limit,
     cpu_limit: node.cpu_limit ?? 1000,
-    memory_unlimit: !node.memory_limit_mb,
-    memory_limit: memory_limit,
+    cpu_unlimit: !node.cpu_limit,
+    memory_limit,
     memory_limit_unit: memory_unit,
-    storage_unlimit: !node.disk_limit_mb,
-    storage_size: storage_size,
-    storage_size_unit: storage_unit
+    memory_unlimit: !node.memory_limit_mb,
+    name: node.name,
+    secure: node.secure,
+    storage_size,
+    storage_size_unit: storage_unit,
+    storage_unlimit: !node.disk_limit_mb
   };
 };
 
 export const generalSettings = z.object({
-  name: z.string().min(1, 'Name is required').default(''),
   address: z.string().min(1, 'Address is required').default(''),
+  name: z.string().min(1, 'Name is required').default(''),
   secure: z.boolean().default(true)
 });
 
@@ -90,14 +86,14 @@ const unit = z
   .max(1);
 
 export const advancedSettings = z.object({
-  cpu_unlimit: z.boolean().default(true),
   cpu_limit: z.number().gt(1, 'CPU limit must be at least 1').default(1000),
-  memory_unlimit: z.boolean().default(true),
+  cpu_unlimit: z.boolean().default(true),
   memory_limit: amount.default(2048),
   memory_limit_unit: unit.default(['MiB']),
-  storage_unlimit: z.boolean().default(true),
+  memory_unlimit: z.boolean().default(true),
   storage_size: amount.default(100),
-  storage_size_unit: unit.default(['GiB'])
+  storage_size_unit: unit.default(['GiB']),
+  storage_unlimit: z.boolean().default(true)
 });
 
 export const summary = z.object({

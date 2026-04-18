@@ -1,8 +1,8 @@
 import {
-  get,
-  post,
   RequestError,
-  ResponseType
+  ResponseType,
+  get,
+  post
 } from '@profidev/pleiades/backend';
 import { fetchKey, getEncrypt } from './auth.svelte';
 
@@ -20,31 +20,32 @@ export interface SetupStatus {
 export const getSetupStatus = async (
   fetch: typeof window.fetch = window.fetch
 ) => {
-  let ret = await get<SetupStatus>('/api/setup', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<SetupStatus>('/api/setup', {
+    fetch,
+    res_type: ResponseType.Json
   });
 
   if (typeof ret === 'object') {
     return ret;
   }
+  return undefined;
 };
 
 export const performSetup = async (payload: SetupPayload) => {
-  let encrypt = getEncrypt();
+  const encrypt = getEncrypt();
   if (!encrypt) {
     return RequestError.Other;
   }
 
-  let encrypted_password = encrypt.encrypt(payload.admin_password);
+  const encrypted_password = encrypt.encrypt(payload.admin_password);
   payload.admin_password = encrypted_password || '';
 
-  let res = await post('/api/setup', {
+  const res = await post('/api/setup', {
     body: payload
   });
 
   if (res === RequestError.Unauthorized) {
-    fetchKey();
+    const _ = fetchKey();
   }
 
   return res;

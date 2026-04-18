@@ -13,12 +13,10 @@ export interface CreateNodeRes {
   uuid: string;
 }
 
-export const createNode = async (node: CreateNode) => {
-  return await post<CreateNodeRes>('/api/nodes', {
+export const createNode = async (node: CreateNode) => await post<CreateNodeRes>('/api/nodes', {
     body: node,
     res_type: ResponseType.Json
   });
-};
 
 export interface NodeInfo {
   id: string;
@@ -34,30 +32,27 @@ export interface NodeInfo {
 }
 
 export const listNodes = async (fetch: typeof window.fetch = window.fetch) => {
-  let ret = await get<NodeInfo[]>('/api/nodes', {
-    res_type: ResponseType.Json,
-    fetch
+  const ret = await get<NodeInfo[]>('/api/nodes', {
+    fetch,
+    res_type: ResponseType.Json
   });
   if (Array.isArray(ret)) {
     return ret;
   }
+  return undefined;
 };
 
-export const deleteNode = async (uuid: string) => {
-  return await delete_(`/api/nodes`, {
+export const deleteNode = async (uuid: string) => await delete_(`/api/nodes`, {
     body: { uuid }
   });
-};
 
 export const nodeInfo = async (
   uuid: string,
   fetch: typeof window.fetch = window.fetch
-) => {
-  return await get<NodeInfo>(`/api/nodes/${uuid}`, {
-    res_type: ResponseType.Json,
-    fetch
+) => await get<NodeInfo>(`/api/nodes/${uuid}`, {
+    fetch,
+    res_type: ResponseType.Json
   });
-};
 
 export interface UpdateNode {
   name: string;
@@ -68,8 +63,6 @@ export interface UpdateNode {
   cpu_limit?: number;
 }
 
-export const updateNode = async (uuid: string, node: UpdateNode) => {
-  return await post<undefined>(`/api/nodes/${uuid}`, {
+export const updateNode = async (uuid: string, node: UpdateNode) => await post(`/api/nodes/${uuid}`, {
     body: node
   });
-};
