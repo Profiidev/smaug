@@ -51,6 +51,7 @@ uuid = { version = "1.23.1", features = ["v4"] }
 reqwest-middleware = { version = "0.5.2", features = ["rustls", "http2", "json", "charset", "query"] }
 rand = "0.10.1"
 hex = "0.4.3"
+rustls = { version = "0.23.41", features = ["aws-lc-rs"] }
 
 [features]
 # only used for testing purposes

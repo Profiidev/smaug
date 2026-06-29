@@ -29,6 +29,10 @@ async fn main() {
   let config = Config::parse();
   init_logging(config.base.log_level);
 
+  rustls::crypto::aws_lc_rs::default_provider()
+    .install_default()
+    .unwrap();
+
   let listener = listener_setup(config.base.port).await;
   let app = build_router(router, state, config).await;
 
