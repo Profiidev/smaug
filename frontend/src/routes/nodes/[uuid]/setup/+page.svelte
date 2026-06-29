@@ -20,7 +20,7 @@
 </script>
 
 <h4 class="mb-2">Node Setup</h4>
-<div class="flex flex-col gap-2 w-full">
+<div class="flex w-full flex-col gap-2">
   <Label class="mr-4 text-nowrap">Node Auth Token:</Label>
   <CopyButton
     text={node?.token ?? 'loading...'}
