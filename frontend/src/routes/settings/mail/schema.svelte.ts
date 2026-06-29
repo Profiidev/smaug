@@ -1,4 +1,4 @@
-import type { MailSettings } from '$lib/backend/settings.svelte';
+import type { MailSettings } from '$lib/client';
 import type { FormValue } from '@profidev/pleiades/components/form/types';
 import { z } from 'zod';
 
@@ -6,19 +6,18 @@ export const mailSettings = z
   .object({
     smtp_enabled: z.boolean(),
     smtp_from_address: z.email().optional(),
-    smtp_from_name: z.string().optional().default('Smaug'),
-    smtp_host: z.string().optional(),
-    smtp_password: z.string().optional(),
+    smtp_from_name: z.string().optional().default('Positron'),
+    smtp_password: z.string().default(''),
     smtp_port: z.number().optional(),
-    smtp_user: z.string().optional(),
-    use_tls: z.boolean()
+    smtp_server: z.string().optional(),
+    smtp_use_tls: z.boolean(),
+    smtp_username: z.string().optional()
   })
   .superRefine((data, ctx) => {
     const smtpFields: (keyof typeof data)[] = [
-      'smtp_host',
+      'smtp_server',
       'smtp_port',
-      'smtp_user',
-      'smtp_password',
+      'smtp_username',
       'smtp_from_address',
       'smtp_from_name'
     ];
@@ -36,31 +35,33 @@ export const mailSettings = z
     }
   });
 
-export const reformat = (form: FormValue<typeof mailSettings>) => {
-  const data: MailSettings = {};
-  if (form.smtp_enabled) {
-    data.smtp = {
-      from_address: form.smtp_from_address!,
-      from_name: form.smtp_from_name,
-      password: form.smtp_password!,
-      port: form.smtp_port!,
-      server: form.smtp_host!,
-      use_tls: form.use_tls,
-      username: form.smtp_user!
-    };
+export const reformat = (
+  data: FormValue<typeof mailSettings>,
+  from_env: string[]
+) => {
+  const settings: MailSettings = {
+    ...data
+  };
+
+  for (const key of from_env) {
+    if (key in settings) {
+      // oxlint-disable-next-line no-unsafe-type-assertion no-dynamic-delete
+      delete settings[key as keyof MailSettings];
+    }
   }
-  return data;
+
+  return settings;
 };
 
 export const unReformat = (
   settings: MailSettings
 ): FormValue<typeof mailSettings> => ({
-  smtp_enabled: Boolean(settings.smtp),
-  smtp_from_address: settings.smtp?.from_address,
-  smtp_from_name: settings.smtp?.from_name || 'Smaug',
-  smtp_host: settings.smtp?.server,
-  smtp_password: settings.smtp?.password || '',
-  smtp_port: settings.smtp?.port,
-  smtp_user: settings.smtp?.username,
-  use_tls: settings.smtp?.use_tls || false
+  smtp_enabled: settings.smtp_enabled ?? false,
+  smtp_from_address: settings.smtp_from_address ?? undefined,
+  smtp_from_name: settings.smtp_from_name || 'Positron',
+  smtp_password: settings.smtp_password || '',
+  smtp_port: settings.smtp_port ?? undefined,
+  smtp_server: settings.smtp_server ?? undefined,
+  smtp_use_tls: settings.smtp_use_tls || false,
+  smtp_username: settings.smtp_username ?? undefined
 });

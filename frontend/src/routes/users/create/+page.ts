@@ -1,9 +1,11 @@
-import { getMailStatus } from '$lib/backend/user.svelte';
+import { mailActive } from '$lib/client';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ fetch }) => {
-  const active = await getMailStatus(fetch);
+export const load: PageLoad = ({ fetch }) => {
+  const active = mailActive({
+    fetch
+  }).then(({ data }) => data?.active ?? false);
   return {
-    mailActive: active?.active ?? false
+    mailActive: active
   };
 };

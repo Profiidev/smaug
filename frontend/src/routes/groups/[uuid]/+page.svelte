@@ -3,39 +3,81 @@
   import { Button } from '@profidev/pleiades/components/ui/button';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Trash from '@lucide/svelte/icons/trash';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import { Permission } from '$lib/permissions.svelte';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { goto } from '$app/navigation';
-  import { deleteGroup, editGroup } from '$lib/backend/groups.svelte.js';
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { formatData, groupSettings, reformatData } from './schema.svelte.js';
   import type { FormValue } from '@profidev/pleiades/components/form/types';
-  import { RequestError } from '@profidev/pleiades/backend';
   import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
   import Save from '@lucide/svelte/icons/save';
   import { Spinner } from '@profidev/pleiades/components/ui/spinner';
-  import FormCheckbox from '$lib/components/form/FormCheckbox.svelte';
   import FormSelect from '@profidev/pleiades/components/form/form-select.svelte';
+  import Permissions from './Permissions.svelte';
+  import { ScrollArea } from '@profidev/pleiades/components/ui/scroll-area';
+  import {
+    deleteGroup,
+    editGroup,
+    type GroupInfo,
+    type SimpleUserInfo,
+    type UserInfo
+  } from '$lib/client';
+  import { Skeleton } from '@profidev/pleiades/components/ui/skeleton';
 
   const { data } = $props();
 
   let deleteOpen = $state(false);
   let isLoading = $state(false);
-  let readonly = $derived(
-    !data.user?.permissions.includes(Permission.GROUP_EDIT)
-  );
+  let user: UserInfo | undefined = $state();
+  let adminGroup: string | undefined = $state();
+  let group: GroupInfo | undefined = $state();
+  let form: BaseForm<typeof groupSettings> | undefined = $state();
+  let users: SimpleUserInfo[] | undefined = $state();
+
+  let readonly = $derived(!user?.permissions.includes(Permission.GROUP_EDIT));
+
+  $effect(() => {
+    data.groupRes.then((res) => {
+      if (!res.data) {
+        if (res.response?.status === 404) {
+          goto('/groups?error=not_found');
+        } else {
+          goto('/groups?error=other');
+        }
+        return;
+      }
+
+      group = res.data.group;
+      adminGroup = res.data.admin_group;
+      form?.setValue(formatData(group));
+    });
+  });
+
+  $effect(() => {
+    data.user.then((d) => {
+      user = d;
+    });
+  });
+
+  $effect(() => {
+    data.usersPromise.then(({ data }) => {
+      users = data;
+    });
+  });
 
   const deleteItemConfirm = async () => {
+    if (!group) return;
     isLoading = true;
-    let ret = await deleteGroup({ uuid: data.group.id });
+    let ret = await deleteGroup({ body: { uuid: group.id } });
     isLoading = false;
 
-    if (ret) {
+    if (ret.error) {
       return { error: 'Failed to delete group' };
     } else {
-      toast.success(`Group ${data.group.name} deleted successfully`);
+      toast.success(`Group ${group.name} deleted successfully`);
       setTimeout(() => {
         goto('/groups');
       });
@@ -43,182 +85,131 @@
   };
 
   const onsubmit = async (form: FormValue<typeof groupSettings>) => {
-    let group = reformatData(form, data.group.id);
-    let res = await editGroup(group);
+    if (!group) return;
+    let groupData = reformatData(form, group.id);
+    if (group.id === adminGroup) {
+      groupData.permissions = group.permissions;
+    }
+    let res = await editGroup({ body: groupData });
 
-    if (res) {
-      if (res === RequestError.Conflict) {
-        return { error: 'This group name is already in use', field: 'name' };
+    if (res.error) {
+      if (res.response?.status === 409) {
+        return {
+          error: 'This group name is already in use',
+          field: 'name'
+        } as const;
+      } else if (res.response?.status === 406) {
+        return {
+          error: 'Admin group must have at least 1 user',
+          field: 'users'
+        } as const;
       } else {
         return { error: 'Failed to update group' };
       }
     } else {
-      toast.success(`Group ${data.group.name} updated successfully`);
+      toast.success(`Group ${group.name} updated successfully`);
       // do not trigger form reset
       return { error: '' };
     }
   };
 </script>
 
-<div class="flex h-full w-full flex-col space-y-6 p-4">
+<div class="flex h-full max-h-screen min-h-0 w-full flex-col space-y-6 p-4">
   <div class="mt-1! mb-0 ml-7 flex items-center md:m-0">
     <Button size="icon" variant="ghost" href="/groups" class="mr-2">
       <ArrowLeft class="size-5" />
     </Button>
-    <h3 class="text-xl font-medium">Group: {data.group.name}</h3>
+    <h3 class="flex text-xl font-medium">
+      Group:
+      {#if !group}
+        <Skeleton class="ml-2 h-7 w-20" />
+      {:else}
+        {group.name}
+      {/if}
+    </h3>
     <Button
       class="ml-auto cursor-pointer"
       onclick={() => (deleteOpen = true)}
       variant="destructive"
-      disabled={readonly}
+      disabled={readonly || group?.id === adminGroup}
     >
       <Trash />
       Delete
     </Button>
   </div>
   <Separator class="my-4" />
-  <div
-    class="flex grow flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-6"
-  >
-    <div class="flex-1">
-      <h4 class="mb-2">Settings</h4>
-      <BaseForm
-        schema={groupSettings}
-        {onsubmit}
-        initialValue={formatData(data.group)}
-      >
-        {#snippet children({ props })}
-          <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_1fr]">
+  <div class="flex min-h-0 grow flex-col space-y-4 lg:space-y-0 lg:space-x-6">
+    <h4 class="mb-2">Settings</h4>
+    <BaseForm
+      class="flex min-h-0 grow flex-col"
+      schema={groupSettings}
+      {onsubmit}
+      bind:this={form}
+    >
+      {#snippet children({ props })}
+        <ScrollArea class="mt-2 min-h-0">
+          <div
+            class="grid min-h-0 grow grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_1fr]"
+          >
             <div>
               <FormInput
                 {...props}
                 key="name"
                 label="Group Name"
                 placeholder="Enter group name"
-                {readonly}
+                disabled={readonly}
               />
               <FormSelect
                 {...props}
                 key="users"
                 label="Group Members"
-                data={data.users?.map((user) => ({
+                data={users?.map((user) => ({
                   label: user.name,
                   value: user.id
                 })) || []}
               />
-              <h5>Permissions</h5>
-              <div class="ml-4">
-                {#if data.user?.permissions.includes(Permission.NODE_VIEW) || data.user?.permissions.includes(Permission.NODE_EDIT)}
-                  <h6>Nodes</h6>
-                  <div class="ml-4">
-                    {#if data.user?.permissions.includes(Permission.NODE_VIEW)}
-                      <FormCheckbox
-                        {...props}
-                        key="node_view"
-                        label="View Nodes"
-                        disabled={readonly}
-                      />
-                    {/if}
-                    {#if data.user?.permissions.includes(Permission.NODE_EDIT)}
-                      <FormCheckbox
-                        {...props}
-                        key="node_edit"
-                        label="Edit Nodes"
-                        disabled={readonly}
-                      />
-                    {/if}
-                  </div>
-                {/if}
-                {#if data.user?.permissions.includes(Permission.SETTINGS_VIEW) || data.user?.permissions.includes(Permission.SETTINGS_EDIT)}
-                  <h6>Settings</h6>
-                  <div class="ml-4">
-                    {#if data.user?.permissions.includes(Permission.SETTINGS_VIEW)}
-                      <FormCheckbox
-                        {...props}
-                        key="settings_view"
-                        label="View Settings"
-                        disabled={readonly}
-                      />
-                    {/if}
-                    {#if data.user?.permissions.includes(Permission.SETTINGS_EDIT)}
-                      <FormCheckbox
-                        {...props}
-                        key="settings_edit"
-                        label="Edit Settings"
-                        disabled={readonly}
-                      />
-                    {/if}
-                  </div>
-                {/if}
-                {#if data.user?.permissions.includes(Permission.GROUP_VIEW) || data.user?.permissions.includes(Permission.GROUP_EDIT)}
-                  <h6>Groups</h6>
-                  <div class="ml-4">
-                    {#if data.user?.permissions.includes(Permission.GROUP_VIEW)}
-                      <FormCheckbox
-                        {...props}
-                        key="group_view"
-                        label="View Groups"
-                        disabled={readonly}
-                      />
-                    {/if}
-                    {#if data.user?.permissions.includes(Permission.GROUP_EDIT)}
-                      <FormCheckbox
-                        {...props}
-                        key="group_edit"
-                        label="Edit Groups"
-                        disabled={readonly}
-                      />
-                    {/if}
-                  </div>
-                {/if}
-                {#if data.user?.permissions.includes(Permission.USER_VIEW) || data.user?.permissions.includes(Permission.USER_EDIT)}
-                  <h6>Users</h6>
-                  <div class="ml-4">
-                    {#if data.user?.permissions.includes(Permission.USER_VIEW)}
-                      <FormCheckbox
-                        {...props}
-                        key="user_view"
-                        label="View Users"
-                        disabled={readonly}
-                      />
-                    {/if}
-                    {#if data.user?.permissions.includes(Permission.USER_EDIT)}
-                      <FormCheckbox
-                        {...props}
-                        key="user_edit"
-                        label="Edit Users"
-                        disabled={readonly}
-                      />
-                    {/if}
-                  </div>
-                {/if}
-              </div>
+              {#if group?.id !== adminGroup}
+                <Permissions
+                  {user}
+                  readonly={readonly || adminGroup === group?.id}
+                  {...props}
+                />
+              {/if}
             </div>
           </div>
-        {/snippet}
-        {#snippet footer({ isLoading }: { isLoading: boolean })}
-          <div class="mt-4 grid w-full grid-cols-1 gap-8 lg:grid-cols-2">
-            <Button
-              class="ml-auto cursor-pointer"
-              type="submit"
-              disabled={isLoading}
-            >
-              {#if isLoading}
-                <Spinner />
-              {:else}
-                <Save />
-              {/if}
-              Save Changes</Button
-            >
-          </div>
-        {/snippet}
-      </BaseForm>
-    </div>
+        </ScrollArea>
+      {/snippet}
+      {#snippet footer({
+        isLoading,
+        isError
+      }: {
+        isLoading: boolean;
+        isError: boolean;
+      })}
+        <div class="mt-4 grid w-full grid-cols-1 gap-8 lg:grid-cols-2">
+          <Button
+            class="ml-auto cursor-pointer"
+            type="submit"
+            disabled={isLoading}
+            variant={isError ? 'destructive' : undefined}
+          >
+            {#if isLoading}
+              <Spinner />
+            {:else if isError}
+              <RotateCcw />
+            {:else}
+              <Save />
+            {/if}
+            {isError ? 'Retry' : 'Save Changes'}</Button
+          >
+        </div>
+      {/snippet}
+    </BaseForm>
   </div>
 </div>
 <FormDialog
   title={`Delete Group`}
-  description={`Do you really want to delete the group ${data.group.name}?`}
+  description={`Do you really want to delete the group ${group?.name}?`}
   confirm="Delete"
   confirmVariant="destructive"
   onsubmit={deleteItemConfirm}

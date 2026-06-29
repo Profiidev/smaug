@@ -2,25 +2,32 @@
   import { Button } from '@profidev/pleiades/components/ui/button';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import Plus from '@lucide/svelte/icons/plus';
-  import Table from '$lib/components/table/Table.svelte';
+  import Table from '@profidev/pleiades/components/table/clean-table.svelte';
   import { columns } from './table.svelte';
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { Permission } from '$lib/permissions.svelte';
-  import { deleteUser, type UserListInfo } from '$lib/backend/user.svelte';
+  import { deleteUser, type UserListInfo } from '$lib/client';
 
   const { data } = $props();
 
   let selected: UserListInfo | undefined = $state();
   let deleteOpen = $state(false);
   let isLoading = $state(false);
+  let canEdit = $state(false);
+
+  $effect(() => {
+    data.user.then((user) => {
+      canEdit = user?.permissions.includes(Permission.USER_EDIT) ?? false;
+    });
+  });
 
   $effect(() => {
     if (data.error) {
-      if (data.error === 'user_not_found') {
+      if (data.error === 'not_found') {
         toast.error('User not found');
-      } else if (data.error === 'user_other') {
+      } else if (data.error === 'other') {
         toast.error('Failed to load user');
       }
 
@@ -34,10 +41,14 @@
     if (!selected) return;
 
     isLoading = true;
-    let ret = await deleteUser(selected.uuid);
+    let ret = await deleteUser({
+      body: {
+        uuid: selected.uuid
+      }
+    });
     isLoading = false;
 
-    if (ret) {
+    if (ret.error) {
       return { error: 'Failed to delete user' };
     } else {
       toast.success(`User ${selected.name} deleted successfully`);
@@ -57,7 +68,7 @@
     <Button
       class="ml-auto cursor-pointer"
       href="/users/create"
-      disabled={!data.user?.permissions.includes(Permission.USER_EDIT)}
+      disabled={!canEdit}
     >
       <Plus />
       Create
@@ -69,8 +80,9 @@
     class="mt-4"
     columnData={{
       deleteUser: startDeleteUser,
-      user: data.user
+      canEdit
     }}
+    searchColumns={['email', 'groups', 'name', 'uuid']}
   />
 </div>
 <FormDialog

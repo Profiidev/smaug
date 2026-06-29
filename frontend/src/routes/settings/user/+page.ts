@@ -1,20 +1,14 @@
-import {
-  getGeneralSettings,
-  getUserSettings
-} from '$lib/backend/settings.svelte';
+import { getGeneralSettings, getUserSettings } from '$lib/client';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ fetch }) => {
-  const fetchSettings = getUserSettings(fetch);
-  const fetchGeneralSettings = getGeneralSettings(fetch);
-
-  const [settings, generalSettings] = await Promise.all([
-    fetchSettings,
-    fetchGeneralSettings
-  ]);
+export const load: PageLoad = ({ fetch }) => {
+  const fetchSettings = getUserSettings({ fetch }).then(({ data }) => data);
+  const fetchGeneralSettings = getGeneralSettings({ fetch }).then(
+    ({ data }) => data
+  );
 
   return {
-    generalSettings,
-    settings
+    generalSettingsPromise: fetchGeneralSettings,
+    settingsPromise: fetchSettings
   };
 };

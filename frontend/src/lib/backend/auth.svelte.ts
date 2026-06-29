@@ -1,11 +1,7 @@
 import type JSEncrypt from 'jsencrypt';
-import {
-  RequestError,
-  ResponseType,
-  get,
-  post
-} from '@profidev/pleiades/backend';
+import { RequestError, ResponseType, get } from '@profidev/pleiades/backend';
 import { browser } from '$app/environment';
+import { key as getKey } from '$lib/client';
 
 let encrypt: false | undefined | JSEncrypt = $state(browser && undefined);
 
@@ -16,54 +12,31 @@ export const fetchKey = async () => {
     return RequestError.Other;
   }
 
-  const key = await get<{ key: string }>('/api/auth/password', {
-    res_type: ResponseType.Json
-  });
-
-  if (typeof key !== 'object') {
-    return key;
+  const { data: keyData } = await getKey();
+  if (!keyData) {
+    return undefined;
   }
 
   const { JSEncrypt } = await import('jsencrypt');
 
   encrypt = new JSEncrypt({ default_key_size: '4096' });
-  encrypt.setPublicKey(key.key);
+  encrypt.setPublicKey(keyData.key);
+
   return undefined;
 };
 const _ = fetchKey();
 
-export const passwordLogin = async (email: string, password: string) => {
-  if (!encrypt) {
-    return RequestError.Other;
-  }
-
-  const encrypted_password = encrypt.encrypt(password);
-  const res = await post('/api/auth/password', {
-    body: {
-      email,
-      password: encrypted_password
+export const getOidcUrl = async (redirect?: string) => {
+  const res = await get<{ url: string }>(
+    `/api/auth/oidc/url${redirect ? `?redirect_to=${redirect}` : ''}`,
+    {
+      res_type: ResponseType.Json
     }
-  });
+  );
 
-  if (res === RequestError.Unauthorized) {
-    const _f = fetchKey();
+  if (typeof res === 'object') {
+    return res.url;
   }
-  return res;
-};
 
-export const logout = async () => {
-  const res = await post('/api/auth/logout');
-
-  return res;
-};
-
-export const testToken = async () => {
-  const res = await get<boolean>('/api/auth/test_token', {
-    res_type: ResponseType.Json
-  });
-
-  if (typeof res === 'boolean') {
-    return res;
-  }
   return undefined;
 };

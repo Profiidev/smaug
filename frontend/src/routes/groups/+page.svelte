@@ -2,25 +2,43 @@
   import { Button } from '@profidev/pleiades/components/ui/button';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import Plus from '@lucide/svelte/icons/plus';
-  import Table from '$lib/components/table/Table.svelte';
+  import Table from '@profidev/pleiades/components/table/clean-table.svelte';
   import { columns } from './table.svelte';
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { Permission } from '$lib/permissions.svelte';
-  import { deleteGroup, type GroupInfo } from '$lib/backend/groups.svelte';
+  import { deleteGroup, type GroupInfo, type UserInfo } from '$lib/client';
 
   const { data } = $props();
 
   let selected: GroupInfo | undefined = $state();
   let deleteOpen = $state(false);
   let isLoading = $state(false);
+  let user: UserInfo | undefined = $state();
+  let adminGroup: string | undefined = $state();
+
+  let canCreate = $derived(
+    user?.permissions.includes(Permission.GROUP_EDIT) ?? false
+  );
+
+  $effect(() => {
+    data.user.then((d) => {
+      user = d;
+    });
+  });
+
+  $effect(() => {
+    data.admin_group.then((d) => {
+      adminGroup = d;
+    });
+  });
 
   $effect(() => {
     if (data.error) {
-      if (data.error === 'group_not_found') {
+      if (data.error === 'not_found') {
         toast.error('Group not found');
-      } else if (data.error === 'group_other') {
+      } else if (data.error === 'other') {
         toast.error('Failed to load group');
       }
 
@@ -34,10 +52,10 @@
     if (!selected) return;
 
     isLoading = true;
-    let ret = await deleteGroup({ uuid: selected.id });
+    let ret = await deleteGroup({ body: { uuid: selected.id } });
     isLoading = false;
 
-    if (ret) {
+    if (ret.error) {
       return { error: 'Failed to delete group' };
     } else {
       toast.success(`Group ${selected.name} deleted successfully`);
@@ -57,7 +75,7 @@
     <Button
       class="ml-auto cursor-pointer"
       href="/groups/create"
-      disabled={!data.user?.permissions.includes(Permission.GROUP_EDIT)}
+      disabled={!canCreate}
     >
       <Plus />
       Create
@@ -69,9 +87,10 @@
     class="mt-4"
     columnData={{
       deleteGroup: startDeleteGroup,
-      user: data.user,
-      admin_group: data.admin_group
+      user,
+      admin_group: adminGroup
     }}
+    searchColumns={['id', 'name', 'permissions', 'users']}
   />
 </div>
 <FormDialog

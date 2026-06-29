@@ -1,28 +1,27 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { createGroup } from '$lib/backend/groups.svelte';
-  import { RequestError } from '@profidev/pleiades/backend';
   import { toast } from '@profidev/pleiades/components/util/general';
-  import type { Stage } from '$lib/components/form/types.svelte';
-  import MultiStepForm from '$lib/components/form/MultiStepForm.svelte';
+  import type { Stage } from '@profidev/pleiades/components/form/types';
+  import MultiStepForm from '@profidev/pleiades/components/form/multistep-form.svelte';
   import Information from './Information.svelte';
+  import { createGroup } from '$lib/client';
 
   let stages: Stage[] = [
     {
-      title: 'Information',
+      title: 'Create Group',
       content: Information,
       data: {}
     }
   ];
 
   const submit = async (rawData: object) => {
-    let res = await createGroup(rawData as any);
+    let res = await createGroup({ body: rawData as any });
 
-    if (typeof res === 'string') {
-      if (res === RequestError.Conflict) {
+    if (!res.data) {
+      if (res.response?.status === 409) {
         return {
           error: 'A group with this name already exists.',
-          path: 'name'
+          field: 'name'
         };
       } else {
         return { error: 'Error creating group.' };
@@ -30,7 +29,7 @@
     } else {
       toast.success('Group created successfully.');
       setTimeout(() => {
-        goto(`/groups/${res.uuid}`);
+        goto(`/groups/${res.data.uuid}`);
       });
     }
   };

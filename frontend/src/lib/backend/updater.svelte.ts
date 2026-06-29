@@ -1,91 +1,53 @@
-import { browser } from '$app/environment';
 import { invalidate } from '$app/navigation';
-import { sleep } from '@profidev/pleiades/util/interval.svelte';
+import { createWebsocket } from '@profidev/pleiades/backend';
 
 export enum UpdateType {
-  Nodes = 'Nodes',
   Settings = 'Settings',
-  Users = 'Users',
-  Groups = 'Groups'
+  User = 'User',
+  UserPermissions = 'UserPermissions',
+  Group = 'Group',
+  Nodes = 'Nodes'
 }
 
-export interface UpdateMessage {
-  type:
-    | UpdateType.Nodes
-    | UpdateType.Settings
-    | UpdateType.Users
-    | UpdateType.Groups;
-}
-
-let updater: WebSocket | undefined | false = $state(browser && undefined);
-let interval = 0;
-let disconnect = false;
-
-export const connectWebsocket = () => {
-  if (updater === false || updater) {
-    return;
-  }
-  createWebsocket();
-};
-
-const createWebsocket = () => {
-  updater = new WebSocket('/api/ws/updater');
-
-  // oxlint-disable-next-line prefer-add-event-listener
-  updater.onmessage = (event) => {
-    const msg: UpdateMessage = JSON.parse(event.data);
-    handleMessage(msg);
-  };
-
-  // oxlint-disable-next-line prefer-add-event-listener
-  updater.onclose = async () => {
-    clearInterval(interval);
-    if (disconnect) {
-      return;
+export type UpdateMessage =
+  | {
+      type: UpdateType.User | UpdateType.Group | UpdateType.Nodes;
+      uuid: string;
     }
-    await sleep(1000);
-    createWebsocket();
-  };
+  | {
+      type: UpdateType.Settings | UpdateType.UserPermissions;
+    };
 
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  interval = setInterval(() => {
-    if (
-      !updater ||
-      updater.readyState === updater.CLOSING ||
-      updater.readyState === updater.CLOSED
-    ) {
-      clearInterval(interval);
-      return;
-    }
+const socket = createWebsocket<UpdateMessage>();
 
-    updater.send('heartbeat');
-  }, 10_000) as unknown as number;
-};
+export const connectWebsocket = (user: string) =>
+  socket.connect((msg) => handleMessage(msg, user));
+export const disconnectWebsocket = () => socket.disconnect();
 
-export const disconnectWebsocket = () => {
-  if (updater) {
-    disconnect = true;
-    updater.close();
-    updater = undefined;
-  }
-};
-
-const handleMessage = (msg: UpdateMessage) => {
+const handleMessage = (msg: UpdateMessage, user: string) => {
   switch (msg.type) {
-    case UpdateType.Nodes: {
-      const _ = invalidate((url) => url.pathname.startsWith('/api/nodes'));
-      break;
-    }
     case UpdateType.Settings: {
       const _ = invalidate((url) => url.pathname.startsWith('/api/settings'));
       break;
     }
-    case UpdateType.Users: {
-      const _ = invalidate((url) => url.pathname.startsWith('/api/user'));
+    case UpdateType.User: {
+      invalidate('/api/user/management').catch(() => {});
+      invalidate(`/api/user/management/${msg.uuid}`).catch(() => {});
+      invalidate('/api/group/users').catch(() => {});
+      // Same as current user
+      if (msg.uuid === user) {
+        invalidate('/api/user/info').catch(() => {});
+      }
       break;
     }
-    case UpdateType.Groups: {
-      const _ = invalidate((url) => url.pathname.startsWith('/api/group'));
+    case UpdateType.UserPermissions: {
+      invalidate('/api/user/info').catch(() => {});
+      break;
+    }
+    case UpdateType.Group: {
+      invalidate('/api/group').catch(() => {});
+      invalidate(`/api/group/${msg.uuid}`).catch(() => {});
+      invalidate('/api/user/management/groups').catch(() => {});
       break;
     }
     default: {

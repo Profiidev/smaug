@@ -1,27 +1,15 @@
 import Settings from '@lucide/svelte/icons/settings';
-import Server from '@lucide/svelte/icons/server';
 import House from '@lucide/svelte/icons/house';
+import Server from '@lucide/svelte/icons/server';
 import { Permission } from '$lib/permissions.svelte';
-import type { Component } from 'svelte';
 import Users from '@lucide/svelte/icons/users';
 import User from '@lucide/svelte/icons/user';
-
-export interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
-export interface NavItem {
-  label: string;
-  href: string;
-  icon?: Component;
-  requiredPermission?: Permission;
-}
+import type { NavGroup } from '@profidev/pleiades/components/nav/sidebar/types';
 
 export const items: NavGroup[] = [
   {
     items: [{ href: '/', icon: House, label: 'Overview' }],
-    label: 'General'
+    label: 'Overview'
   },
   {
     items: [
@@ -59,10 +47,12 @@ export const items: NavGroup[] = [
   }
 ];
 
-export const noSidebarPaths = [
+export const noAuthPaths = [
   '/login',
   '/setup',
   '/password',
   '/password/forgot',
   '/password/reset'
 ];
+
+export const noSidebarPaths = [...noAuthPaths];

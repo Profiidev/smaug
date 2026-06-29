@@ -4,23 +4,32 @@
   import * as Card from '@profidev/pleiades/components/ui/card';
   import { resetPassword } from './schema.svelte';
   import type { FormValue } from '@profidev/pleiades/components/form/types';
-  import { sendResetPassword } from '$lib/backend/mail.svelte';
   import { toast } from '@profidev/pleiades/components/util/general';
-  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
+  import FormInputPassword from '@profidev/pleiades/components/form/form-input-password.svelte';
   import { goto } from '$app/navigation';
-  import { RequestError } from '@profidev/pleiades/backend';
+  import { resetPassword as sendResetPassword } from '$lib/client';
+  import { getEncrypt } from '$lib/backend/auth.svelte';
 
   let { data } = $props();
 
-  const onsubmit = async (data: FormValue<typeof resetPassword>) => {
+  const onsubmit = async (formData: FormValue<typeof resetPassword>) => {
+    let encrypt = getEncrypt();
+    if (!encrypt) {
+      return {
+        error: 'Encryption function not available. Please try again later.'
+      };
+    }
+
     let ret = await sendResetPassword({
-      token: data.token,
-      new_password: data.new_password
+      body: {
+        token: formData.token,
+        new_password: encrypt.encrypt(formData.new_password) || ''
+      }
     });
 
-    if (ret === RequestError.TooManyRequests) {
+    if (ret.error && ret.response?.status === 429) {
       return { error: 'Rate limit exceeded. Please try again later.' };
-    } else if (ret) {
+    } else if (ret.error) {
       return { error: 'Failed to reset password.' };
     } else {
       toast.success(
@@ -46,6 +55,7 @@
         schema={resetPassword}
         {onsubmit}
         initialValue={{ token: data.token ?? '' }}
+        submitText="Reset Password"
       >
         {#snippet children({ props })}
           <FormInput
@@ -66,9 +76,6 @@
             placeholder="Confirm your new password"
             key="confirm_password"
           />
-        {/snippet}
-        {#snippet footer({ defaultBtn })}
-          {@render defaultBtn({ content: 'Reset Password' })}
         {/snippet}
       </BaseForm>
     </Card.Content>

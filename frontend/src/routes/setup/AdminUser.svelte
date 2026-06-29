@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { StageProps } from '$lib/components/form/types.svelte';
+  import type { StageProps } from '@profidev/pleiades/components/form/types';
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { adminUser } from './schema.svelte';
   import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
-  import FormInputPassword from '$lib/components/form/FormInputPassword.svelte';
+  import FormInputPassword from '@profidev/pleiades/components/form/form-input-password.svelte';
 
   let {
     initialValue,
@@ -21,7 +21,14 @@
   };
 </script>
 
-<BaseForm {onsubmit} {initialValue} {footer} bind:isLoading schema={adminUser}>
+<BaseForm
+  {onsubmit}
+  {initialValue}
+  {footer}
+  bind:isLoading
+  schema={adminUser}
+  bind:this={form}
+>
   {#snippet children({ props })}
     <FormInput
       {...props}
