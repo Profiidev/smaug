@@ -1,6 +1,9 @@
 use centaurus::{
   Config,
-  backend::config::{BaseConfig, MetricsConfig, SiteConfig},
+  backend::{
+    auth::settings::AuthConfig,
+    config::{BaseConfig, MetricsConfig, SiteConfig},
+  },
 };
 use figment::{
   Figment,
@@ -17,8 +20,12 @@ pub struct Config {
   #[serde(flatten)]
   #[metrics]
   pub metrics: MetricsConfig,
+  // required because of cargo feature unification
   #[site]
   pub site: SiteConfig,
+  // required because of cargo feature unification
+  #[auth]
+  pub auth: AuthConfig,
 
   pub token: String,
 }
@@ -35,6 +42,7 @@ impl Default for Config {
         site_url: "http://localhost:8080".parse().unwrap(),
       },
       token: "test-token".to_string(),
+      auth: AuthConfig::default(),
     }
   }
 }

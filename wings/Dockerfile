@@ -1,7 +1,11 @@
-ARG TARGET=x86_64-unknown-linux-gnu
-ARG RUSTFLAGS="-C target-feature=+crt-static"
+ARG TARGETARCH
+# If TARGETARCH is amd64, result is x86_64. If arm64, result is aarch64.
+ARG RUST_ARCH=${TARGETARCH/amd64/x86_64}
+ARG RUST_ARCH=${RUST_ARCH/arm64/aarch64}
+ARG TARGET=${RUST_ARCH}-unknown-linux-gnu
+ARG RUSTFLAGS="-C target-feature=+crt-static --cfg reqwest_unstable"
 
-FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:34cee96885e1080da4e0a9a8a86dd8db503796bfc140a13b4e1a0f72784644ab AS wings-planner
+FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:15425af80485c6688cca13a291888674946c5fc3af0b8330c106ceff21c5af0b AS wings-planner
 
 ARG TARGET
 ARG RUSTFLAGS
@@ -17,7 +21,7 @@ RUN \
   --mount=type=cache,target=/app/target \
   cargo chef prepare --recipe-path recipe.json --bin wings
 
-FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:34cee96885e1080da4e0a9a8a86dd8db503796bfc140a13b4e1a0f72784644ab AS wings-builder
+FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:15425af80485c6688cca13a291888674946c5fc3af0b8330c106ceff21c5af0b AS wings-builder
 
 ARG TARGET
 ARG RUSTFLAGS
@@ -43,7 +47,7 @@ RUN \
   cd wings && cargo build --release --target $TARGET \
   && mv ../target/$TARGET/release/wings ../app
 
-FROM node:24-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f
+FROM scratch
 
 ARG FRONTEND_DIR
 
