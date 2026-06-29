@@ -28,6 +28,31 @@
     <Collapsible.Trigger>
       {#snippet child({ props })}
         <button {...props} class="flex w-full cursor-pointer">
+          <span>Servers</span>
+          {#if props['data-state'] === 'closed'}
+            <ChevronDown class="text-muted-foreground ml-auto" />
+          {:else}
+            <ChevronUp class="text-muted-foreground ml-auto" />
+          {/if}
+        </button>
+      {/snippet}
+    </Collapsible.Trigger>
+    <Collapsible.Content>
+      {@render permission({
+        header: 'Node View',
+        read: Permission.NODE_VIEW,
+        read_key: 'node$view',
+        read_label: 'View Node',
+        write: Permission.NODE_EDIT,
+        write_key: 'node$edit',
+        write_label: 'Edit Node'
+      })}
+    </Collapsible.Content>
+  </Collapsible.Root>
+  <Collapsible.Root class="my-1 w-full" open={true}>
+    <Collapsible.Trigger>
+      {#snippet child({ props })}
+        <button {...props} class="flex w-full cursor-pointer">
           <span>Administration</span>
           {#if props['data-state'] === 'closed'}
             <ChevronDown class="text-muted-foreground ml-auto" />
