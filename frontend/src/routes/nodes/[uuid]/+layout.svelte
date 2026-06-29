@@ -11,6 +11,7 @@
   import { goto } from '$app/navigation';
   import { deleteNode, type NodeInfo, type UserInfo } from '$lib/client';
   import { Skeleton } from '@profidev/pleiades/components/ui/skeleton';
+  import Status from '$lib/components/table/Status.svelte';
 
   const { children, data } = $props();
 
@@ -85,6 +86,7 @@
         {node.name}
       {/if}
     </h3>
+    <Status connected={node?.connected} class="mt-0 mb-1" />
     <Button
       class="ml-auto cursor-pointer"
       onclick={() => (deleteOpen = true)}
