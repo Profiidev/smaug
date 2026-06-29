@@ -50,6 +50,11 @@ const handleMessage = (msg: UpdateMessage, user: string) => {
       invalidate('/api/user/management/groups').catch(() => {});
       break;
     }
+    case UpdateType.Nodes: {
+      invalidate('/api/nodes').catch(() => {});
+      invalidate(`/api/nodes/${msg.uuid}`).catch(() => {});
+      break;
+    }
     default: {
       break;
     }
