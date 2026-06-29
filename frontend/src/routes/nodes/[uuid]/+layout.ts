@@ -3,10 +3,10 @@ import { nodeInfo } from '$lib/client';
 
 export const load: LayoutLoad = ({ params, fetch }) => ({
   nodeRes: nodeInfo({
+    fetch,
     path: {
       uuid: params.uuid
-    },
-    fetch
+    }
   }),
   uuid: params.uuid
 });
