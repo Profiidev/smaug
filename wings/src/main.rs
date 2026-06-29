@@ -2,17 +2,19 @@ use aide::axum::ApiRouter;
 use axum::Extension;
 use centaurus::{
   backend::{
-    init::{listener_setup, run_app},
+    init::{listener_setup, run_app_connect_info},
     middleware::rate_limiter::RateLimiter,
     router::build_router,
   },
   logging::init_logging,
 };
 #[cfg(debug_assertions)]
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use tracing::info;
 
 use crate::config::Config;
+
+extern crate centaurus_wings as centaurus;
 
 mod auth;
 mod config;
@@ -27,12 +29,15 @@ async fn main() {
   let config = Config::parse();
   init_logging(config.base.log_level);
 
-  let listener = listener_setup(config.base.port).await;
+  rustls::crypto::aws_lc_rs::default_provider()
+    .install_default()
+    .unwrap();
 
+  let listener = listener_setup(config.base.port).await;
   let app = build_router(router, state, config).await;
 
   info!("Starting application");
-  run_app(listener, app).await;
+  run_app_connect_info(listener, app).await;
 }
 
 fn router(_limiter: &mut RateLimiter) -> ApiRouter {

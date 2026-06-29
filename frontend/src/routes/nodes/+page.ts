@@ -1,7 +1,7 @@
-import { listNodes } from '$lib/backend/node.svelte';
+import { listNodes } from '$lib/client';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ fetch, url }) => ({
+export const load: PageLoad = ({ fetch, url }) => ({
   error: url.searchParams.get('error'),
-  nodes: await listNodes(fetch)
+  nodes: listNodes({ fetch }).then((r) => r.data)
 });

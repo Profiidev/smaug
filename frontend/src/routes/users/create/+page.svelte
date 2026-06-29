@@ -1,11 +1,11 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { RequestError } from '@profidev/pleiades/backend';
   import { toast } from '@profidev/pleiades/components/util/general';
-  import type { Stage } from '$lib/components/form/types.svelte';
-  import MultiStepForm from '$lib/components/form/MultiStepForm.svelte';
+  import type { Stage } from '@profidev/pleiades/components/form/types';
+  import MultiStepForm from '@profidev/pleiades/components/form/multistep-form.svelte';
   import Information from './Information.svelte';
-  import { createUser } from '$lib/backend/user.svelte';
+  import { createUser } from '$lib/client';
+  import { getEncrypt } from '$lib/backend/auth.svelte';
 
   let { data } = $props();
 
@@ -13,31 +13,49 @@
     mailActive: boolean;
   }>[] = [
     {
-      title: 'Information',
+      title: 'Create User',
       content: Information,
       data: {}
     }
   ];
 
+  let mailActive = $state(false);
+
+  $effect(() => {
+    data.mailActive.then((active) => {
+      mailActive = active;
+    });
+  });
+
   const submit = async (rawData: object) => {
     let anyData = rawData as any;
-    if (
-      !data.mailActive &&
-      (!anyData.password || anyData.password.length < 6)
-    ) {
+    if (!mailActive && (!anyData.password || anyData.password.length < 6)) {
       return {
         error: 'Password must be at least 6 characters long.',
-        path: 'password'
+        field: 'password'
       };
     }
 
-    let res = await createUser(anyData);
+    let encrypt = getEncrypt();
+    if (!encrypt) {
+      return {
+        error: 'Encryption function not available.',
+        field: 'password'
+      };
+    }
 
-    if (typeof res === 'string') {
-      if (res === RequestError.Conflict) {
+    let encrypted_password = encrypt.encrypt(anyData.password || '');
+    anyData.password = encrypted_password || '';
+
+    let res = await createUser({
+      body: anyData
+    });
+
+    if (!res.data) {
+      if (res.response?.status === 409) {
         return {
           error: 'A user with this email already exists.',
-          path: 'email'
+          field: 'email'
         };
       } else {
         return { error: 'Error creating user.' };
@@ -45,7 +63,7 @@
     } else {
       toast.success('User created successfully.');
       setTimeout(() => {
-        goto(`/users/${res.uuid}`);
+        goto(`/users/${res.data.uuid}`);
       });
     }
   };
@@ -54,6 +72,6 @@
 <MultiStepForm
   {stages}
   onsubmit={submit}
-  data={{ mailActive: data.mailActive }}
+  data={{ mailActive }}
   cancelHref="/users"
 />

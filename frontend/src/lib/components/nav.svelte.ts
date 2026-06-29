@@ -1,0 +1,58 @@
+import Settings from '@lucide/svelte/icons/settings';
+import House from '@lucide/svelte/icons/house';
+import Server from '@lucide/svelte/icons/server';
+import { Permission } from '$lib/permissions.svelte';
+import Users from '@lucide/svelte/icons/users';
+import User from '@lucide/svelte/icons/user';
+import type { NavGroup } from '@profidev/pleiades/components/nav/sidebar/types';
+
+export const items: NavGroup[] = [
+  {
+    items: [{ href: '/', icon: House, label: 'Overview' }],
+    label: 'Overview'
+  },
+  {
+    items: [
+      {
+        href: '/nodes',
+        icon: Server,
+        label: 'Nodes',
+        requiredPermission: Permission.NODE_VIEW
+      }
+    ],
+    label: 'Servers'
+  },
+  {
+    items: [
+      {
+        href: '/users',
+        icon: User,
+        label: 'Users',
+        requiredPermission: Permission.USER_VIEW
+      },
+      {
+        href: '/groups',
+        icon: Users,
+        label: 'Groups',
+        requiredPermission: Permission.GROUP_VIEW
+      },
+      {
+        href: '/settings',
+        icon: Settings,
+        label: 'Settings',
+        requiredPermission: Permission.SETTINGS_VIEW
+      }
+    ],
+    label: 'Administration'
+  }
+];
+
+export const noAuthPaths = [
+  '/login',
+  '/setup',
+  '/password',
+  '/password/forgot',
+  '/password/reset'
+];
+
+export const noSidebarPaths = [...noAuthPaths];

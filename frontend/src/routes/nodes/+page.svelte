@@ -2,19 +2,20 @@
   import { Button } from '@profidev/pleiades/components/ui/button';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import Plus from '@lucide/svelte/icons/plus';
-  import Table from '$lib/components/table/Table.svelte';
   import { columns } from './table.svelte';
-  import { deleteNode, type NodeInfo } from '$lib/backend/node.svelte';
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { Permission } from '$lib/permissions.svelte';
+  import { deleteNode, type NodeInfo, type UserInfo } from '$lib/client';
+  import Table from '@profidev/pleiades/components/table/clean-table.svelte';
 
   const { data } = $props();
 
   let selected: NodeInfo | undefined = $state();
   let deleteOpen = $state(false);
   let isLoading = $state(false);
+  let user: UserInfo | undefined = $state();
 
   $effect(() => {
     if (data.error) {
@@ -30,11 +31,21 @@
     }
   });
 
+  $effect(() => {
+    data.user.then((d) => {
+      user = d;
+    });
+  });
+
   const deleteItemConfirm = async () => {
     if (!selected) return;
 
     isLoading = true;
-    let ret = await deleteNode(selected.id);
+    let ret = await deleteNode({
+      body: {
+        uuid: selected.id
+      }
+    });
     isLoading = false;
 
     if (ret) {
@@ -57,7 +68,7 @@
     <Button
       class="ml-auto cursor-pointer"
       href="/nodes/create"
-      disabled={!data.user?.permissions.includes(Permission.NODE_EDIT)}
+      disabled={!user?.permissions.includes(Permission.NODE_EDIT)}
     >
       <Plus />
       Create
@@ -67,7 +78,7 @@
     data={data.nodes}
     {columns}
     class="mt-4"
-    columnData={{ deleteNode: startDeleteNode, user: data.user }}
+    columnData={{ deleteNode: startDeleteNode, user }}
   />
 </div>
 <FormDialog

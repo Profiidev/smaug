@@ -4,17 +4,30 @@
   import * as Select from '@profidev/pleiades/components/ui/select';
   import * as Code from '$lib/components/code';
   import { dockerCompose, dockerRun } from './code.svelte';
+  import type { NodeInfo } from '$lib/client';
 
   let { data } = $props();
 
+  let node: NodeInfo | undefined = $state();
   let setupMethod = $state('Docker Compose');
+
+  $effect(() => {
+    data.nodeRes.then((res) => {
+      if (!res.data) return;
+      node = res.data;
+    });
+  });
 </script>
 
 <h4 class="mb-2">Node Setup</h4>
-<div class="flex flex-col gap-2">
+<div class="flex w-full flex-col gap-2">
   <Label class="mr-4 text-nowrap">Node Auth Token:</Label>
-  <CopyButton text={data.node.token} variant="outline" class="max-w-155">
-    <span class="truncate">{data.node.token}</span>
+  <CopyButton
+    text={node?.token ?? 'loading...'}
+    variant="outline"
+    class="max-w-141"
+  >
+    <span class="truncate">{node?.token ?? 'loading...'}</span>
   </CopyButton>
   <Label class="mr-4 text-nowrap">Setup Method:</Label>
   <Select.Root bind:value={setupMethod} type="single" allowDeselect={false}>
@@ -30,10 +43,10 @@
   </Select.Root>
   <Code.Root
     code={setupMethod === 'Docker Compose'
-      ? dockerCompose(data.node.token)
-      : dockerRun(data.node.token)}
+      ? dockerCompose(node?.token ?? 'loading...')
+      : dockerRun(node?.token ?? 'loading...')}
     lang={setupMethod === 'Docker Compose' ? 'yaml' : 'bash'}
-    class="mt-4"
+    class="mt-4 min-w-0 grow"
   >
     <Code.CopyButton />
   </Code.Root>

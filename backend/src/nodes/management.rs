@@ -1,8 +1,8 @@
-use axum::{
-  Json, Router,
-  extract::{FromRequest, FromRequestParts, Path},
-  routing::{delete, get, post},
+use aide::axum::{
+  ApiRouter,
+  routing::{delete_with, get_with, post_with},
 };
+use axum::{Json, extract::Path};
 use centaurus::{
   bail,
   db::init::Connection,
@@ -10,6 +10,7 @@ use centaurus::{
 };
 use http::{StatusCode, Uri};
 use rand::Rng;
+use schemars::JsonSchema;
 use sea_orm::{IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -19,21 +20,19 @@ use crate::{
   auth::jwt_auth::JwtAuth,
   db::{DBTrait, node::Node},
   nodes::state::Wings,
-  permissions::{NodeEditPerm, NodeViewPerm},
-  ws::state::{UpdateMessage, Updater},
+  utils::{NodeEditPerm, NodeViewPerm, UpdateMessage, Updater},
 };
 
-pub fn router() -> Router {
-  Router::new()
-    .route("/", post(create_node))
-    .route("/", get(list_nodes))
-    .route("/", delete(delete_node))
-    .route("/{uuid}", get(node_info))
-    .route("/{uuid}", post(update_node))
+pub fn router() -> ApiRouter {
+  ApiRouter::new()
+    .api_route("/", post_with(create_node, |op| op.id("createNode")))
+    .api_route("/", get_with(list_nodes, |op| op.id("listNodes")))
+    .api_route("/", delete_with(delete_node, |op| op.id("deleteNode")))
+    .api_route("/{uuid}", get_with(node_info, |op| op.id("nodeInfo")))
+    .api_route("/{uuid}", post_with(update_node, |op| op.id("updateNode")))
 }
 
-#[derive(FromRequest, Deserialize)]
-#[from_request(via(Json))]
+#[derive(Deserialize, JsonSchema)]
 struct CreateNode {
   name: String,
   address: String,
@@ -43,7 +42,7 @@ struct CreateNode {
   cpu_limit: Option<u32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 struct CreateNodeRes {
   uuid: Uuid,
 }
@@ -53,7 +52,7 @@ async fn create_node(
   db: Connection,
   wings: Wings,
   updater: Updater,
-  data: CreateNode,
+  Json(data): Json<CreateNode>,
 ) -> Result<Json<CreateNodeRes>> {
   if db.node().find_by_name(data.name.clone()).await.is_ok() {
     bail!(CONFLICT, "Node with this name already exists");
@@ -103,12 +102,12 @@ async fn create_node(
   db.node().create_node(model).await?;
   info!("Created node with ID {}", id);
 
-  updater.broadcast(UpdateMessage::Nodes).await;
+  updater.broadcast(UpdateMessage::Nodes { uuid: id }).await;
 
   Ok(Json(CreateNodeRes { uuid: id }))
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct NodeInfo {
   pub id: Uuid,
   pub name: String,
@@ -154,8 +153,7 @@ async fn list_nodes(
   Ok(Json(node_infos))
 }
 
-#[derive(FromRequest, Deserialize)]
-#[from_request(via(Json))]
+#[derive(Deserialize, JsonSchema)]
 struct DeleteNode {
   uuid: Uuid,
 }
@@ -165,20 +163,21 @@ async fn delete_node(
   db: Connection,
   wings: Wings,
   updater: Updater,
-  data: DeleteNode,
+  Json(data): Json<DeleteNode>,
 ) -> Result<()> {
   wings.disconnect(data.uuid).await?;
 
   db.node().delete_node(data.uuid).await?;
   info!("Deleted node with ID {}", data.uuid);
 
-  updater.broadcast(UpdateMessage::Nodes).await;
+  updater
+    .broadcast(UpdateMessage::Nodes { uuid: data.uuid })
+    .await;
 
   Ok(())
 }
 
-#[derive(FromRequestParts, Deserialize)]
-#[from_request(via(Path))]
+#[derive(Deserialize, JsonSchema)]
 struct NodeInfoRequest {
   uuid: Uuid,
 }
@@ -187,7 +186,7 @@ async fn node_info(
   _auth: JwtAuth<NodeViewPerm>,
   db: Connection,
   wings: Wings,
-  req: NodeInfoRequest,
+  Path(req): Path<NodeInfoRequest>,
 ) -> Result<Json<NodeInfo>> {
   let node = db.node().find_by_id(req.uuid).await?;
   let node_info = NodeInfo::from_node(node.into(), &wings).await;
@@ -195,8 +194,7 @@ async fn node_info(
   Ok(Json(node_info))
 }
 
-#[derive(FromRequest, Deserialize)]
-#[from_request(via(Json))]
+#[derive(Deserialize, JsonSchema)]
 struct UpdateNode {
   name: String,
   address: String,
@@ -211,8 +209,8 @@ async fn update_node(
   db: Connection,
   wings: Wings,
   updater: Updater,
-  req: NodeInfoRequest,
-  data: UpdateNode,
+  Path(req): Path<NodeInfoRequest>,
+  Json(data): Json<UpdateNode>,
 ) -> Result<()> {
   if let Some(disk) = data.disk_limit_mb
     && disk < 0.0
@@ -263,7 +261,9 @@ async fn update_node(
 
   db.node().update_node(node).await?;
   info!("Updated node with ID {}", req.uuid);
-  updater.broadcast(UpdateMessage::Nodes).await;
+  updater
+    .broadcast(UpdateMessage::Nodes { uuid: req.uuid })
+    .await;
 
   Ok(())
 }

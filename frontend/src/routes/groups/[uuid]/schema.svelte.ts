@@ -1,29 +1,29 @@
-import type { GroupEditRequest, GroupInfo } from '$lib/backend/groups.svelte';
+import type { EditGroupRequest, GroupDetails } from '$lib/client';
 import type { FormValue } from '@profidev/pleiades/components/form/types';
 import { z } from 'zod';
 
 export const groupSettings = z.object({
-  group_edit: z.boolean().default(false),
-  group_view: z.boolean().default(false),
+  group$edit: z.boolean().default(false),
+  group$view: z.boolean().default(false),
   name: z.string().min(1, 'Group name is required'),
-  node_edit: z.boolean().default(false),
-  node_view: z.boolean().default(false),
-  settings_edit: z.boolean().default(false),
-  settings_view: z.boolean().default(false),
-  user_edit: z.boolean().default(false),
-  user_view: z.boolean().default(false),
+  node$edit: z.boolean().default(false),
+  node$view: z.boolean().default(false),
+  settings$edit: z.boolean().default(false),
+  settings$view: z.boolean().default(false),
+  user$edit: z.boolean().default(false),
+  user$view: z.boolean().default(false),
   users: z.array(z.string())
 });
 
 export const reformatData = (
   data: FormValue<typeof groupSettings>,
   uuid: string
-): GroupEditRequest => {
+): EditGroupRequest => {
   const permissions: string[] = [];
 
   for (const [key, value] of Object.entries(data)) {
     if (key !== 'name' && value === true) {
-      permissions.push(key.replace('_', ':'));
+      permissions.push(key.replace('$', ':'));
     }
   }
 
@@ -36,24 +36,20 @@ export const reformatData = (
 };
 
 export const formatData = (
-  group: GroupInfo
+  group: GroupDetails
 ): FormValue<typeof groupSettings> => {
   const formattedData: FormValue<typeof groupSettings> = {
-    group_edit: false,
-    group_view: false,
+    // oxlint-disable-next-line no-unsafe-type-assertion
+    ...(Object.fromEntries(
+      Object.keys(groupSettings.shape).map((key) => [key, false])
+    ) as unknown as FormValue<typeof groupSettings>),
     name: group.name,
-    node_edit: false,
-    node_view: false,
-    settings_edit: false,
-    settings_view: false,
-    user_edit: false,
-    user_view: false,
     users: group.users.map((user) => user.id)
   };
 
   for (const permission of group.permissions) {
     // oxlint-disable-next-line no-unsafe-type-assertion
-    const key = permission.replace(':', '_') as keyof FormValue<
+    const key = permission.replace(':', '$') as keyof FormValue<
       typeof groupSettings
     >;
     // @ts-ignore

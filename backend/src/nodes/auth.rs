@@ -1,5 +1,6 @@
 use centaurus::eyre::Context;
 use http::Extensions;
+use migration::async_trait;
 use reqwest_middleware::{Middleware, Next};
 use shared::auth::SignData;
 use tokio::net::TcpStream;

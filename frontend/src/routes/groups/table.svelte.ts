@@ -1,10 +1,9 @@
 import type { ColumnDef } from '@tanstack/table-core';
 import * as DataTable from '@profidev/pleiades/components/ui/data-table';
 import { createColumn } from '@profidev/pleiades/components/table/helpers.svelte';
-import Actions from '$lib/components/table/Actions.svelte';
 import { Permission } from '$lib/permissions.svelte';
-import type { GroupInfo, SimpleUserInfo } from '$lib/backend/groups.svelte';
-import type { UserInfo } from '$lib/backend/user.svelte';
+import type { GroupInfo, SimpleUserInfo, UserInfo } from '$lib/client';
+import Actions from '@profidev/pleiades/components/table/actions.svelte';
 
 export const columns = ({
   deleteGroup,
@@ -31,17 +30,16 @@ export const columns = ({
   {
     accessorKey: 'actions',
     cell: ({ row }) => {
-      const disabled =
-        !user?.permissions.includes(Permission.GROUP_EDIT) ||
-        row.original.id === admin_group ||
-        row.original.permissions.some(
-          // oxlint-disable-next-line no-unsafe-type-assertion
-          (p) => !user?.permissions.includes(p as Permission)
-        );
+      const disabled = !user
+        ? true
+        : !user?.permissions.includes(Permission.GROUP_EDIT) ||
+          row.original.permissions.some(
+            (p) => !user?.permissions.includes(p as Permission) // oxlint-disable-line no-unsafe-type-assertion
+          );
 
       return DataTable.renderComponent(Actions, {
-        delete_disabled: disabled,
-        editHref: `/groups/${row.original.id}`,
+        delete_disabled: disabled || row.original.id === admin_group,
+        edit: `/groups/${row.original.id}`,
         edit_disabled: disabled,
         remove: () => deleteGroup(row.original)
       });

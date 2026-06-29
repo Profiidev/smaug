@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use crate::{
   nodes::auth::{WingsAuth, WsStream},
-  ws::state::{UpdateMessage, Updater},
+  utils::{UpdateMessage, Updater},
 };
 
 pub struct WingsConnection {
@@ -155,7 +155,7 @@ async fn reconnect_task(
 
     // only send update if we were previously connected
     if conn_ref.sender.is_some() {
-      updater.broadcast(UpdateMessage::Nodes).await;
+      updater.broadcast(UpdateMessage::Nodes { uuid }).await;
     }
 
     conn_ref.sender = None;
@@ -193,7 +193,7 @@ async fn reconnect_task(
     conn_ref.receiver = Some(receiver);
     drop(conn_ref);
 
-    updater.broadcast(UpdateMessage::Nodes).await;
+    updater.broadcast(UpdateMessage::Nodes { uuid }).await;
 
     debug!("Wings connection to {} re-established", uuid);
   }

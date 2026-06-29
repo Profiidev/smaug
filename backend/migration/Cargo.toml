@@ -9,7 +9,11 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-async-std = { version = "1", features = ["attributes", "tokio1"] }
+centaurus = { version = "0.16.2", default-features = false, features = [
+  "avatar",
+  "db"
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [dependencies.sea-orm-migration]
 version = "1.1.20"
@@ -18,5 +22,5 @@ features = [
   # View the list of supported features at https://www.sea-ql.org/SeaORM/docs/install-and-config/database-and-async-runtime.
   # e.g.
   "runtime-tokio-rustls", # `ASYNC_RUNTIME` feature
-  # "sqlx-postgres",         # `DATABASE_DRIVER` feature
+  "sqlx-postgres" # `DATABASE_DRIVER` feature
 ]

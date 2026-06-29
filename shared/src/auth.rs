@@ -8,7 +8,7 @@ use hmac::{KeyInit, Mac};
 use http::{HeaderMap, StatusCode};
 use rand::Rng;
 
-type HmacSha3_512 = hmac::Hmac<sha3::Sha3_512>;
+type HmacSha3_512 = hmac::Hmac<sha2::Sha512>;
 
 const TIMESTAMP_HEADER: &str = "x-wings-timestamp";
 const NONCE_HEADER: &str = "x-wings-nonce";

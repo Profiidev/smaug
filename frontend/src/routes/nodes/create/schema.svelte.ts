@@ -1,4 +1,4 @@
-import type { CreateNode, NodeInfo } from '$lib/backend/node.svelte';
+import type { CreateNode, NodeInfo } from '$lib/client';
 import type { FormValue } from '@profidev/pleiades/components/form/types';
 import z from 'zod';
 

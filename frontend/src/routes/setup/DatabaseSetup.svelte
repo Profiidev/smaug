@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { StageProps } from '$lib/components/form/types.svelte';
+  import type { StageProps } from '@profidev/pleiades/components/form/types';
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { databaseSetupSchema } from './schema.svelte';
-  import FormCheckbox from '$lib/components/form/FormCheckbox.svelte';
+  import FormCheckbox from '@profidev/pleiades/components/form/form-checkbox.svelte';
   import * as Alert from '@profidev/pleiades/components/ui/alert';
   import AlertCircle from '@lucide/svelte/icons/alert-circle';
 
@@ -28,12 +28,13 @@
   {initialValue}
   {footer}
   bind:isLoading
+  bind:this={form}
   schema={databaseSetupSchema}
 >
   {#snippet children({ props })}
     <Alert.Root variant="default" class="text-orange-500">
       <AlertCircle />
-      <Alert.Title>Database Disclaimer</Alert.Title>
+      <Alert.Title>Disclaimer</Alert.Title>
       <Alert.Description>
         <p class="text-orange-500">
           You are currently using <strong>{data.db_backend}</strong> as

@@ -1,4 +1,3 @@
-import type { NodeInfo } from '$lib/backend/node.svelte';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
 import type { ColumnDef } from '@tanstack/table-core';
@@ -7,11 +6,11 @@ import {
   createColumn,
   createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
-import Actions from '$lib/components/table/Actions.svelte';
+import Actions from '@profidev/pleiades/components/table/actions.svelte';
 import { createRawSnippet } from 'svelte';
 import Status from '$lib/components/table/Status.svelte';
-import type { UserInfo } from '$lib/backend/user.svelte';
 import { Permission } from '$lib/permissions.svelte';
+import type { NodeInfo, UserInfo } from '$lib/client';
 
 export const columns = ({
   deleteNode,
@@ -61,7 +60,7 @@ export const columns = ({
     cell: ({ row }) =>
       DataTable.renderComponent(Actions, {
         delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
-        editHref: `/nodes/${row.original.id}/setup`,
+        edit: `/nodes/${row.original.id}/setup`,
         edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         remove: () => deleteNode(row.original)
       }),

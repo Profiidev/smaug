@@ -1,5 +1,5 @@
 use axum::{Extension, Router, extract::FromRequestParts};
-use centaurus::{error::ErrorReport, state::extract::StateExtractExt};
+use centaurus::{backend::request::extract::StateExtractExt, error::ErrorReport};
 use http::request::Parts;
 use shared::auth::SignData;
 use tracing::info;

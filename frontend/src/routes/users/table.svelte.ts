@@ -1,28 +1,24 @@
 import type { ColumnDef } from '@tanstack/table-core';
 import * as DataTable from '@profidev/pleiades/components/ui/data-table';
 import { createColumn } from '@profidev/pleiades/components/table/helpers.svelte';
-import Actions from '$lib/components/table/Actions.svelte';
-import { Permission } from '$lib/permissions.svelte';
-import type {
-  SimpleGroupInfo,
-  UserInfo,
-  UserListInfo
-} from '$lib/backend/user.svelte';
-import SimpleAvatar from '@profidev/pleiades/components/util/simple-avatar.svelte';
+import type { SimpleGroupInfo, UserListInfo } from '$lib/client';
+import Actions from '@profidev/pleiades/components/table/actions.svelte';
+import UserAvatar from '@profidev/pleiades/components/util/user-avatar.svelte';
 
 export const columns = ({
   deleteUser,
-  user
+  canEdit
 }: {
   deleteUser: (user: UserListInfo) => void;
-  user?: UserInfo;
+  canEdit: boolean;
 }): ColumnDef<UserListInfo>[] => [
   {
     accessorKey: 'avatar',
     cell: ({ row }) =>
-      DataTable.renderComponent(SimpleAvatar, {
+      DataTable.renderComponent(UserAvatar, {
         class: 'size-8',
-        src: row.getValue('avatar') as string // oxlint-disable-line no-unnecessary-type-assertion
+        userId: row.original.uuid,
+        username: row.original.name
       }),
     header: () => {},
     size: 10
@@ -38,16 +34,13 @@ export const columns = ({
   createColumn('uuid', 'UUID'),
   {
     accessorKey: 'actions',
-    cell: ({ row }) => {
-      const disabled = !user?.permissions.includes(Permission.USER_EDIT);
-
-      return DataTable.renderComponent(Actions, {
-        delete_disabled: disabled,
-        editHref: `/users/${row.original.uuid}`,
-        edit_disabled: disabled,
+    cell: ({ row }) =>
+      DataTable.renderComponent(Actions, {
+        delete_disabled: !canEdit,
+        edit: `/users/${row.original.uuid}`,
+        edit_disabled: !canEdit,
         remove: () => deleteUser(row.original)
-      });
-    },
+      }),
     enableHiding: false,
     header: () => {}
   }
