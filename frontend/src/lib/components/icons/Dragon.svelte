@@ -23,6 +23,6 @@
   ];
 </script>
 
-<Icon name="dragon" {...props} {iconNode}>
+<Icon name="dragon" {...props} {iconNode} class="stroke-orange-400">
   {@render props.children?.()}
 </Icon>

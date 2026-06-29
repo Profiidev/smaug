@@ -19,6 +19,7 @@
   import Sidebar from '@profidev/pleiades/components/nav/sidebar/sidebar.svelte';
   import { avatarUrl } from '$lib/permissions.svelte';
   import { buildLoginUrl } from '$lib/redirect';
+  import Dragon from '$lib/components/icons/Dragon.svelte';
 
   // @ts-ignore this is injected at build time via Vite's define option
   let version = __version__;
@@ -73,6 +74,7 @@
   <Sidebar
     {user}
     app_name="Smaug"
+    app_icon={Dragon}
     avatar={user ? `${avatarUrl}/${user.uuid}` : undefined}
     {version}
     {items}
