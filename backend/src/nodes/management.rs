@@ -81,7 +81,7 @@ async fn create_node(
   rand::rng().fill_bytes(&mut raw_token);
   let token = hex::encode(raw_token);
 
-  let id = Uuid::new_v4();
+  let id = Uuid::now_v7();
 
   wings
     .connect(id, &address, port, data.secure, &token)
