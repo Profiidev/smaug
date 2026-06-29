@@ -1,7 +1,13 @@
+use aide::OperationIo;
+use axum::{Extension, extract::FromRequestParts};
 use centaurus::{
   Config,
-  backend::config::{BaseConfig, MetricsConfig, SiteConfig},
+  backend::{
+    auth::settings::{AuthConfig, UserSettings},
+    config::{BaseConfig, MetricsConfig, SiteConfig},
+  },
   db::config::DBConfig,
+  mail::MailSettings,
 };
 use figment::{
   Figment,
@@ -10,25 +16,32 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
-#[derive(Deserialize, Serialize, Clone, Config)]
+#[derive(Deserialize, Serialize, Clone, FromRequestParts, Config, OperationIo)]
+#[from_request(via(Extension))]
 pub struct Config {
-  #[serde(flatten)]
   #[base]
+  #[serde(flatten)]
   pub base: BaseConfig,
   #[serde(flatten)]
   pub db: DBConfig,
-  #[serde(flatten)]
   #[metrics]
-  pub metrics: MetricsConfig,
   #[serde(flatten)]
+  pub metrics: MetricsConfig,
   #[site]
+  #[serde(flatten)]
   pub site: SiteConfig,
+  #[auth]
+  #[serde(flatten)]
+  pub auth: AuthConfig,
+  #[mail]
+  #[serde(flatten)]
+  pub mail: MailSettings,
+  #[oidc]
+  #[serde(flatten)]
+  pub oidc: UserSettings,
 
   pub db_url: String,
-
-  pub auth_pepper: String,
-  pub auth_issuer: String,
-  pub auth_jwt_expiration: i64,
+  pub admin_group: String,
 }
 
 impl Default for Config {
@@ -36,17 +49,20 @@ impl Default for Config {
     Self {
       base: BaseConfig::default(),
       db: DBConfig::default(),
+      site: SiteConfig::default(),
+      mail: MailSettings::default(),
+      oidc: UserSettings::default(),
       db_url: "".to_string(),
+      admin_group: "Admin".to_string(),
       metrics: MetricsConfig {
         metrics_name: "smaug".to_string(),
         ..Default::default()
       },
-      site: SiteConfig {
-        site_url: "http://localhost:3000".parse().unwrap(),
+      auth: AuthConfig {
+        auth_pepper: "__smaug_PEPPER__".to_string(),
+        auth_jwt_expiration: 60 * 60 * 24, // 1 days
+        ..Default::default()
       },
-      auth_pepper: "__SMAUG_PEPPER__".to_string(),
-      auth_issuer: "smaug_auth".to_string(),
-      auth_jwt_expiration: 60 * 60 * 24 * 7, // 7 days
     }
   }
 }
@@ -58,10 +74,14 @@ impl Config {
       .merge(Serialized::defaults(Self::default()))
       .merge(Env::raw().global());
 
-    let config: Self = config.extract().expect("Failed to parse configuration");
+    let mut config: Self = config.extract().expect("Failed to parse configuration");
 
     if config.db_url.is_empty() {
       panic!("Database URL is not set");
+    }
+
+    if config.db_url.starts_with("sqlite") {
+      config.db.validate_sqlite();
     }
 
     config

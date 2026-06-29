@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
+use aide::OperationIo;
 use axum::{Extension, extract::FromRequestParts};
 use centaurus::{db::init::Connection, error::Result};
 use dashmap::DashMap;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{db::DBTrait, nodes::connection::WingsConnection, ws::state::Updater};
+use crate::{db::DBTrait, nodes::connection::WingsConnection, utils::Updater};
 
-#[derive(Clone, FromRequestParts)]
+#[derive(Clone, FromRequestParts, OperationIo)]
 #[from_request(via(Extension))]
 pub struct Wings {
   wings: Arc<DashMap<Uuid, Arc<Mutex<WingsConnection>>>>,
