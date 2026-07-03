@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/profiidev/images/node-gnu-dev:main@sha256:98071687039dfc38aea9dd691f6c555b58f4758b782234eea4cd989c2d47903d
+    image: ghcr.io/profiidev/images/node-gnu-dev:main@sha256:61e87c72097f5ff6adcba649295209700d3842f8ff9cab4910c8218df24a60ca
     restart: unless-stopped
     user: '${HOST_UID:-0}:${HOST_GID:-0}'
     volumes:
