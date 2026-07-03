@@ -5,7 +5,7 @@ ARG RUST_ARCH=${RUST_ARCH/arm64/aarch64}
 ARG TARGET=${RUST_ARCH}-unknown-linux-gnu
 ARG RUSTFLAGS="-C target-feature=+crt-static --cfg reqwest_unstable"
 
-FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:15425af80485c6688cca13a291888674946c5fc3af0b8330c106ceff21c5af0b AS wings-planner
+FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:060cb215d84ed1963dc102216ab9ee58f9186053f31c314fcf50fdea69e346f4 AS wings-planner
 
 ARG TARGET
 ARG RUSTFLAGS
@@ -21,7 +21,7 @@ RUN \
   --mount=type=cache,target=/app/target \
   cargo chef prepare --recipe-path recipe.json --bin wings
 
-FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:15425af80485c6688cca13a291888674946c5fc3af0b8330c106ceff21c5af0b AS wings-builder
+FROM ghcr.io/profiidev/images/rust-gnu-builder:main@sha256:060cb215d84ed1963dc102216ab9ee58f9186053f31c314fcf50fdea69e346f4 AS wings-builder
 
 ARG TARGET
 ARG RUSTFLAGS
