@@ -23,10 +23,14 @@ import type {
   ConvertOidcUserResponses,
   CreateGroupData,
   CreateGroupResponses,
+  CreateNodeData,
+  CreateNodeResponses,
   CreateUserData,
   CreateUserResponses,
   DeleteGroupData,
   DeleteGroupResponses,
+  DeleteNodeData,
+  DeleteNodeResponses,
   DeleteUserData,
   DeleteUserResponses,
   EditGroupData,
@@ -45,9 +49,11 @@ import type {
   KeyResponses,
   ListGroupsResponses,
   ListGroupsSimpleResponses,
+  ListNodesResponses,
   ListUsersResponses,
   ListUsersSimpleResponses,
   MailActiveResponses,
+  NodeInfoResponses,
   ResetPasswordData,
   ResetPasswordResponses,
   ResetUserAvatarData,
@@ -63,11 +69,12 @@ import type {
   StartEmailChangeData,
   StartEmailChangeResponses,
   TestMailResponses,
-  TestResponses,
   UpdateAccountData,
   UpdateAccountResponses,
   UpdateAvatarData,
   UpdateAvatarResponses,
+  UpdateNodeData,
+  UpdateNodeResponses,
   UpdatePasswordData,
   UpdatePasswordResponses,
   UserInfoResponses
@@ -1556,20 +1563,184 @@ export function handleListUsersSimple(
   );
 }
 
-export type HandleTestResponse = {
-  body: TestResponses[200];
+export type HandleDeleteNodeResponse = {
+  body: DeleteNodeResponses[200];
   status?: 200;
 };
 
 /**
- * Handler for the `GET /api/dummy/test` operation.
+ * Handler for the `DELETE /api/nodes` operation.
  */
-export function handleTest(
-  response?: HandleTestResponse | HttpResponseResolver<never, never>,
+export function handleDeleteNode(
+  response?:
+    | HandleDeleteNodeResponse
+    | HttpResponseResolver<never, DeleteNodeData['body']>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<never, DeleteNodeData['body']>(
+    `${options?.baseUrl ?? '*'}/api/nodes`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleListNodesResponse = {
+  body: ListNodesResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/nodes` operation.
+ */
+export function handleListNodes(
+  response?: HandleListNodesResponse | HttpResponseResolver<never, never>,
   options?: RequestHandlerOptions
 ): HttpHandler {
   return http.get<never, never>(
-    `${options?.baseUrl ?? '*'}/api/dummy/test`,
+    `${options?.baseUrl ?? '*'}/api/nodes`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateNodeResponse = {
+  body: CreateNodeResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/nodes` operation.
+ */
+export function handleCreateNode(
+  response?:
+    | HandleCreateNodeResponse
+    | HttpResponseResolver<never, CreateNodeData['body']>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<never, CreateNodeData['body']>(
+    `${options?.baseUrl ?? '*'}/api/nodes`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleNodeInfoResponse = {
+  body: NodeInfoResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/nodes/{uuid}` operation.
+ */
+export function handleNodeInfo(
+  response?:
+    | HandleNodeInfoResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/nodes/:uuid`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleUpdateNodeResponse = {
+  body: UpdateNodeResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/nodes/{uuid}` operation.
+ */
+export function handleUpdateNode(
+  response?:
+    | HandleUpdateNodeResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        UpdateNodeData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    UpdateNodeData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/nodes/:uuid`,
     (info) => {
       if (typeof response === 'function') {
         return response(info);
@@ -1756,9 +1927,25 @@ export type MswHandlerFactories = {
    */
   listUsersSimple: typeof handleListUsersSimple;
   /**
-   * Handler for the `GET /api/dummy/test` operation.
+   * Handler for the `DELETE /api/nodes` operation.
    */
-  test: typeof handleTest;
+  deleteNode: typeof handleDeleteNode;
+  /**
+   * Handler for the `GET /api/nodes` operation.
+   */
+  listNodes: typeof handleListNodes;
+  /**
+   * Handler for the `POST /api/nodes` operation.
+   */
+  createNode: typeof handleCreateNode;
+  /**
+   * Handler for the `GET /api/nodes/{uuid}` operation.
+   */
+  nodeInfo: typeof handleNodeInfo;
+  /**
+   * Handler for the `POST /api/nodes/{uuid}` operation.
+   */
+  updateNode: typeof handleUpdateNode;
 };
 
 export type CreateMswHandlersResult = {
@@ -1824,7 +2011,11 @@ export function createMswHandlers(
     editGroup: wrap(handleEditGroup),
     groupInfo: wrap(handleGroupInfo),
     listUsersSimple: wrap(handleListUsersSimple),
-    test: wrap(handleTest)
+    deleteNode: wrap(handleDeleteNode),
+    listNodes: wrap(handleListNodes),
+    createNode: wrap(handleCreateNode),
+    nodeInfo: wrap(handleNodeInfo),
+    updateNode: wrap(handleUpdateNode)
   };
   const all: CreateMswHandlersResult['all'] = (options = {}) => {
     type OverrideValue<R> = R | [response?: R, options?: RequestHandlerOptions];
@@ -1870,14 +2061,18 @@ export function createMswHandlers(
       invoke(pick.saveMailSettings, overrides.saveMailSettings),
       invoke(pick.testMail, overrides.testMail),
       invoke(pick.listUsersSimple, overrides.listUsersSimple),
-      invoke(pick.test, overrides.test),
       invoke(pick.groupInfo, overrides.groupInfo),
+      invoke(pick.nodeInfo, overrides.nodeInfo),
+      invoke(pick.updateNode, overrides.updateNode),
       invoke(pick.isSetup, overrides.isSetup),
       invoke(pick.completeSetup, overrides.completeSetup),
       invoke(pick.deleteGroup, overrides.deleteGroup),
       invoke(pick.listGroups, overrides.listGroups),
       invoke(pick.createGroup, overrides.createGroup),
-      invoke(pick.editGroup, overrides.editGroup)
+      invoke(pick.editGroup, overrides.editGroup),
+      invoke(pick.deleteNode, overrides.deleteNode),
+      invoke(pick.listNodes, overrides.listNodes),
+      invoke(pick.createNode, overrides.createNode)
     ];
   };
   return { all, pick };
