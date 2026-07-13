@@ -2,6 +2,8 @@
 
 pub mod prelude;
 
+pub mod egg;
+pub mod egg_variable;
 pub mod group;
 pub mod group_permission;
 pub mod group_user;
