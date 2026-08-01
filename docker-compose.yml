@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/profiidev/images/node-gnu-dev:main@sha256:61e87c72097f5ff6adcba649295209700d3842f8ff9cab4910c8218df24a60ca
+    image: ghcr.io/profiidev/images/node-gnu-dev:main@sha256:b4a6c1296d51acf251868f8f54b64f3f6e2fe9c174ad283439b91933de530a59
     restart: unless-stopped
     user: '${HOST_UID:-0}:${HOST_GID:-0}'
     volumes:
@@ -18,7 +18,7 @@ services:
     #command: npm i
 
   backend:
-    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:fe2632f5dd048025fb3713ac610a06733f3c151987060230317ab4397682f312
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b394c8a18efd983d74234fea57cf26f4abf5c79afcafc63d6e2997d3ab9b5441
     user: '${HOST_UID:-0}:${HOST_GID:-0}'
     volumes:
       - ./.cargo:/app/.cargo
@@ -36,7 +36,7 @@ services:
         condition: service_healthy
 
   wings:
-    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:fe2632f5dd048025fb3713ac610a06733f3c151987060230317ab4397682f312
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b394c8a18efd983d74234fea57cf26f4abf5c79afcafc63d6e2997d3ab9b5441
     user: '${HOST_UID:-0}:${HOST_GID:-0}'
     restart: unless-stopped
     volumes:
@@ -51,7 +51,7 @@ services:
     command: ['cargo', 'watch', '-x', 'run']
 
   postgres:
-    image: postgres:18@sha256:4aabea78cf39b90e834caf3af7d602a18565f6fe2508705c8d01aa63245c2e20
+    image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
     restart: unless-stopped
     volumes:
       - ./postgres:/var/lib/postgresql
