@@ -33,9 +33,7 @@ export const columns = ({
       const disabled = !user
         ? true
         : !user?.permissions.includes(Permission.GROUP_EDIT) ||
-          row.original.permissions.some(
-            (p) => !user?.permissions.includes(p as Permission) // oxlint-disable-line no-unsafe-type-assertion
-          );
+          row.original.permissions.some((p) => !user?.permissions.includes(p));
 
       return DataTable.renderComponent(Actions, {
         delete_disabled: disabled || row.original.id === admin_group,

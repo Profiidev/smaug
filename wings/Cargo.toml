@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 shared = { path = "../shared" }
-centaurus_wings = { version = "0.16.2", features = [
+centaurus_wings = { version = "0.17.0", features = [
   "backend",
   "openapi",
   "auth",
@@ -15,21 +15,21 @@ centaurus_wings = { version = "0.16.2", features = [
   "uuid",
   "hmac"
 ], default-features = false, package = "centaurus" }
-uuid = { version = "1.23.4", features = ["v4"] }
+uuid = { version = "1.24.0", features = ["v4"] }
 axum = { version = "0.8.9", features = ["macros", "ws", "tracing"] }
 axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
 tracing = "0.1.44"
 tower = "0.5.3"
 tower-http = { version = "0.7.0", features = ["cors", "trace"] }
-tokio = { version = "1.52.3", features = ["signal"] }
-http = "1.4.2"
+tokio = { version = "1.53.1", features = ["signal"] }
+http = "1.5.0"
 dotenvy = "0.15.7"
 serde = { version = "1.0.228", features = ["derive"] }
 figment = { version = "0.10.19", features = ["env"] }
 hyper-util = { version = "0.1.20", features = ["client-legacy"] }
-serde_json = "1.0.150"
+serde_json = "1.0.151"
 aide = { version = "0.16.0-alpha.4", features = ["axum"] }
-rustls = { version = "0.23.41", features = ["aws-lc-rs"] }
+rustls = { version = "0.23.43", features = ["aws-lc-rs"] }
 
 [[bin]]
 name = "wings"

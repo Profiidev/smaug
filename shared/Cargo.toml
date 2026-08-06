@@ -4,15 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-centaurus = { version = "0.16.2", default-features = false, features = [
+centaurus = { version = "0.17.0", default-features = false, features = [
   "error"
 ] }
 chrono = "0.4.45"
 hex = "0.4.3"
 hmac = "0.13.0"
-http = "1.4.2"
-rand = "0.10.1"
-serde = { version = "1.0.228", features = ["derive"] }
+http = "1.5.0"
+rand = "0.10.2"
+serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.0"
 
 [lib]
