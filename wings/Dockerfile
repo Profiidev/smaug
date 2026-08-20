@@ -47,13 +47,19 @@ RUN \
   cd wings && cargo build --release --target $TARGET \
   && mv ../target/$TARGET/release/wings ../app
 
+RUN groupadd -r smaug && useradd -r -g smaug smaug
+
 FROM scratch
 
-ARG FRONTEND_DIR
-
 COPY --from=wings-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=wings-builder /etc/passwd /etc/passwd
+COPY --from=wings-builder /etc/group /etc/group
 
 WORKDIR /app
 COPY --from=wings-builder /app/app /usr/local/bin/smaug-wings
+
+EXPOSE 8000
+
+USER smaug
 
 ENTRYPOINT ["smaug-wings"]
