@@ -174,13 +174,13 @@ jobs:
   cleanup:
     name: Cleanup
     runs-on: ubuntu-latest
-    needs:
-      - merge
-    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
-        package: [smaug, smaug-wings]
+        package: [smaug/smaug, smaug/smaug-wings]
     steps:
       - uses: actions/delete-package-versions@4dbb860504f6d0cde296a192842138c03915746a # v5
         with:
