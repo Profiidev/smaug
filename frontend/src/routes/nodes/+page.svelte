@@ -5,7 +5,7 @@
   import { columns } from './table.svelte';
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
-  import { invalidate } from '$app/navigation';
+  import { afterNavigate, invalidate } from '$app/navigation';
   import { Permission } from '$lib/permissions.svelte';
   import { deleteNode, type NodeInfo, type UserInfo } from '$lib/client';
   import Table from '@profidev/pleiades/components/table/clean-table.svelte';
@@ -17,18 +17,22 @@
   let isLoading = $state(false);
   let user: UserInfo | undefined = $state();
 
-  $effect(() => {
-    if (data.error) {
+  let errorToasted = false;
+  afterNavigate(() => {
+    if (!data.error) return;
+
+    if (!errorToasted) {
+      errorToasted = true;
       if (data.error === 'node_not_found') {
         toast.error('Node not found');
       } else if (data.error === 'node_other') {
         toast.error('Failed to load node');
       }
-
-      const url = new URL(window.location.href);
-      url.searchParams.delete('error');
-      window.history.replaceState({}, '', url);
     }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('error');
+    window.history.replaceState({}, '', url);
   });
 
   $effect(() => {
