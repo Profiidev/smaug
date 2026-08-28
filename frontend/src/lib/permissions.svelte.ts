@@ -6,7 +6,9 @@ export enum Permission {
   GROUP_VIEW = 'group:view',
   GROUP_EDIT = 'group:edit',
   USER_VIEW = 'user:view',
-  USER_EDIT = 'user:edit'
+  USER_EDIT = 'user:edit',
+  EGG_VIEW = 'egg:view',
+  EGG_EDIT = 'egg:edit'
 }
 
 export const avatarUrl = '/api/user/info/avatar';
