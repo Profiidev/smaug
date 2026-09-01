@@ -73,4 +73,4 @@ reqwest = { version = "=0.13.4", features = ["form", "json"] }
 serde_json = "=1.0.151"
 base64 = "=0.23.1"
 rsa = "=0.9.10"
-uuid = { version = "=1.24.0", features = ["v4"] }
+uuid = { version = "=1.26.0", features = ["v4"] }
