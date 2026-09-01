@@ -4,8 +4,8 @@ import { type UserSettings, getOidcSettings, isSetup } from '$lib/client';
 import { unReformat } from '../settings/user/schema.svelte';
 
 export const load: PageLoad = async ({ fetch }) => {
-  const { data: status } = await isSetup({ fetch });
-  const { data: settings } = await getOidcSettings({ fetch });
+  const { data: status } = await isSetup({ fetch }),
+    { data: settings } = await getOidcSettings({ fetch });
 
   if (status?.is_setup) {
     redirect(302, '/');

@@ -33,9 +33,9 @@ export const columns = ({
   {
     ...createColumnHeader('address', 'Address'),
     cell: ({ row }) => {
-      const address = row.getValue<string>('address');
-      const { port } = row.original;
-      const value = `${address}:${port}`;
+      const address = row.getValue<string>('address'),
+        { port } = row.original,
+        value = `${address}:${port}`;
 
       return DataTable.renderSnippet(
         createRawSnippet(() => ({
