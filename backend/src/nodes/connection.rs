@@ -9,7 +9,6 @@ use futures_util::{
   stream::{SplitSink, SplitStream},
 };
 use http::StatusCode;
-use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use shared::msg::WingsMessage;
 use tokio::{
@@ -24,7 +23,7 @@ use uuid::Uuid;
 
 use crate::{
   nodes::auth::{WingsAuth, WsStream},
-  utils::{UpdateMessage, Updater},
+  utils::{UpdateMessage, Updater, client},
 };
 
 pub struct WingsConnection {
@@ -53,7 +52,7 @@ impl WingsConnection {
       port
     );
 
-    let client = Client::new();
+    let client = client();
     let client = ClientBuilder::new(client)
       .with(WingsAuth::new(token.clone()))
       .build();
