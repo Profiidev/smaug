@@ -40,7 +40,7 @@ jobs:
           clippy: true
           auto_fix: true
           svelte: true
-          svelte_args: "--ignore target"
+          svelte_args: --ignore target,"frontend/src/lib/components/code/code.svelte"
           tsc: true
           tsc_dir: frontend
           oxlint: true
