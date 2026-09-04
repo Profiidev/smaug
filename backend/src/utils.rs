@@ -6,6 +6,7 @@ use centaurus::{
   },
   permission,
 };
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -40,3 +41,10 @@ pub fn permissions() -> Vec<&'static str> {
 
 permission!(NodeViewPerm, "node:view");
 permission!(NodeEditPerm, "node:edit");
+
+pub fn client() -> Client {
+  Client::builder()
+    .user_agent(format!("Smaug v{}", env!("CARGO_PKG_VERSION")))
+    .build()
+    .expect("Failed to build HTTP client")
+}
