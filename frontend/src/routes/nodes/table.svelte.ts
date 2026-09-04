@@ -1,8 +1,8 @@
+import { renderComponent, renderSnippet } from '@tanstack/svelte-table';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
-import type { ColumnDef } from '@tanstack/table-core';
-import * as DataTable from '@profidev/pleiades/components/ui/data-table';
 import {
+  type TableColumnDef,
   createColumn,
   createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
@@ -18,12 +18,12 @@ export const columns = ({
 }: {
   deleteNode: (node: NodeInfo) => void;
   user?: UserInfo;
-}): ColumnDef<NodeInfo>[] => [
+}): TableColumnDef<NodeInfo>[] => [
   {
     accessorKey: 'connected',
     cell: ({ row }) => {
       const connected = row.getValue<boolean>('connected');
-      return DataTable.renderComponent(Status, {
+      return renderComponent(Status, {
         connected
       });
     },
@@ -37,7 +37,7 @@ export const columns = ({
         { port } = row.original,
         value = `${address}:${port}`;
 
-      return DataTable.renderSnippet(
+      return renderSnippet(
         createRawSnippet(() => ({
           render: () =>
             `<div class="ml-4 truncate h-full w-full text-wrap">${value}</div>`
@@ -49,7 +49,7 @@ export const columns = ({
     ...createColumnHeader('secure', 'Secure'),
     cell: ({ row }) => {
       const secure = row.getValue<boolean>('secure');
-      return DataTable.renderComponent(secure ? Lock : LockOpen, {
+      return renderComponent(secure ? Lock : LockOpen, {
         class: `ml-3 ${secure ? 'text-green-500' : 'text-orange-500'}`
       });
     }
@@ -58,7 +58,7 @@ export const columns = ({
   {
     accessorKey: 'actions',
     cell: ({ row }) =>
-      DataTable.renderComponent(Actions, {
+      renderComponent(Actions, {
         delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
         edit: `/nodes/${row.original.id}/setup`,
         edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
