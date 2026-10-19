@@ -31,24 +31,6 @@ export const setupSession = async (
 };
 
 /**
- * Seeds an anonymous public-share visitor: no auth cookie (so `info` reports no
- * session and the page treats the visitor as anonymous) plus `mock_public` to
- * pick the view-only or editable public note. Used by the `/notes/share/[id]`
- * tests, which must render without a logged-in user.
- */
-export const seedPublicShareVisitor = async (
-  context: BrowserContext,
-  access: 'view' | 'edit' = 'view'
-) => {
-  await context.addCookies([
-    { name: 'mock_anon', url: URL, value: '1' },
-    { name: 'mock_public', url: URL, value: access }
-  ]);
-  await seedDocumentCookie(context, 'mock_anon=1');
-  await seedDocumentCookie(context, `mock_public=${access}`);
-};
-
-/**
  * Seeds the `special_valid` cookie that `AccessConfirm` polls for. With it set,
  * the account auth flows (password / email / passkey changes) treat the session
  * as already re-authenticated and skip the "Confirm Access" dialog.

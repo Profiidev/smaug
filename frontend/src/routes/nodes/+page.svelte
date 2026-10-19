@@ -23,9 +23,9 @@
 
     if (!errorToasted) {
       errorToasted = true;
-      if (data.error === 'node_not_found') {
+      if (data.error === 'not_found') {
         toast.error('Node not found');
-      } else if (data.error === 'node_other') {
+      } else if (data.error === 'other') {
         toast.error('Failed to load node');
       }
     }
@@ -52,7 +52,7 @@
     });
     isLoading = false;
 
-    if (ret) {
+    if (ret.error) {
       return { error: 'Failed to delete node' };
     } else {
       toast.success(`Node ${selected.name} deleted successfully`);
