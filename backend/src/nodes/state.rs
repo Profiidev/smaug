@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use aide::OperationIo;
 use axum::{Extension, extract::FromRequestParts};
-use centaurus::{db::init::Connection, error::Result};
+use centaurus::{bail, db::init::Connection, error::Result};
 use dashmap::DashMap;
 use tracing::warn;
 use uuid::Uuid;
@@ -14,13 +14,15 @@ use crate::{db::DBTrait, nodes::connection::WingsConnection, utils::Updater};
 pub struct Wings {
   wings: Arc<DashMap<Uuid, WingsConnection>>,
   updater: Updater,
+  allow_insecure: bool,
 }
 
 impl Wings {
-  pub async fn new(db: &Connection, updater: Updater) -> Result<Self> {
+  pub async fn new(db: &Connection, updater: Updater, allow_insecure: bool) -> Result<Self> {
     let wings = Self {
       wings: Arc::new(DashMap::new()),
       updater,
+      allow_insecure,
     };
 
     for node in db.node().list_nodes().await? {
@@ -41,6 +43,10 @@ impl Wings {
     secure: bool,
     token: &str,
   ) -> Result<()> {
+    if !secure && !self.allow_insecure {
+      bail!(BAD_REQUEST, "Insecure wings connections are disabled");
+    }
+
     let conn = WingsConnection::new(
       uuid,
       addr,

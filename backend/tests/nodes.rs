@@ -418,3 +418,23 @@ async fn node_token_regenerate() {
     .await;
   assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn insecure_nodes_rejected_when_disallowed() {
+  // ponytail: process env, safe under nextest (one process per test)
+  unsafe { std::env::set_var("ALLOW_INSECURE_WINGS", "false") };
+  let (server, _) = TestServer::start_with_admin().await;
+
+  let resp = server.post("/nodes", node_body("plain")).await;
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+  let mut body = node_body("tls");
+  body["address"] = json!("https://127.0.0.1:1");
+  body["secure"] = json!(true);
+  let uuid = create(&server, body).await;
+  let resp = server
+    .post(&format!("/nodes/{uuid}"), node_body("tls"))
+    .await;
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+  assert_eq!(info(&server, uuid).await["secure"], true);
+}
