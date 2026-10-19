@@ -21,22 +21,29 @@ import type {
   ConfirmEmailChangeResponses,
   ConvertOidcUserData,
   ConvertOidcUserResponses,
+  CreateEggData,
+  CreateEggResponses,
   CreateGroupData,
   CreateGroupResponses,
   CreateNodeData,
   CreateNodeResponses,
   CreateUserData,
   CreateUserResponses,
+  DeleteEggData,
+  DeleteEggResponses,
   DeleteGroupData,
   DeleteGroupResponses,
   DeleteNodeData,
   DeleteNodeResponses,
   DeleteUserData,
   DeleteUserResponses,
+  EditEggData,
+  EditEggResponses,
   EditGroupData,
   EditGroupResponses,
   EditUserData,
   EditUserResponses,
+  EggInfoResponses,
   GetGeneralSettingsResponses,
   GetMailSettingsResponses,
   GetOidcSettingsResponses,
@@ -47,6 +54,7 @@ import type {
   InitOidcResponses,
   IsSetupResponses,
   KeyResponses,
+  ListEggsResponses,
   ListGroupsResponses,
   ListGroupsSimpleResponses,
   ListNodesResponses,
@@ -1761,6 +1769,194 @@ export function handleUpdateNode(
   );
 }
 
+export type HandleDeleteEggResponse = {
+  body: DeleteEggResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `DELETE /api/eggs` operation.
+ */
+export function handleDeleteEgg(
+  response?:
+    | HandleDeleteEggResponse
+    | HttpResponseResolver<never, DeleteEggData['body']>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<never, DeleteEggData['body']>(
+    `${options?.baseUrl ?? '*'}/api/eggs`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleListEggsResponse = {
+  body: ListEggsResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/eggs` operation.
+ */
+export function handleListEggs(
+  response?: HandleListEggsResponse | HttpResponseResolver<never, never>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<never, never>(
+    `${options?.baseUrl ?? '*'}/api/eggs`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateEggResponse = {
+  body: CreateEggResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/eggs` operation.
+ */
+export function handleCreateEgg(
+  response?:
+    | HandleCreateEggResponse
+    | HttpResponseResolver<never, CreateEggData['body']>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<never, CreateEggData['body']>(
+    `${options?.baseUrl ?? '*'}/api/eggs`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleEditEggResponse = {
+  body: EditEggResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `PUT /api/eggs` operation.
+ */
+export function handleEditEgg(
+  response?:
+    | HandleEditEggResponse
+    | HttpResponseResolver<never, EditEggData['body']>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.put<never, EditEggData['body']>(
+    `${options?.baseUrl ?? '*'}/api/eggs`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleEggInfoResponse = {
+  body: EggInfoResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/eggs/{uuid}` operation.
+ */
+export function handleEggInfo(
+  response?:
+    | HandleEggInfoResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/eggs/:uuid`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
 export type MswHandlerFactories = {
   /**
    * Handler for the `GET /api/setup` operation.
@@ -1946,6 +2142,26 @@ export type MswHandlerFactories = {
    * Handler for the `POST /api/nodes/{uuid}` operation.
    */
   updateNode: typeof handleUpdateNode;
+  /**
+   * Handler for the `DELETE /api/eggs` operation.
+   */
+  deleteEgg: typeof handleDeleteEgg;
+  /**
+   * Handler for the `GET /api/eggs` operation.
+   */
+  listEggs: typeof handleListEggs;
+  /**
+   * Handler for the `POST /api/eggs` operation.
+   */
+  createEgg: typeof handleCreateEgg;
+  /**
+   * Handler for the `PUT /api/eggs` operation.
+   */
+  editEgg: typeof handleEditEgg;
+  /**
+   * Handler for the `GET /api/eggs/{uuid}` operation.
+   */
+  eggInfo: typeof handleEggInfo;
 };
 
 export type CreateMswHandlersResult = {
@@ -2015,7 +2231,12 @@ export function createMswHandlers(
     listNodes: wrap(handleListNodes),
     createNode: wrap(handleCreateNode),
     nodeInfo: wrap(handleNodeInfo),
-    updateNode: wrap(handleUpdateNode)
+    updateNode: wrap(handleUpdateNode),
+    deleteEgg: wrap(handleDeleteEgg),
+    listEggs: wrap(handleListEggs),
+    createEgg: wrap(handleCreateEgg),
+    editEgg: wrap(handleEditEgg),
+    eggInfo: wrap(handleEggInfo)
   };
   const all: CreateMswHandlersResult['all'] = (options = {}) => {
     type OverrideValue<R> = R | [response?: R, options?: RequestHandlerOptions];
@@ -2064,6 +2285,7 @@ export function createMswHandlers(
       invoke(pick.groupInfo, overrides.groupInfo),
       invoke(pick.nodeInfo, overrides.nodeInfo),
       invoke(pick.updateNode, overrides.updateNode),
+      invoke(pick.eggInfo, overrides.eggInfo),
       invoke(pick.isSetup, overrides.isSetup),
       invoke(pick.completeSetup, overrides.completeSetup),
       invoke(pick.deleteGroup, overrides.deleteGroup),
@@ -2072,7 +2294,11 @@ export function createMswHandlers(
       invoke(pick.editGroup, overrides.editGroup),
       invoke(pick.deleteNode, overrides.deleteNode),
       invoke(pick.listNodes, overrides.listNodes),
-      invoke(pick.createNode, overrides.createNode)
+      invoke(pick.createNode, overrides.createNode),
+      invoke(pick.deleteEgg, overrides.deleteEgg),
+      invoke(pick.listEggs, overrides.listEggs),
+      invoke(pick.createEgg, overrides.createEgg),
+      invoke(pick.editEgg, overrides.editEgg)
     ];
   };
   return { all, pick };

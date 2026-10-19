@@ -28,6 +28,9 @@ import type {
   ConvertOidcUserData,
   ConvertOidcUserErrors,
   ConvertOidcUserResponses,
+  CreateEggData,
+  CreateEggErrors,
+  CreateEggResponses,
   CreateGroupData,
   CreateGroupErrors,
   CreateGroupResponses,
@@ -37,6 +40,9 @@ import type {
   CreateUserData,
   CreateUserErrors,
   CreateUserResponses,
+  DeleteEggData,
+  DeleteEggErrors,
+  DeleteEggResponses,
   DeleteGroupData,
   DeleteGroupErrors,
   DeleteGroupResponses,
@@ -46,12 +52,18 @@ import type {
   DeleteUserData,
   DeleteUserErrors,
   DeleteUserResponses,
+  EditEggData,
+  EditEggErrors,
+  EditEggResponses,
   EditGroupData,
   EditGroupErrors,
   EditGroupResponses,
   EditUserData,
   EditUserErrors,
   EditUserResponses,
+  EggInfoData,
+  EggInfoErrors,
+  EggInfoResponses,
   GetGeneralSettingsData,
   GetGeneralSettingsErrors,
   GetGeneralSettingsResponses,
@@ -78,6 +90,9 @@ import type {
   IsSetupResponses,
   KeyData,
   KeyResponses,
+  ListEggsData,
+  ListEggsErrors,
+  ListEggsResponses,
   ListGroupsData,
   ListGroupsErrors,
   ListGroupsResponses,
@@ -793,3 +808,65 @@ export const updateNode = <ThrowOnError extends boolean = false>(
       ...options.headers
     }
   });
+
+export const deleteEgg = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteEggData, ThrowOnError>
+): RequestResult<DeleteEggResponses, DeleteEggErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteEggResponses,
+    DeleteEggErrors,
+    ThrowOnError
+  >({
+    url: '/api/eggs',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const listEggs = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEggsData, ThrowOnError>
+): RequestResult<ListEggsResponses, ListEggsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListEggsResponses,
+    ListEggsErrors,
+    ThrowOnError
+  >({ url: '/api/eggs', ...options });
+
+export const createEgg = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEggData, ThrowOnError>
+): RequestResult<CreateEggResponses, CreateEggErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateEggResponses,
+    CreateEggErrors,
+    ThrowOnError
+  >({
+    url: '/api/eggs',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const editEgg = <ThrowOnError extends boolean = false>(
+  options: Options<EditEggData, ThrowOnError>
+): RequestResult<EditEggResponses, EditEggErrors, ThrowOnError> =>
+  (options.client ?? client).put<EditEggResponses, EditEggErrors, ThrowOnError>(
+    {
+      url: '/api/eggs',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    }
+  );
+
+export const eggInfo = <ThrowOnError extends boolean = false>(
+  options: Options<EggInfoData, ThrowOnError>
+): RequestResult<EggInfoResponses, EggInfoErrors, ThrowOnError> =>
+  (options.client ?? client).get<EggInfoResponses, EggInfoErrors, ThrowOnError>(
+    { url: '/api/eggs/{uuid}', ...options }
+  );
