@@ -22,6 +22,7 @@ use crate::{config::Config, utils::UpdateMessage};
 
 mod config;
 mod db;
+mod eggs;
 mod nodes;
 mod settings;
 mod utils;
@@ -79,6 +80,7 @@ fn api_router(rate_limiter: &mut RateLimiter) -> ApiRouter {
     .nest("/mail", mail::router(rate_limiter))
     .nest("/group", group::router::<UpdateMessage>())
     .nest("/nodes", nodes::router())
+    .nest("/eggs", eggs::router())
 }
 
 async fn state(mut router: ApiRouter, config: Config) -> ApiRouter {

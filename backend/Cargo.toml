@@ -34,7 +34,7 @@ jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 migration = { path = "migration" }
 reqwest = { version = "0.13.5", features = ["form", "json"] }
 rsa = "0.9.10"
-schemars = { version = "1.2.3", features = ["chrono04", "url2", "uuid1"] }
+schemars = { version = "1.2.3", features = ["chrono04", "indexmap2", "url2", "uuid1"] }
 sea-orm = { version = "2.0.4", features = [
   "runtime-tokio-rustls",
   "sqlx-postgres",
@@ -60,6 +60,7 @@ reqwest-middleware = { version = "0.5.2", features = [
 ] }
 rand = "0.10.3"
 hex = "0.4.3"
+indexmap = { version = "2.14.2", features = ["serde"] }
 rustls = { version = "0.23.46", features = ["aws-lc-rs"] }
 
 [features]
@@ -70,7 +71,9 @@ test = ["centaurus/test"]
 tokio = { version = "=1.53.3", features = ["macros", "rt-multi-thread"] }
 tower = { version = "=0.5.3", features = ["util"] }
 reqwest = { version = "=0.13.5", features = ["form", "json"] }
-serde_json = "=1.0.154"
+# tests build ordered request bodies with `json!`; the server itself parses
+# ordered maps straight into `IndexMap` and does not need it
+serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 base64 = "=0.23.1"
 rsa = "=0.9.10"
 uuid = { version = "=1.28.0", features = ["v4"] }

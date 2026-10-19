@@ -153,7 +153,7 @@ impl TestServer {
     format!("http://localhost:{}{}", self.port, path)
   }
 
-  fn cookie_header(&self) -> Option<String> {
+  pub fn cookie_header(&self) -> Option<String> {
     let jar = self.cookies.lock().unwrap();
     if jar.is_empty() {
       return None;
@@ -291,6 +291,14 @@ impl TestServer {
     self.cookies.lock().unwrap().contains_key(name)
   }
 
+  pub fn set_cookie(&self, name: &str, value: &str) {
+    self
+      .cookies
+      .lock()
+      .unwrap()
+      .insert(name.into(), value.into());
+  }
+
   /// Drop all stored cookies so subsequent requests are unauthenticated.
   pub fn clear_cookies(&self) {
     self.cookies.lock().unwrap().clear();
@@ -317,4 +325,59 @@ static COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub fn unique(prefix: &str) -> String {
   format!("{prefix}-{}", COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+/// A valid PLCN_v3-shaped egg body; map keys are deliberately not alphabetical.
+pub fn egg_body() -> Value {
+  serde_json::json!({
+    "name": "Paper",
+    "author": "dev@example.com",
+    "description": "Minecraft",
+    "tags": ["minecraft"],
+    "features": ["eula"],
+    // deliberately not alphabetical: order must survive the roundtrip
+    "docker_images": { "Zulu 21": "ghcr.io/java:21", "Alpha 17": "ghcr.io/java:17", "Mid 11": "ghcr.io/java:11" },
+    "file_denylist": ["*.jar"],
+    "startup_commands": { "Zeta": "java -jar a.jar", "Default": "java -jar b.jar" },
+    "config": {
+      "files": "{\"server.properties\":{\"parser\":\"properties\",\"find\":{\"server-port\":\"{{server.allocations.default.port}}\"}}}",
+      "startup": { "done": ")! For help, type " },
+      "logs": "{}",
+      "stop": "stop"
+    },
+    "scripts": { "installation": { "script": "echo hi", "container": "alpine", "entrypoint": "ash" } },
+    "meta": { "update_url": null },
+    "variables": [
+      { "name": "Late", "description": "", "env_variable": "LATE", "default_value": "", "user_viewable": true, "user_editable": false, "rules": ["nullable"], "sort": 2 },
+      { "name": "Unsorted", "description": "", "env_variable": "UNSORTED", "default_value": "", "user_viewable": true, "user_editable": false, "rules": [], "sort": null },
+      { "name": "First", "description": "", "env_variable": "FIRST", "default_value": "1", "user_viewable": true, "user_editable": true, "rules": ["required", "string"], "sort": 1 }
+    ]
+  })
+}
+
+/// Keys of an ordered JSON map in a response body. Parsed via `IndexMap`
+/// because `serde_json::Value` (without `preserve_order`) sorts keys.
+pub fn egg_keys(raw: &str, field: &str) -> Vec<String> {
+  #[derive(serde::Deserialize)]
+  struct Maps {
+    docker_images: indexmap::IndexMap<String, String>,
+    startup_commands: indexmap::IndexMap<String, String>,
+  }
+  let m: Maps = serde_json::from_str(raw).unwrap();
+  match field {
+    "docker_images" => m.docker_images,
+    "startup_commands" => m.startup_commands,
+    _ => panic!("unknown field {field}"),
+  }
+  .into_keys()
+  .collect()
+}
+
+pub fn egg_envs(info: &Value) -> Vec<&str> {
+  info["variables"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|v| v["env_variable"].as_str().unwrap())
+    .collect()
 }

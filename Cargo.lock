@@ -571,6 +571,7 @@ dependencies = [
  "futures-util",
  "hex",
  "http",
+ "indexmap 2.14.2",
  "jsonwebtoken",
  "migration",
  "rand 0.10.3",
@@ -4513,6 +4514,8 @@ version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
+ "foldhash",
+ "indexmap 2.14.2",
  "itoa",
  "memchr",
  "serde",
