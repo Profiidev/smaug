@@ -1,32 +1,62 @@
-use axum::{Extension, Router, extract::FromRequestParts};
-use centaurus::{backend::request::extract::StateExtractExt, error::ErrorReport};
-use http::request::Parts;
-use shared::auth::SignData;
-use tracing::info;
+use std::sync::Arc;
+
+use axum::{
+  Extension, Router,
+  body::{Body, to_bytes},
+  extract::{OriginalUri, Request},
+  middleware::Next,
+  response::{IntoResponse, Response},
+};
+use centaurus::error::{ErrorReportStatusExt, Result};
+use http::StatusCode;
+use shared::auth::{NonceCache, SignData};
+use tracing::debug;
 
 use crate::config::Config;
 
-pub struct Auth {
-  pub timestamp: String,
+const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
+
+#[derive(Clone)]
+pub struct WingsAuth {
+  token: Arc<str>,
+  nonces: Arc<NonceCache>,
 }
 
-#[derive(FromRequestParts, Clone)]
-#[from_request(via(Extension))]
-pub struct WingsToken(pub String);
+/// Verifies the request signature (method, path, body, timestamp, nonce) and
+/// signs the response so the backend can verify it came from this wings.
+pub async fn verify(
+  Extension(auth): Extension<WingsAuth>,
+  OriginalUri(uri): OriginalUri,
+  req: Request,
+  next: Next,
+) -> Result<Response> {
+  let (parts, body) = req.into_parts();
+  let body = to_bytes(body, MAX_BODY_BYTES)
+    .await
+    .status_context(StatusCode::PAYLOAD_TOO_LARGE, "Request body too large")?;
+  let path = uri.path_and_query().map(|p| p.as_str()).unwrap_or("/");
 
-impl<S: Sync> FromRequestParts<S> for Auth {
-  type Rejection = ErrorReport;
+  let data = SignData::validate_header_map(
+    &parts.headers,
+    &auth.token,
+    parts.method.as_str(),
+    path,
+    &body,
+  )?;
+  auth.nonces.check(&data)?;
+  debug!("Authenticated wings request to {}", path);
 
-  async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-    let token = parts.extract_state::<WingsToken>().await.0;
-    let timestamp = SignData::validate_header_map(&parts.headers, &token, None)?;
-
-    info!("Authenticated wings request with timestamp {}", timestamp);
-
-    Ok(Auth { timestamp })
-  }
+  let mut res = next
+    .run(Request::from_parts(parts, Body::from(body)))
+    .await
+    .into_response();
+  data.add_response_to_header_map(res.headers_mut(), &auth.token)?;
+  Ok(res)
 }
 
 pub fn state(router: Router, config: &Config) -> Router {
-  router.layer(Extension(WingsToken(config.token.clone())))
+  router.layer(Extension(WingsAuth {
+    token: config.token.as_str().into(),
+    nonces: Default::default(),
+  }))
 }

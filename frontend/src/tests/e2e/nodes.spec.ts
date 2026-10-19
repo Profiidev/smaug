@@ -97,7 +97,10 @@ test.describe('node create', () => {
     network.use(
       gen.handleCreateNode(async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ uuid: 'node-new' }) as never;
+        return HttpResponse.json({
+          token: 'fresh-token',
+          uuid: 'node-new'
+        }) as never;
       }),
       gen.handleNodeInfo(
         () =>
@@ -105,8 +108,7 @@ test.describe('node create', () => {
             ...nodeInfo,
             connected: false,
             id: 'node-new',
-            name: 'Fresh Node',
-            token: 'fresh-token'
+            name: 'Fresh Node'
           }) as never
       )
     );
@@ -160,6 +162,13 @@ test.describe('node create', () => {
     await expect(code).toContainText('docker run -d');
     await expect(code).toContainText('-e TOKEN=fresh-token');
     await expectNoHorizontalOverflow(page);
+
+    // The token is only shown once.
+    await page.reload();
+    await expect(page.locator('input.text-destructive')).toHaveValue(
+      'Can not be viewed.'
+    );
+    await expect(code).toContainText('- TOKEN=<TOKEN>');
   });
 
   test('blocks an empty first step', async ({ network, page }) => {
@@ -215,9 +224,30 @@ test.describe('node detail', () => {
     await expect(page.getByRole('heading', { name: /Node:/ })).toContainText(
       'Node One'
     );
+    await expect(page.locator('input.text-destructive')).toHaveValue(
+      'Can not be viewed.'
+    );
+  });
+
+  test('regenerates the node token', async ({ page }) => {
+    await gotoReady(page, '/nodes/node-1/setup');
+
+    await page.getByRole('button', { name: 'Regenerate' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Regenerate' })
+      .click();
+
     await expect(
-      page.getByRole('button', { name: 'node-token-123' })
+      page.getByText('Token for node Node One regenerated successfully')
     ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'node-regenerated-token' })
+    ).toBeVisible();
+    await expect(page.getByText('(Can not be viewed again!)')).toBeVisible();
+    await expect(page.locator('pre.shiki')).toContainText(
+      '- TOKEN=node-regenerated-token'
+    );
   });
 
   test('updates the node settings', async ({ network, page }) => {

@@ -26,8 +26,7 @@ const node: NodeInfo = {
   id: 'n1',
   name: 'Alpha',
   port: 8443,
-  secure: true,
-  token: 'tok'
+  secure: true
 };
 
 interface Cell {

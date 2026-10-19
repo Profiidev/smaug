@@ -24,13 +24,18 @@ fn node_body(name: &str) -> Value {
 }
 
 async fn create(server: &TestServer, body: Value) -> Uuid {
+  create_with_token(server, body).await.0
+}
+
+/// The token is only returned on create (and regenerate).
+async fn create_with_token(server: &TestServer, body: Value) -> (Uuid, String) {
   let resp = server.post("/nodes", body).await;
   assert_eq!(resp.status(), StatusCode::OK);
-  resp.json::<Value>().await.unwrap()["uuid"]
-    .as_str()
-    .unwrap()
-    .parse()
-    .unwrap()
+  let res: Value = resp.json().await.unwrap();
+  let token = res["token"].as_str().unwrap().to_string();
+  assert_eq!(token.len(), 64);
+  assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
+  (res["uuid"].as_str().unwrap().parse().unwrap(), token)
 }
 
 async fn info(server: &TestServer, uuid: Uuid) -> Value {
@@ -75,15 +80,12 @@ async fn node_crud_flow() {
   assert_eq!(list.as_array().unwrap().len(), 3);
 
   let node = info(&server, uuid).await;
-  let token = node["token"].as_str().unwrap();
-  assert_eq!(token.len(), 64);
-  assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
   assert_eq!(
     node,
     json!({
       "id": uuid, "name": "alpha", "address": "127.0.0.1", "port": 1, "secure": false,
       "disk_limit_mb": 1024.0, "memory_limit_mb": 512.0, "cpu_limit": 2,
-      "token": token, "connected": false
+      "connected": false
     })
   );
   let node = info(&server, beta).await;
@@ -103,7 +105,7 @@ async fn node_crud_flow() {
     json!({
       "id": uuid, "name": "alpha 2", "address": "localhost", "port": 2, "secure": true,
       "disk_limit_mb": null, "memory_limit_mb": 1.5, "cpu_limit": null,
-      "token": token, "connected": false
+      "connected": false
     })
   );
 
@@ -232,8 +234,10 @@ async fn node_permissions() {
   );
 
   // no cookie is rejected by centaurus with 400, a bogus token with 401
+  let token_path = format!("/nodes/{uuid}/token");
   let all = async |server: &TestServer, view: StatusCode, edit: StatusCode| {
     assert_eq!(server.get("/nodes").await.status(), view);
+    assert_eq!(server.post(&token_path, json!({})).await.status(), edit);
     assert_eq!(server.get(&info_path).await.status(), view);
     assert_eq!(server.post("/nodes", node_body("new")).await.status(), edit);
     assert_eq!(
@@ -276,6 +280,10 @@ async fn node_permissions() {
   );
   assert_eq!(
     server.post("/nodes", node_body("new")).await.status(),
+    StatusCode::OK
+  );
+  assert_eq!(
+    server.post(&token_path, json!({})).await.status(),
     StatusCode::OK
   );
   assert_eq!(server.delete("/nodes", del).await.status(), StatusCode::OK);
@@ -325,8 +333,9 @@ async fn node_changes_are_broadcast() {
   assert_eq!(next().await, json!({ "type": "Nodes", "uuid": uuid }));
 }
 
-/// Minimal Wings stand-in (mirrors `wings/src/ws.rs`): accepts the websocket
-/// and signs the handshake response with `token`. Returns its port.
+/// Minimal Wings stand-in (mirrors `wings/src/auth.rs`): verifies the signed
+/// handshake, signs the response with `token` and accepts the websocket.
+/// Returns its port.
 // the handshake callback's error type is fixed by tungstenite
 #[allow(clippy::result_large_err)]
 async fn fake_wings(token: String) -> u16 {
@@ -341,9 +350,11 @@ async fn fake_wings(token: String) -> u16 {
         let sign =
           |req: &tokio_tungstenite::tungstenite::handshake::server::Request,
            mut res: tokio_tungstenite::tungstenite::handshake::server::Response| {
-            let ts = req.headers()["x-wings-timestamp"].to_str().unwrap();
-            SignData::from_timestamp(ts.to_string())
-              .add_to_header_map(res.headers_mut(), &token)
+            let data =
+              SignData::validate_header_map(req.headers(), &token, "GET", req.uri().path(), b"")
+                .unwrap();
+            data
+              .add_response_to_header_map(res.headers_mut(), &token)
               .unwrap();
             Ok(res)
           };
@@ -360,11 +371,7 @@ async fn fake_wings(token: String) -> u16 {
 #[tokio::test]
 async fn node_connects_to_wings() {
   let (server, _) = TestServer::start_with_admin().await;
-  let uuid = create(&server, node_body("alpha")).await;
-  let token = info(&server, uuid).await["token"]
-    .as_str()
-    .unwrap()
-    .to_string();
+  let (uuid, token) = create_with_token(&server, node_body("alpha")).await;
 
   // the token only exists after create, so point the node at wings afterwards
   let mut next = nodes_updates(&server).await;
@@ -387,4 +394,47 @@ async fn node_connects_to_wings() {
     server.get(&format!("/nodes/{uuid}")).await.status(),
     StatusCode::NOT_FOUND
   );
+}
+
+#[tokio::test]
+async fn node_token_regenerate() {
+  let (server, _) = TestServer::start_with_admin().await;
+  let (uuid, token) = create_with_token(&server, node_body("alpha")).await;
+
+  let resp = server
+    .post(&format!("/nodes/{uuid}/token"), json!({}))
+    .await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  let new = resp.json::<Value>().await.unwrap()["token"]
+    .as_str()
+    .unwrap()
+    .to_string();
+  assert_eq!(new.len(), 64);
+  assert_ne!(new, token);
+  assert!(info(&server, uuid).await.get("token").is_none());
+
+  let resp = server
+    .post(&format!("/nodes/{}/token", Uuid::now_v7()), json!({}))
+    .await;
+  assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn insecure_nodes_rejected_when_disallowed() {
+  // ponytail: process env, safe under nextest (one process per test)
+  unsafe { std::env::set_var("ALLOW_INSECURE_WINGS", "false") };
+  let (server, _) = TestServer::start_with_admin().await;
+
+  let resp = server.post("/nodes", node_body("plain")).await;
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+  let mut body = node_body("tls");
+  body["address"] = json!("https://127.0.0.1:1");
+  body["secure"] = json!(true);
+  let uuid = create(&server, body).await;
+  let resp = server
+    .post(&format!("/nodes/{uuid}"), node_body("tls"))
+    .await;
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+  assert_eq!(info(&server, uuid).await["secure"], true);
 }

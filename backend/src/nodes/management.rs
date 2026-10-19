@@ -30,6 +30,16 @@ pub fn router() -> ApiRouter {
     .api_route("/", delete_with(delete_node, |op| op.id("deleteNode")))
     .api_route("/{uuid}", get_with(node_info, |op| op.id("nodeInfo")))
     .api_route("/{uuid}", post_with(update_node, |op| op.id("updateNode")))
+    .api_route(
+      "/{uuid}/token",
+      post_with(regenerate_token, |op| op.id("nodeTokenRegenerate")),
+    )
+}
+
+fn gen_token() -> String {
+  let mut raw_token = [0u8; 32];
+  rand::rng().fill_bytes(&mut raw_token);
+  hex::encode(raw_token)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -45,6 +55,8 @@ struct CreateNode {
 #[derive(Serialize, JsonSchema)]
 struct CreateNodeRes {
   uuid: Uuid,
+  /// Only returned here and on regenerate, it can not be viewed later.
+  token: String,
 }
 
 async fn create_node(
@@ -77,15 +89,10 @@ async fn create_node(
     .to_string();
   let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 });
 
-  let mut raw_token = [0u8; 32];
-  rand::rng().fill_bytes(&mut raw_token);
-  let token = hex::encode(raw_token);
-
+  let token = gen_token();
   let id = Uuid::now_v7();
 
-  wings
-    .connect(id, &address, port, data.secure, &token)
-    .await?;
+  wings.connect(id, &address, port, data.secure, &token)?;
 
   let model = Node {
     id,
@@ -96,7 +103,7 @@ async fn create_node(
     disk_limit_mb: data.disk_limit_mb,
     memory_limit_mb: data.memory_limit_mb,
     cpu_limit: data.cpu_limit.map(|v| v as i32),
-    token,
+    token: token.clone(),
   };
 
   db.node().create_node(model).await?;
@@ -104,7 +111,7 @@ async fn create_node(
 
   updater.broadcast(UpdateMessage::Nodes { uuid: id }).await;
 
-  Ok(Json(CreateNodeRes { uuid: id }))
+  Ok(Json(CreateNodeRes { uuid: id, token }))
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -117,12 +124,11 @@ pub struct NodeInfo {
   pub disk_limit_mb: Option<f64>,
   pub memory_limit_mb: Option<f64>,
   pub cpu_limit: Option<i32>,
-  pub token: String,
   pub connected: bool,
 }
 
 impl NodeInfo {
-  async fn from_node(node: Node, wings: &Wings) -> Self {
+  fn from_node(node: Node, wings: &Wings) -> Self {
     NodeInfo {
       id: node.id,
       name: node.name,
@@ -132,8 +138,7 @@ impl NodeInfo {
       disk_limit_mb: node.disk_limit_mb,
       memory_limit_mb: node.memory_limit_mb,
       cpu_limit: node.cpu_limit,
-      token: node.token,
-      connected: wings.is_connected(node.id).await,
+      connected: wings.is_connected(node.id),
     }
   }
 }
@@ -147,7 +152,7 @@ async fn list_nodes(
   let mut node_infos = Vec::new();
 
   for node in nodes {
-    node_infos.push(NodeInfo::from_node(node, &wings).await);
+    node_infos.push(NodeInfo::from_node(node, &wings));
   }
 
   Ok(Json(node_infos))
@@ -168,7 +173,7 @@ async fn delete_node(
   if db.node().delete_node(data.uuid).await? == 0 {
     bail!(NOT_FOUND, "Node not found");
   }
-  wings.disconnect(data.uuid).await?;
+  wings.disconnect(data.uuid);
   info!("Deleted node with ID {}", data.uuid);
 
   updater
@@ -190,7 +195,7 @@ async fn node_info(
   Path(req): Path<NodeInfoRequest>,
 ) -> Result<Json<NodeInfo>> {
   let node = db.node().find_by_id(req.uuid).await?;
-  let node_info = NodeInfo::from_node(node.into(), &wings).await;
+  let node_info = NodeInfo::from_node(node.into(), &wings);
 
   Ok(Json(node_info))
 }
@@ -248,11 +253,8 @@ async fn update_node(
     || read_node.port != i32::from(port)
     || read_node.secure != data.secure
   {
-    wings.disconnect(read_node.id).await.ok();
-
-    wings
-      .connect(read_node.id, &address, port, data.secure, &read_node.token)
-      .await?;
+    // replaces the existing connection
+    wings.connect(read_node.id, &address, port, data.secure, &read_node.token)?;
 
     node.address = Set(address);
     node.port = Set(i32::from(port));
@@ -270,4 +272,46 @@ async fn update_node(
     .await;
 
   Ok(())
+}
+
+#[derive(Serialize, JsonSchema)]
+struct TokenRegenerateRes {
+  token: String,
+}
+
+async fn regenerate_token(
+  _auth: JwtAuth<NodeEditPerm>,
+  db: Connection,
+  wings: Wings,
+  updater: Updater,
+  Path(req): Path<NodeInfoRequest>,
+) -> Result<Json<TokenRegenerateRes>> {
+  let read_node = db.node().find_by_id(req.uuid).await?;
+  let token = gen_token();
+
+  let mut node = read_node.clone().into_active_model();
+  node.token = Set(token.clone());
+  db.node().update_node(node).await?;
+
+  if let Err(err) = wings.connect(
+    read_node.id,
+    &read_node.address,
+    read_node.port as u16,
+    read_node.secure,
+    &token,
+  ) {
+    // old token is invalid now, drop the connection that still uses it
+    wings.disconnect(read_node.id);
+    info!(
+      "Not reconnecting node {} after token regenerate: {:?}",
+      req.uuid, err
+    );
+  }
+  info!("Regenerated token for node with ID {}", req.uuid);
+
+  updater
+    .broadcast(UpdateMessage::Nodes { uuid: req.uuid })
+    .await;
+
+  Ok(Json(TokenRegenerateRes { token }))
 }

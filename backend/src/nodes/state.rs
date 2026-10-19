@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use aide::OperationIo;
 use axum::{Extension, extract::FromRequestParts};
-use centaurus::{db::init::Connection, error::Result};
+use centaurus::{bail, db::init::Connection, error::Result};
 use dashmap::DashMap;
-use tokio::sync::Mutex;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{db::DBTrait, nodes::connection::WingsConnection, utils::Updater};
@@ -12,33 +12,30 @@ use crate::{db::DBTrait, nodes::connection::WingsConnection, utils::Updater};
 #[derive(Clone, FromRequestParts, OperationIo)]
 #[from_request(via(Extension))]
 pub struct Wings {
-  wings: Arc<DashMap<Uuid, Arc<Mutex<WingsConnection>>>>,
+  wings: Arc<DashMap<Uuid, WingsConnection>>,
   updater: Updater,
+  allow_insecure: bool,
 }
 
 impl Wings {
-  pub async fn new(db: &Connection, updater: Updater) -> Result<Self> {
-    let nodes = db.node().list_nodes().await?;
-    let wings = Arc::new(DashMap::new());
+  pub async fn new(db: &Connection, updater: Updater, allow_insecure: bool) -> Result<Self> {
+    let wings = Self {
+      wings: Arc::new(DashMap::new()),
+      updater,
+      allow_insecure,
+    };
 
-    for node in nodes {
-      let conn = WingsConnection::new(
-        node.id,
-        &node.address,
-        node.port,
-        node.secure,
-        node.token.clone(),
-        updater.clone(),
-      )
-      .await?;
-
-      wings.insert(node.id, conn);
+    for node in db.node().list_nodes().await? {
+      if let Err(err) = wings.connect(node.id, &node.address, node.port, node.secure, &node.token) {
+        warn!("Not connecting to node {}: {:?}", node.id, err);
+      }
     }
 
-    Ok(Self { wings, updater })
+    Ok(wings)
   }
 
-  pub async fn connect(
+  /// Connects to a wings node, replacing any existing connection to it.
+  pub fn connect(
     &self,
     uuid: Uuid,
     addr: &str,
@@ -46,6 +43,10 @@ impl Wings {
     secure: bool,
     token: &str,
   ) -> Result<()> {
+    if !secure && !self.allow_insecure {
+      bail!(BAD_REQUEST, "Insecure wings connections are disabled");
+    }
+
     let conn = WingsConnection::new(
       uuid,
       addr,
@@ -53,23 +54,19 @@ impl Wings {
       secure,
       token.to_string(),
       self.updater.clone(),
-    )
-    .await?;
+    );
     self.wings.insert(uuid, conn);
     Ok(())
   }
 
-  pub async fn disconnect(&self, uuid: Uuid) -> Result<()> {
-    if let Some((_, conn)) = self.wings.remove(&uuid) {
-      conn.lock().await.disconnect();
-    }
-    Ok(())
+  pub fn disconnect(&self, uuid: Uuid) {
+    self.wings.remove(&uuid);
   }
 
-  pub async fn is_connected(&self, uuid: Uuid) -> bool {
-    if let Some(conn) = self.wings.get(&uuid) {
-      return conn.lock().await.is_connected();
-    }
-    false
+  pub fn is_connected(&self, uuid: Uuid) -> bool {
+    self
+      .wings
+      .get(&uuid)
+      .is_some_and(|conn| conn.is_connected())
   }
 }

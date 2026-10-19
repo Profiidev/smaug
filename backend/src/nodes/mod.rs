@@ -13,9 +13,14 @@ pub fn router() -> ApiRouter {
   management::router()
 }
 
-pub async fn state(router: ApiRouter, db: &Connection, updater: Updater) -> ApiRouter {
+pub async fn state(
+  router: ApiRouter,
+  db: &Connection,
+  updater: Updater,
+  allow_insecure: bool,
+) -> ApiRouter {
   router.layer(Extension(
-    Wings::new(db, updater)
+    Wings::new(db, updater, allow_insecure)
       .await
       .expect("Failed to create Wings state"),
   ))

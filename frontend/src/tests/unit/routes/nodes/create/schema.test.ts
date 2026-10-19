@@ -32,8 +32,7 @@ const node: NodeInfo = {
   id: 'n1',
   name: 'Alpha',
   port: 443,
-  secure: true,
-  token: 'tok'
+  secure: true
 };
 
 describe('units', () => {

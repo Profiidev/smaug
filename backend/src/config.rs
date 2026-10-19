@@ -42,6 +42,9 @@ pub struct Config {
 
   pub db_url: String,
   pub admin_group: String,
+  /// Allow plain ws/http connections to wings nodes. Signed commands are then
+  /// sent unencrypted, so this is only on by default in debug builds.
+  pub allow_insecure_wings: bool,
 }
 
 impl Default for Config {
@@ -54,6 +57,7 @@ impl Default for Config {
       oidc: UserSettings::default(),
       db_url: "".to_string(),
       admin_group: "Admin".to_string(),
+      allow_insecure_wings: cfg!(debug_assertions),
       metrics: MetricsConfig {
         metrics_name: "smaug".to_string(),
         ..Default::default()
