@@ -1,6 +1,5 @@
 <script lang="ts">
   import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
-  import RowInput from './RowInput.svelte';
   import FormTags from '@profidev/pleiades/components/form/form-tags.svelte';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import { Separator } from '@profidev/pleiades/components/ui/separator';
@@ -96,10 +95,10 @@
   {#each $formData.dockerImages as _, i (i)}
     <div class="flex flex-wrap items-start gap-2 sm:flex-nowrap">
       <div class="min-w-0 flex-[1_1_140px]">
-        <RowInput
+        <FormInput
           {...props}
           key={`dockerImages[${i}].label`}
-          label="Label"
+          aria-label="Label"
           placeholder="Java 21"
         />
       </div>
@@ -107,10 +106,10 @@
         class="text-muted-foreground mt-2 hidden size-4 flex-none sm:block"
       />
       <div class="min-w-0 flex-[3_1_220px]">
-        <RowInput
+        <FormInput
           {...props}
           key={`dockerImages[${i}].image`}
-          label="Image"
+          aria-label="Image"
           class="font-mono"
           placeholder="ghcr.io/pelican-eggs/yolks:java_21"
         />
@@ -145,10 +144,10 @@
   {#each $formData.startupCommands as _, i (i)}
     <div class="flex flex-wrap items-start gap-2 sm:flex-nowrap">
       <div class="min-w-0 flex-[1_1_140px]">
-        <RowInput
+        <FormInput
           {...props}
           key={`startupCommands[${i}].label`}
-          label="Label"
+          aria-label="Label"
           placeholder="Default"
         />
       </div>
@@ -156,10 +155,10 @@
         class="text-muted-foreground mt-2 hidden size-4 flex-none sm:block"
       />
       <div class="min-w-0 flex-[3_1_220px]">
-        <RowInput
+        <FormInput
           {...props}
           key={`startupCommands[${i}].command`}
-          label="Command"
+          aria-label="Command"
           class="font-mono"
           placeholder={'java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar {{SERVER_JARFILE}}'}
         />
