@@ -3,12 +3,12 @@ import { listGroupsSimple, userInfo } from '$lib/client';
 
 export const load: PageLoad = ({ params, fetch }) => {
   const resPromise = userInfo({
-    fetch,
-    path: { uuid: params.uuid }
-  });
-  const groupsPromise = listGroupsSimple({
-    fetch
-  }).then((res) => res.data ?? []);
+      fetch,
+      path: { uuid: params.uuid }
+    }),
+    groupsPromise = listGroupsSimple({
+      fetch
+    }).then((res) => res.data ?? []);
 
   return {
     groupsPromise,

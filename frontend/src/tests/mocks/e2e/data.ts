@@ -52,8 +52,8 @@ export const adminUser = {
   uuid: 'user-admin'
 };
 
-const simpleUser = { id: 'user-1', name: 'Bob User' };
-const simpleGroup = { name: 'Admins', uuid: 'group-admins' };
+const simpleUser = { id: 'user-1', name: 'Bob User' },
+  simpleGroup = { name: 'Admins', uuid: 'group-admins' };
 
 export const isSetup = {
   db_backend: 'sqlite',

@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Login to DockerHub
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -90,7 +90,7 @@ jobs:
           retention-days: 1
 
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         if: github.event_name != 'pull_request'
         with:
           subject-name: ${{ env.IMAGE }}
@@ -132,7 +132,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -170,3 +170,29 @@ jobs:
           repository: profiidev/helm-charts
           token: ${{ steps.app-token.outputs.token }}
           client-payload: '{"chart_name": "smaug", "chart_version": "${{ github.ref_name }}" }'
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    needs:
+      - merge
+    if: github.event_name != 'pull_request'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - ${{ github.event.repository.name }}/smaug
+          - ${{ github.event.repository.name }}/smaug-wings
+
+    steps:
+      - uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1
+        with:
+          package: ${{ matrix.package }}
+          delete-untagged: true
+          older-than: 1 day
