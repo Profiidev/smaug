@@ -83,9 +83,7 @@ async fn create_node(
 
   let id = Uuid::now_v7();
 
-  wings
-    .connect(id, &address, port, data.secure, &token)
-    .await?;
+  wings.connect(id, &address, port, data.secure, &token)?;
 
   let model = Node {
     id,
@@ -122,7 +120,7 @@ pub struct NodeInfo {
 }
 
 impl NodeInfo {
-  async fn from_node(node: Node, wings: &Wings) -> Self {
+  fn from_node(node: Node, wings: &Wings) -> Self {
     NodeInfo {
       id: node.id,
       name: node.name,
@@ -133,7 +131,7 @@ impl NodeInfo {
       memory_limit_mb: node.memory_limit_mb,
       cpu_limit: node.cpu_limit,
       token: node.token,
-      connected: wings.is_connected(node.id).await,
+      connected: wings.is_connected(node.id),
     }
   }
 }
@@ -147,7 +145,7 @@ async fn list_nodes(
   let mut node_infos = Vec::new();
 
   for node in nodes {
-    node_infos.push(NodeInfo::from_node(node, &wings).await);
+    node_infos.push(NodeInfo::from_node(node, &wings));
   }
 
   Ok(Json(node_infos))
@@ -168,7 +166,7 @@ async fn delete_node(
   if db.node().delete_node(data.uuid).await? == 0 {
     bail!(NOT_FOUND, "Node not found");
   }
-  wings.disconnect(data.uuid).await?;
+  wings.disconnect(data.uuid);
   info!("Deleted node with ID {}", data.uuid);
 
   updater
@@ -190,7 +188,7 @@ async fn node_info(
   Path(req): Path<NodeInfoRequest>,
 ) -> Result<Json<NodeInfo>> {
   let node = db.node().find_by_id(req.uuid).await?;
-  let node_info = NodeInfo::from_node(node.into(), &wings).await;
+  let node_info = NodeInfo::from_node(node.into(), &wings);
 
   Ok(Json(node_info))
 }
@@ -248,11 +246,8 @@ async fn update_node(
     || read_node.port != i32::from(port)
     || read_node.secure != data.secure
   {
-    wings.disconnect(read_node.id).await.ok();
-
-    wings
-      .connect(read_node.id, &address, port, data.secure, &read_node.token)
-      .await?;
+    // replaces the existing connection
+    wings.connect(read_node.id, &address, port, data.secure, &read_node.token)?;
 
     node.address = Set(address);
     node.port = Set(i32::from(port));
