@@ -34,7 +34,12 @@ jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 migration = { path = "migration" }
 reqwest = { version = "0.13.5", features = ["form", "json"] }
 rsa = "0.9.10"
-schemars = { version = "1.2.3", features = ["chrono04", "indexmap2", "url2", "uuid1"] }
+schemars = { version = "1.2.3", features = [
+  "chrono04",
+  "indexmap2",
+  "url2",
+  "uuid1"
+] }
 sea-orm = { version = "2.0.4", features = [
   "runtime-tokio-rustls",
   "sqlx-postgres",
