@@ -199,6 +199,7 @@ export type EggInstallScript = {
 export type EggListItem = {
   author: string;
   description?: string | null;
+  has_update_url: boolean;
   name: string;
   uuid: string;
 };
@@ -209,6 +210,13 @@ export type EggMeta = {
 
 export type EggScripts = {
   installation: EggInstallScript;
+};
+
+export type EggSourceResponse = {
+  /**
+   * Raw egg JSON served at the update URL (any PTDL/PLCN version).
+   */
+  source: unknown;
 };
 
 export type EggUuid = {
@@ -2086,3 +2094,29 @@ export type EggInfoResponses = {
 };
 
 export type EggInfoResponse = EggInfoResponses[keyof EggInfoResponses];
+
+export type EggSourceData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/eggs/{uuid}/source';
+};
+
+export type EggSourceErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type EggSourceResponses = {
+  200: EggSourceResponse;
+};
+
+export type EggSourceResponse2 = EggSourceResponses[keyof EggSourceResponses];

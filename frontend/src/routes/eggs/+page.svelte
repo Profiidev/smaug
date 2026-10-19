@@ -2,6 +2,8 @@
   import { Button } from '@profidev/pleiades/components/ui/button';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import Plus from '@lucide/svelte/icons/plus';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import Table from '@profidev/pleiades/components/table/clean-table.svelte';
   import { columns } from './table.svelte';
   import { z } from 'zod';
@@ -14,6 +16,8 @@
   import { Permission } from '$lib/permissions.svelte';
   import { deleteEgg, type EggListItem, type UserInfo } from '$lib/client';
   import { apiErrorMessage, type EggImport } from './schema.svelte';
+  import { checkEggUpdate, type EggUpdate } from './update';
+  import UpdateDialog from './UpdateDialog.svelte';
 
   const { data } = $props();
 
@@ -23,6 +27,12 @@
   let user: UserInfo | undefined = $state();
   // Undefined while loading; drives the count caption and the empty state.
   let eggs: EggListItem[] | undefined = $state();
+  let checking = $state(false);
+  // Last check result per egg uuid: available update or failure reason.
+  let updates: Record<string, EggUpdate> = $state({});
+  let failed: Record<string, string> = $state({});
+  let reviewing: EggUpdate | undefined = $state.raw();
+  let reviewOpen = $state(false);
 
   let canEdit = $derived(
     user?.permissions.includes(Permission.EGG_EDIT) ?? false
@@ -73,6 +83,73 @@
     goto('/eggs/create', { state: { eggImport } });
   };
 
+  const plural = (n: number, word: string) =>
+    `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  const review = (update: EggUpdate) => {
+    reviewing = update;
+    reviewOpen = true;
+  };
+
+  const checkAll = async () => {
+    const targets = (eggs ?? []).filter((e) => e.has_update_url);
+    if (!targets.length) {
+      toast.info('No egg has an update URL', {
+        description: 'Add an Update URL in General to check an egg for updates.'
+      });
+      return;
+    }
+
+    checking = true;
+    const results = await Promise.allSettled(
+      targets.map((e) => checkEggUpdate(e.uuid))
+    );
+    checking = false;
+
+    updates = {};
+    failed = {};
+    results.forEach((res, i) => {
+      const { uuid } = targets[i];
+      if (res.status === 'rejected') {
+        failed[uuid] =
+          res.reason instanceof Error ? res.reason.message : 'Check failed';
+      } else if (res.value.changed.length) {
+        updates[uuid] = res.value;
+      }
+    });
+
+    const found = Object.values(updates);
+    const failedEggs = targets.filter((e) => failed[e.uuid]);
+    if (failedEggs.length) {
+      toast.error(`Couldn't check ${plural(failedEggs.length, 'egg')}`, {
+        description: failedEggs
+          .map((e) => `${e.name} (${failed[e.uuid]})`)
+          .join(', '),
+        action: { label: 'Retry', onClick: checkAll }
+      });
+    }
+    if (found.length) {
+      toast.info(
+        found.length === 1
+          ? '1 update available'
+          : `${found.length} updates available`,
+        {
+          description: found.map((u) => u.current.name).join(', '),
+          action: { label: 'Review', onClick: () => review(found[0]) }
+        }
+      );
+    } else if (!failedEggs.length) {
+      toast.success('All eggs are up to date', {
+        description: 'Every egg matches its update URL.'
+      });
+    }
+  };
+
+  const onapplied = () => {
+    if (reviewing) delete updates[reviewing.uuid];
+    invalidate((url) => url.pathname.startsWith('/api/eggs'));
+  };
+
   const startDeleteEgg = (item: EggListItem) => {
     selected = item;
     deleteOpen = true;
@@ -89,7 +166,21 @@
     </div>
     <!-- The empty state carries the same actions; avoid duplicate controls. -->
     {#if eggs?.length !== 0}
-      <div class="ml-auto flex gap-2">
+      <div class="ml-auto flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          class="cursor-pointer"
+          onclick={checkAll}
+          disabled={checking || !canEdit || !eggs}
+        >
+          {#if checking}
+            <Spinner />
+            Checking…
+          {:else}
+            <RefreshCw />
+            Check for updates
+          {/if}
+        </Button>
         {@render actions()}
       </div>
     {/if}
@@ -114,7 +205,13 @@
       <Table
         data={data.eggs}
         {columns}
-        columnData={{ canEdit, deleteEgg: startDeleteEgg }}
+        columnData={{
+          canEdit,
+          deleteEgg: startDeleteEgg,
+          updates,
+          failed,
+          review
+        }}
         searchColumns={['name', 'author', 'description']}
       />
       {#if eggs}
@@ -134,6 +231,8 @@
     Create egg
   </Button>
 {/snippet}
+
+<UpdateDialog bind:open={reviewOpen} update={reviewing} {onapplied} />
 
 <FormDialog
   title={`Delete egg ${selected?.name}?`}

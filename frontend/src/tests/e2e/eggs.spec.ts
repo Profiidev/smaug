@@ -56,6 +56,45 @@ const ptdlFile = {
   variables: []
 };
 
+/** Egg source with a new description and an extra install line. */
+const changedSource = {
+  ...eggInfo,
+  description: 'Paper, now faster',
+  scripts: {
+    installation: {
+      ...eggInfo.scripts.installation,
+      script: 'echo install\necho updated'
+    }
+  }
+};
+
+const sourceHandler = (sources: Record<string, unknown>) =>
+  gen.handleEggSource(({ params }) =>
+    params.uuid in sources
+      ? (HttpResponse.json({ source: sources[params.uuid] }) as never)
+      : (new HttpResponse('Could not reach the update URL', {
+          status: 502
+        }) as never)
+  );
+
+/** Reviews the open update dialog and applies the preselected sections. */
+const applyUpdate = async (page: Page) => {
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Update Paper')).toBeVisible();
+  await expect(dialog.getByRole('checkbox', { name: 'General' })).toBeChecked();
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Install script' })
+  ).toBeChecked();
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Variables' })
+  ).toBeDisabled();
+  await expect(dialog.getByText('+1 line, −0 lines.')).toBeVisible();
+  await expect(dialog.getByText('echo updated')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Update 2 sections' }).click();
+  await expect(page.getByText('Egg Paper updated')).toBeVisible();
+  await expect(dialog).toBeHidden();
+};
+
 const notSquashed = async (page: Page) =>
   page
     .locator('[data-slot="card"] [data-slot="card"]')
@@ -205,6 +244,40 @@ test.describe('eggs list', () => {
       page.getByText('Egg Valheim deleted successfully')
     ).toBeVisible();
     expect(del.bodies).toEqual([{ uuid: 'egg-valheim' }]);
+  });
+
+  test('checks all eggs and applies a reviewed update', async ({
+    network,
+    page
+  }) => {
+    const edit = recorder();
+    network.use(
+      sourceHandler({ 'egg-paper': changedSource }),
+      gen.handleEditEgg(async ({ request }) => {
+        await edit.record(request);
+        return new HttpResponse(null, { status: 200 }) as never;
+      })
+    );
+    await gotoReady(page, '/eggs');
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(page.getByText('1 update available')).toBeVisible();
+    await expect(page.getByText("Couldn't check 1 egg")).toBeVisible();
+    await expect(page.getByText('Check failed')).toBeVisible();
+    await page.getByRole('button', { name: 'Review update for Paper' }).click();
+    await applyUpdate(page);
+    expect(edit.bodies).toHaveLength(1);
+    expect(edit.bodies[0]).toMatchObject({
+      description: 'Paper, now faster',
+      scripts: { installation: { script: 'echo install\necho updated' } },
+      uuid: 'egg-paper'
+    });
+  });
+
+  test('reports up-to-date eggs in a toast', async ({ page }) => {
+    await gotoReady(page, '/eggs');
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(page.getByText('All eggs are up to date')).toBeVisible();
+    await expect(page.getByText('Update available')).toHaveCount(0);
   });
 
   test('shows the server error when delete fails', async ({
@@ -793,6 +866,7 @@ test.describe('egg detail', () => {
       );
       const egg = JSON.parse(await readFile(await download.path(), 'utf8'));
       expect(egg.meta.version).toBe(version);
+      await expect(page.getByText('Export downloaded')).toBeVisible();
       expect(egg.name).toBe('Paper Edited');
       if (version === 'PLCN_v3') {
         expect(egg.uuid).toBe('egg-paper');
@@ -805,6 +879,61 @@ test.describe('egg detail', () => {
       }
     });
   }
+
+  test('check for updates without an update URL shows a toast', async ({
+    page
+  }) => {
+    await gotoReady(page, '/eggs/egg-paper');
+    await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(page.getByText('No update URL')).toBeVisible();
+  });
+
+  test('checks the egg for updates and applies them', async ({
+    network,
+    page
+  }) => {
+    const withUrl = {
+      ...eggInfo,
+      meta: { update_url: 'https://eggs.example.com/paper.json' }
+    };
+    network.use(
+      gen.handleEggInfo(() => HttpResponse.json(withUrl) as never),
+      sourceHandler({ 'egg-paper': { ...changedSource, meta: withUrl.meta } })
+    );
+    await gotoReady(page, '/eggs/egg-paper');
+    await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await applyUpdate(page);
+    await expect(page.locator('textarea[name="description"]')).toHaveValue(
+      'Paper, now faster'
+    );
+    await expect(page.getByText('Unsaved changes')).toBeHidden();
+  });
+
+  test('shows check failures in a toast with retry', async ({
+    network,
+    page
+  }) => {
+    network.use(
+      gen.handleEggInfo(
+        () =>
+          HttpResponse.json({
+            ...eggInfo,
+            meta: { update_url: 'https://eggs.example.com/paper.json' }
+          }) as never
+      ),
+      sourceHandler({})
+    );
+    await gotoReady(page, '/eggs/egg-paper');
+    await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(page.getByText("Couldn't check for updates")).toBeVisible();
+    await expect(
+      page.getByText('Could not reach the update URL')
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
+  });
 
   test('deletes the egg and returns to the list', async ({ network, page }) => {
     const del = recorder();

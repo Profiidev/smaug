@@ -1,12 +1,17 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use aide::axum::{
   ApiRouter,
   routing::{delete_with, get_with, post_with, put_with},
 };
 use axum::{Json, extract::Path};
-use centaurus::{bail, db::init::Connection, error::Result};
+use centaurus::{
+  bail,
+  db::init::Connection,
+  error::{ErrorReportStatusExt, Result},
+};
 use entity::{egg, egg_variable};
+use http::StatusCode;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -17,7 +22,7 @@ use uuid::Uuid;
 use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
-  utils::{EggEditPerm, EggViewPerm, UpdateMessage, Updater},
+  utils::{EggEditPerm, EggViewPerm, UpdateMessage, Updater, client},
 };
 
 pub fn router() -> ApiRouter {
@@ -27,6 +32,10 @@ pub fn router() -> ApiRouter {
     .api_route("/", put_with(edit_egg, |op| op.id("edit_egg")))
     .api_route("/", delete_with(delete_egg, |op| op.id("delete_egg")))
     .api_route("/{uuid}", get_with(egg_info, |op| op.id("egg_info")))
+    .api_route(
+      "/{uuid}/source",
+      get_with(egg_source, |op| op.id("egg_source")),
+    )
 }
 
 /// PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
@@ -110,6 +119,13 @@ struct EggListItem {
   name: String,
   author: String,
   description: Option<String>,
+  has_update_url: bool,
+}
+
+#[derive(Serialize, JsonSchema)]
+struct EggSourceResponse {
+  /// Raw egg JSON served at the update URL (any PTDL/PLCN version).
+  source: Value,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -348,6 +364,7 @@ async fn list_eggs(_auth: JwtAuth<EggViewPerm>, db: Connection) -> Result<Json<L
       name: e.name,
       author: e.author,
       description: e.description,
+      has_update_url: e.update_url.is_some(),
     })
     .collect();
   Ok(Json(ListEggsResponse { eggs }))
@@ -360,6 +377,31 @@ async fn egg_info(
 ) -> Result<Json<EggInfo>> {
   let (egg, vars) = db.egg().find_by_id(req.uuid).await?;
   Ok(Json(from_models(egg, vars)?))
+}
+
+async fn egg_source(
+  _auth: JwtAuth<EggViewPerm>,
+  db: Connection,
+  Path(req): Path<EggUuid>,
+) -> Result<Json<EggSourceResponse>> {
+  let (egg, _) = db.egg().find_by_id(req.uuid).await?;
+  let Some(url) = egg.update_url else {
+    bail!(BAD_REQUEST, "Egg has no update URL");
+  };
+  let source = client()
+    .get(&url)
+    .timeout(Duration::from_secs(10))
+    .send()
+    .await
+    .and_then(|r| r.error_for_status())
+    .status_context(StatusCode::BAD_GATEWAY, "Could not reach the update URL")?
+    .json()
+    .await
+    .status_context(
+      StatusCode::BAD_GATEWAY,
+      "Update URL did not return valid JSON",
+    )?;
+  Ok(Json(EggSourceResponse { source }))
 }
 
 async fn create_egg(

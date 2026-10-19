@@ -15,6 +15,7 @@ vi.mock('@tanstack/svelte-table', async (orig) => ({
 const egg: EggListItem = {
   author: 'a@b.co',
   description: null,
+  has_update_url: false,
   name: 'Paper',
   uuid: 'egg-1'
 };

@@ -44,6 +44,7 @@ import type {
   EditUserData,
   EditUserResponses,
   EggInfoResponses,
+  EggSourceResponses,
   GetGeneralSettingsResponses,
   GetMailSettingsResponses,
   GetOidcSettingsResponses,
@@ -2004,6 +2005,52 @@ export function handleEggInfo(
   );
 }
 
+export type HandleEggSourceResponse = {
+  body: EggSourceResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/eggs/{uuid}/source` operation.
+ */
+export function handleEggSource(
+  response?:
+    | HandleEggSourceResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/eggs/:uuid/source`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
 export type MswHandlerFactories = {
   /**
    * Handler for the `GET /api/setup` operation.
@@ -2213,6 +2260,10 @@ export type MswHandlerFactories = {
    * Handler for the `GET /api/eggs/{uuid}` operation.
    */
   eggInfo: typeof handleEggInfo;
+  /**
+   * Handler for the `GET /api/eggs/{uuid}/source` operation.
+   */
+  eggSource: typeof handleEggSource;
 };
 
 export type CreateMswHandlersResult = {
@@ -2288,7 +2339,8 @@ export function createMswHandlers(
     listEggs: wrap(handleListEggs),
     createEgg: wrap(handleCreateEgg),
     editEgg: wrap(handleEditEgg),
-    eggInfo: wrap(handleEggInfo)
+    eggInfo: wrap(handleEggInfo),
+    eggSource: wrap(handleEggSource)
   };
   const all: CreateMswHandlersResult['all'] = (options = {}) => {
     type OverrideValue<R> = R | [response?: R, options?: RequestHandlerOptions];
@@ -2316,6 +2368,7 @@ export function createMswHandlers(
       invoke(pick.resetPassword, overrides.resetPassword),
       invoke(pick.userInfo, overrides.userInfo),
       invoke(pick.nodeTokenRegenerate, overrides.nodeTokenRegenerate),
+      invoke(pick.eggSource, overrides.eggSource),
       invoke(pick.getOidcSettings, overrides.getOidcSettings),
       invoke(pick.initOidc, overrides.initOidc),
       invoke(pick.key, overrides.key),

@@ -5,22 +5,34 @@ import {
 } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
 import type { EggListItem } from '$lib/client';
+import type { EggUpdate } from './update';
 import MutedCell from './MutedCell.svelte';
 import NameCell from './NameCell.svelte';
 
 export const columns = ({
   canEdit,
-  deleteEgg
+  deleteEgg,
+  updates = {},
+  failed = {},
+  review
 }: {
   canEdit: boolean;
   deleteEgg: (egg: EggListItem) => void;
+  updates?: Record<string, EggUpdate>;
+  failed?: Record<string, string>;
+  review?: (update: EggUpdate) => void;
 }): TableColumnDef<EggListItem>[] => [
   {
     ...createColumnHeader<EggListItem>('name', 'Name'),
     cell: ({ row }) =>
       renderComponent(NameCell, {
+        failed: failed[row.original.uuid],
         href: `/eggs/${row.original.uuid}`,
-        name: row.original.name
+        name: row.original.name,
+        onreview:
+          updates[row.original.uuid] && review
+            ? () => review(updates[row.original.uuid])
+            : undefined
       })
   },
   {
