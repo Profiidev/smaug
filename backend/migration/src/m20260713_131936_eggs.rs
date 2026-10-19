@@ -3,7 +3,7 @@ use sea_orm_migration::{prelude::*, schema::*};
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const EGG_VARIABLE_ENV_INDEX_NAME: &str = "egg_variable.egg_id_env_variable";
+const EGG_VARIABLE_ENV_INDEX_NAME: &str = "egg_variable_egg_id_env_variable";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
