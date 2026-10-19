@@ -87,3 +87,27 @@ impl Config {
     config
   }
 }
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn default_values() {
+    let config = Config::default();
+    assert_eq!(config.db_url, "");
+    assert_eq!(config.admin_group, "Admin");
+    assert_eq!(config.metrics.metrics_name, "smaug");
+    assert_eq!(config.auth.auth_pepper, "__smaug_PEPPER__");
+    assert_eq!(config.auth.auth_jwt_expiration, 60 * 60 * 24);
+  }
+
+  #[test]
+  #[should_panic(expected = "Database URL is not set")]
+  fn parse_requires_db_url() {
+    // ponytail: mutates the process env; safe under nextest (one process per test),
+    // and no other unit test reads DB_URL
+    unsafe { std::env::set_var("DB_URL", "") };
+    Config::parse();
+  }
+}

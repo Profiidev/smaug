@@ -8,40 +8,11 @@ export type Scenario =
   | 'at-limit'
   | 'transfer-at-limit';
 
-/**
- * List data only varies between `default` and `empty`; the `readonly` scenario
- * reuses the default lists and only changes the note *detail* payload (see
- * `isReadonlyNote`), so a viewer can be exercised without new list fixtures.
- */
+/** List data only varies between `default` and `empty`. */
 export const scenarioOf = (
   cookies: Record<string, string>
 ): 'default' | 'empty' =>
   cookies.mock_scenario === 'empty' ? 'empty' : 'default';
-
-export const notesScenarioOf = (
-  cookies: Record<string, string>
-): 'default' | 'empty' | 'at-limit' => {
-  if (cookies.mock_scenario === 'empty') {
-    return 'empty';
-  }
-  if (cookies.mock_scenario === 'at-limit') {
-    return 'at-limit';
-  }
-  return 'default';
-};
-
-/** True when the note detail should be served as a view-only (can_edit) note. */
-export const isReadonlyNote = (cookies: Record<string, string>): boolean =>
-  cookies.mock_scenario === 'readonly';
-
-/**
- * The public-share page treats a user whose `info` falls back to the unknown
- * email as an anonymous visitor (and keeps them on the page); any other user is
- * redirected to the authenticated note view. The `mock_anon` cookie makes the
- * `info` endpoint report no session so the anonymous branch renders.
- */
-export const isAnonymous = (cookies: Record<string, string>): boolean =>
-  cookies.mock_anon === '1';
 
 /** Admin user with every permission, so admin pages render full controls. */
 export const adminUser = {
@@ -52,13 +23,16 @@ export const adminUser = {
   uuid: 'user-admin'
 };
 
-/** `readonly` scenario: the admin minus `egg:edit`, for read-only egg pages. */
+/**
+ * `readonly` scenario: the admin minus `egg:edit` and `node:edit`, for
+ * read-only egg and node pages.
+ */
 export const userOf = (cookies: Record<string, string>) =>
   cookies.mock_scenario === 'readonly'
     ? {
         ...adminUser,
         permissions: adminUser.permissions.filter(
-          (p) => p !== Permission.EGG_EDIT
+          (p) => p !== Permission.EGG_EDIT && p !== Permission.NODE_EDIT
         )
       }
     : adminUser;
@@ -170,12 +144,6 @@ export const userDetails = {
 };
 
 export const simpleUsers = { default: [simpleUser], empty: [] as unknown[] };
-// The note owner (simpleUser) plus another user, so the note's share control
-// Has someone to share with (the owner is filtered out of the options).
-export const noteUsers = {
-  default: [simpleUser, { id: 'user-2', name: 'Cara User' }],
-  empty: [] as unknown[]
-};
 export const simpleGroups = { default: [simpleGroup], empty: [] as unknown[] };
 
 // Eggs. `eggInfo` is the API shape (config as objects, no `meta.version`).
@@ -242,3 +210,39 @@ export const eggInfo = {
     }
   ]
 };
+
+// Nodes. `node-missing` answers 404 (see handlers).
+export const nodeInfo = {
+  address: 'node1.example.com',
+  connected: true,
+  cpu_limit: null,
+  disk_limit_mb: null,
+  id: 'node-1',
+  memory_limit_mb: null,
+  name: 'Node One',
+  port: 443,
+  secure: true,
+  token: 'node-token-123'
+};
+
+export const nodeList = {
+  default: [
+    nodeInfo,
+    {
+      address: '10.0.0.2',
+      connected: false,
+      cpu_limit: 2000,
+      disk_limit_mb: 10_000,
+      id: 'node-2',
+      memory_limit_mb: 4096,
+      name: 'Node Two',
+      port: 8000,
+      secure: false,
+      token: 'node-token-456'
+    }
+  ],
+  empty: [] as unknown[]
+};
+
+export const generalSettings = { site_url: 'https://smaug.example/' };
+export const userSettings = { from_env: [] as string[], settings: {} };

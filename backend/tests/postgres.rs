@@ -166,3 +166,62 @@ async fn pg_egg_flow() {
     StatusCode::NOT_FOUND
   );
 }
+
+#[tokio::test]
+async fn pg_node_flow() {
+  let (server, _) = TestServer::with_admin(TestServer::start_pg().await).await;
+  let body = |name: &str| {
+    json!({
+      "name": name, "address": "http://127.0.0.1:1", "secure": false,
+      "disk_limit_mb": 1024.0, "memory_limit_mb": null, "cpu_limit": 2
+    })
+  };
+
+  let resp = server.post("/nodes", body("alpha")).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  let uuid: Uuid = resp.json::<Value>().await.unwrap()["uuid"]
+    .as_str()
+    .unwrap()
+    .parse()
+    .unwrap();
+  assert_eq!(
+    server.post("/nodes", body("alpha")).await.status(),
+    StatusCode::CONFLICT
+  );
+
+  let list: Value = server.get("/nodes").await.json().await.unwrap();
+  assert_eq!(list[0]["id"].as_str().unwrap(), uuid.to_string());
+  assert_eq!(list[0]["port"], 1);
+  assert_eq!(list[0]["disk_limit_mb"], 1024.0);
+
+  let mut update = body("alpha 2");
+  update["memory_limit_mb"] = json!(512.0);
+  // Above i16: the port column must be a full integer on Postgres.
+  update["address"] = json!("http://127.0.0.1:40000");
+  let resp = server.post(&format!("/nodes/{uuid}"), update).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  let info: Value = server
+    .get(&format!("/nodes/{uuid}"))
+    .await
+    .json()
+    .await
+    .unwrap();
+  assert_eq!(info["name"], "alpha 2");
+  assert_eq!(info["memory_limit_mb"], 512.0);
+  assert_eq!(info["cpu_limit"], 2);
+  assert_eq!(info["port"], 40000);
+
+  let resp = server.delete("/nodes", json!({ "uuid": uuid })).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  assert_eq!(
+    server.get(&format!("/nodes/{uuid}")).await.status(),
+    StatusCode::NOT_FOUND
+  );
+  assert_eq!(
+    server
+      .delete("/nodes", json!({ "uuid": uuid }))
+      .await
+      .status(),
+    StatusCode::NOT_FOUND
+  );
+}

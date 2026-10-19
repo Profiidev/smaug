@@ -90,7 +90,11 @@
     </div>
   {/snippet}
   {#snippet footer({ isLoading }: { isLoading: boolean })}
-    <Button class="ml-auto cursor-pointer" type="submit" disabled={isLoading}>
+    <Button
+      class="ml-auto cursor-pointer"
+      type="submit"
+      disabled={isLoading || readonly}
+    >
       {#if isLoading}
         <Spinner />
       {:else}

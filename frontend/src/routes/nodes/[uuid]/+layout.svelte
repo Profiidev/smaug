@@ -62,7 +62,7 @@
     });
     isLoading = false;
 
-    if (ret) {
+    if (ret.error) {
       return { error: 'Failed to delete node' };
     } else {
       toast.success(`Node ${node?.name} deleted successfully`);

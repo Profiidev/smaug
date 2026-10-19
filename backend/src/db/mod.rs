@@ -220,4 +220,80 @@ mod test {
     );
     assert_eq!(eggs.list_eggs().await.unwrap(), [a]);
   }
+
+  fn node(name: &str) -> crate::db::node::Node {
+    crate::db::node::Node {
+      id: Uuid::now_v7(),
+      name: name.into(),
+      address: "127.0.0.1".into(),
+      port: 8080,
+      secure: false,
+      disk_limit_mb: Some(1.5),
+      memory_limit_mb: None,
+      cpu_limit: Some(2),
+      token: "t".into(),
+    }
+  }
+
+  #[tokio::test]
+  async fn pg_node_table() {
+    use crate::db::DBTrait;
+    use sea_orm::{DbErr, IntoActiveModel, Set};
+
+    let (conn, _pg) = test_pg_db().await;
+    let nodes = conn.node();
+    assert!(nodes.list_nodes().await.unwrap().is_empty());
+
+    let a = node("a");
+    nodes.create_node(a.clone()).await.unwrap();
+    let b = node("b");
+    let b_id = b.id;
+    nodes.create_node(b.clone()).await.unwrap();
+
+    let found = nodes.find_by_name("a".into()).await.unwrap();
+    assert_eq!(found, entity::node::Model::from(a.clone()));
+    assert!(matches!(
+      nodes.find_by_name("missing".into()).await,
+      Err(DbErr::RecordNotFound(_))
+    ));
+    assert_eq!(
+      nodes.find_by_id(b.id).await.unwrap(),
+      entity::node::Model::from(b)
+    );
+    assert_eq!(
+      nodes.find_by_id(Uuid::now_v7()).await.unwrap_err().status,
+      http::StatusCode::NOT_FOUND
+    );
+
+    let mut ids: Vec<_> = nodes
+      .list_nodes()
+      .await
+      .unwrap()
+      .into_iter()
+      .map(|n| n.id)
+      .collect();
+    ids.sort();
+    assert_eq!(ids, [a.id, b_id]);
+
+    let mut model = found.into_active_model();
+    model.name = Set("a2".into());
+    model.port = Set(9000);
+    model.disk_limit_mb = Set(None);
+    nodes.update_node(model).await.unwrap();
+    let updated = nodes.find_by_id(a.id).await.unwrap();
+    assert_eq!(
+      (updated.name.as_str(), updated.port, updated.disk_limit_mb),
+      ("a2", 9000, None)
+    );
+    assert_eq!(updated.token, "t");
+
+    // delete reports the rows affected
+    assert_eq!(nodes.delete_node(Uuid::now_v7()).await.unwrap(), 0);
+    assert_eq!(nodes.delete_node(a.id).await.unwrap(), 1);
+    assert_eq!(
+      nodes.find_by_id(a.id).await.unwrap_err().status,
+      http::StatusCode::NOT_FOUND
+    );
+    assert_eq!(nodes.list_nodes().await.unwrap().len(), 1);
+  }
 }

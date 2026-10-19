@@ -40,7 +40,7 @@ impl WingsConnection {
   pub async fn new(
     uuid: Uuid,
     addr: &str,
-    port: i16,
+    port: u16,
     secure: bool,
     token: String,
     updater: Updater,

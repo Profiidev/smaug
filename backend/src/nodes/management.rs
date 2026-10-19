@@ -75,7 +75,7 @@ async fn create_node(
     .host()
     .status_context(StatusCode::BAD_REQUEST, "Address must contain a valid host")?
     .to_string();
-  let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 }) as i16;
+  let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 });
 
   let mut raw_token = [0u8; 32];
   rand::rng().fill_bytes(&mut raw_token);
@@ -112,7 +112,7 @@ pub struct NodeInfo {
   pub id: Uuid,
   pub name: String,
   pub address: String,
-  pub port: i16,
+  pub port: u16,
   pub secure: bool,
   pub disk_limit_mb: Option<f64>,
   pub memory_limit_mb: Option<f64>,
@@ -165,9 +165,10 @@ async fn delete_node(
   updater: Updater,
   Json(data): Json<DeleteNode>,
 ) -> Result<()> {
+  if db.node().delete_node(data.uuid).await? == 0 {
+    bail!(NOT_FOUND, "Node not found");
+  }
   wings.disconnect(data.uuid).await?;
-
-  db.node().delete_node(data.uuid).await?;
   info!("Deleted node with ID {}", data.uuid);
 
   updater
@@ -241,9 +242,12 @@ async fn update_node(
     .host()
     .status_context(StatusCode::BAD_REQUEST, "Address must contain a valid host")?
     .to_string();
-  let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 }) as i16;
+  let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 });
 
-  if read_node.address != address || read_node.port != port || read_node.secure != data.secure {
+  if read_node.address != address
+    || read_node.port != i32::from(port)
+    || read_node.secure != data.secure
+  {
     wings.disconnect(read_node.id).await.ok();
 
     wings
@@ -251,7 +255,7 @@ async fn update_node(
       .await?;
 
     node.address = Set(address);
-    node.port = Set(port);
+    node.port = Set(i32::from(port));
     node.secure = Set(data.secure);
   }
 

@@ -13,12 +13,6 @@ const client: Client = createClient(createConfig<ClientOptions>()),
    */
   updaterWs = ws.link('*/api/ws/updater'),
   /**
-   * No-op mock for the public-note update channel. The public-share page opens
-   * this socket to learn when the owner revokes access; accept it and stay quiet
-   * so the page renders without a dangling connection error.
-   */
-  publicUpdaterWs = ws.link('*/api/notes/update/*'),
-  /**
    * App-login device channel. The login page opens this socket and renders a QR
    * code from the first message it receives, so emit a fake device code on
    * connection to drive the "App Login" flow.
@@ -35,11 +29,11 @@ const client: Client = createClient(createConfig<ClientOptions>()),
 client.setConfig({ ...original, baseUrl: '*' });
 
 const j = (d: unknown) => HttpResponse.json(d as never) as never,
+  ok = () => new HttpResponse(null, { status: 200 }) as never,
   scn = (cookies: Record<string, string>) => data.scenarioOf(cookies);
 
 export const handlers = [
   updaterWs.addEventListener('connection', () => {}),
-  publicUpdaterWs.addEventListener('connection', () => {}),
   // oxlint-disable-next-line no-shadow
   appLoginWs.addEventListener('connection', ({ client }) => {
     client.send('device-login-code');
@@ -47,14 +41,12 @@ export const handlers = [
 
   gen.handleIsSetup(({ cookies }) => j(data.isSetupOf(cookies))),
   gen.handleGetOidcSettings(() => j(data.oidcSettings)),
-  gen.handleInfo(({ cookies }) =>
-    data.isAnonymous(cookies)
-      ? (new HttpResponse(null, { status: 401 }) as never)
-      : j(data.userOf(cookies))
-  ),
+  gen.handleInfo(({ cookies }) => j(data.userOf(cookies))),
   gen.handleAuthConfig(() => j(data.authConfig)),
   gen.handleMailActive(({ cookies }) => j(data.mailActiveOf(cookies))),
   gen.handleGetMailSettings(() => j(data.mailSettings)),
+  gen.handleGetGeneralSettings(() => j(data.generalSettings)),
+  gen.handleGetUserSettings(() => j(data.userSettings)),
   gen.handleKey(() => j({ key: 'test-public-key' })),
 
   // Lists (scenario-aware: `mock_scenario=empty` cookie => empty state).
@@ -85,13 +77,31 @@ export const handlers = [
       : j({ ...data.eggInfo, uuid: params.uuid })
   ),
   gen.handleCreateEgg(() => j({ uuid: 'egg-new' })),
-  gen.handleEditEgg(() => new HttpResponse(null, { status: 200 }) as never),
-  gen.handleDeleteEgg(() => new HttpResponse(null, { status: 200 }) as never),
+  gen.handleEditEgg(ok),
+  gen.handleDeleteEgg(ok),
+
+  // Nodes. `node-missing` answers 404 so the detail redirect can be exercised.
+  gen.handleListNodes(({ cookies }) => j(data.nodeList[scn(cookies)])),
+  gen.handleNodeInfo(({ params }) =>
+    params.uuid === 'node-missing'
+      ? (new HttpResponse(null, { status: 404 }) as never)
+      : j({ ...data.nodeInfo, id: params.uuid })
+  ),
+  gen.handleCreateNode(() => j({ uuid: 'node-new' })),
+  gen.handleUpdateNode(ok),
+  gen.handleDeleteNode(ok),
 
   // Mutations return a generic success so submit flows resolve.
   gen.handleCreateGroup(() => j({ uuid: 'group-new' })),
   gen.handleCreateUser(() => j({ uuid: 'user-new' })),
-  gen.handleSendResetLink(() => new HttpResponse(null, { status: 200 })),
+  gen.handleEditGroup(ok),
+  gen.handleDeleteGroup(ok),
+  gen.handleEditUser(ok),
+  gen.handleDeleteUser(ok),
+  gen.handleResetUserAvatar(ok),
+  gen.handleChangeUserEmail(ok),
+  gen.handleSaveMailSettings(ok),
+  gen.handleSendResetLink(ok),
 
   // Catch-all: any other `/api/*` call resolves with an empty 200 so unmocked
   // Endpoints never crash a page render.

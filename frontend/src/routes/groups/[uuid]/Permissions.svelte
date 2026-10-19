@@ -47,6 +47,15 @@
         write_key: 'node$edit',
         write_label: 'Edit Node'
       })}
+      {@render permission({
+        header: 'Eggs',
+        read: Permission.EGG_VIEW,
+        read_key: 'egg$view',
+        read_label: 'View Egg',
+        write: Permission.EGG_EDIT,
+        write_key: 'egg$edit',
+        write_label: 'Edit Egg'
+      })}
     </Collapsible.Content>
   </Collapsible.Root>
   <Collapsible.Root class="my-1 w-full" open={true}>

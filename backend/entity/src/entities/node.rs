@@ -11,7 +11,7 @@ pub struct Model {
   pub id: Uuid,
   pub name: String,
   pub address: String,
-  pub port: i16,
+  pub port: i32,
   pub secure: bool,
   #[sea_orm(column_type = "Double", nullable)]
   pub disk_limit_mb: Option<f64>,
