@@ -165,9 +165,10 @@ async fn delete_node(
   updater: Updater,
   Json(data): Json<DeleteNode>,
 ) -> Result<()> {
+  if db.node().delete_node(data.uuid).await? == 0 {
+    bail!(NOT_FOUND, "Node not found");
+  }
   wings.disconnect(data.uuid).await?;
-
-  db.node().delete_node(data.uuid).await?;
   info!("Deleted node with ID {}", data.uuid);
 
   updater

@@ -58,3 +58,19 @@ pub fn client() -> Client {
     .build()
     .expect("Failed to build HTTP client")
 }
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn permissions_include_app_and_centaurus_ones() {
+    let perms = permissions();
+    for p in ["node:view", "node:edit", "egg:view", "egg:edit"] {
+      assert!(perms.contains(&p), "missing {p}");
+    }
+    let base = permission::permissions();
+    assert!(base.iter().all(|p| perms.contains(p)));
+    assert_eq!(perms.len(), base.len() + 4);
+  }
+}

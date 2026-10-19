@@ -53,9 +53,13 @@ impl<'db> NodeTable<'db> {
     Ok(nodes.into_iter().map(Node::from).collect())
   }
 
-  pub async fn delete_node(&self, id: Uuid) -> Result<(), DbErr> {
-    node::Entity::delete_by_id(id).exec(self.db).await?;
-    Ok(())
+  pub async fn delete_node(&self, id: Uuid) -> Result<u64, DbErr> {
+    Ok(
+      node::Entity::delete_by_id(id)
+        .exec(self.db)
+        .await?
+        .rows_affected,
+    )
   }
 
   pub async fn update_node(&self, model: node::ActiveModel) -> Result<(), DbErr> {
