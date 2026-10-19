@@ -50,7 +50,7 @@ export const handlers = [
   gen.handleInfo(({ cookies }) =>
     data.isAnonymous(cookies)
       ? (new HttpResponse(null, { status: 401 }) as never)
-      : j(data.adminUser)
+      : j(data.userOf(cookies))
   ),
   gen.handleAuthConfig(() => j(data.authConfig)),
   gen.handleMailActive(({ cookies }) => j(data.mailActiveOf(cookies))),
@@ -76,6 +76,17 @@ export const handlers = [
     )
   ),
   gen.handleUserInfo(() => j(data.userDetails)),
+
+  // Eggs. `egg-missing` answers 404 so the detail redirect can be exercised.
+  gen.handleListEggs(({ cookies }) => j(data.eggList[scn(cookies)])),
+  gen.handleEggInfo(({ params }) =>
+    params.uuid === 'egg-missing'
+      ? (new HttpResponse(null, { status: 404 }) as never)
+      : j({ ...data.eggInfo, uuid: params.uuid })
+  ),
+  gen.handleCreateEgg(() => j({ uuid: 'egg-new' })),
+  gen.handleEditEgg(() => new HttpResponse(null, { status: 200 }) as never),
+  gen.handleDeleteEgg(() => new HttpResponse(null, { status: 200 }) as never),
 
   // Mutations return a generic success so submit flows resolve.
   gen.handleCreateGroup(() => j({ uuid: 'group-new' })),

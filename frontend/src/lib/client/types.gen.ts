@@ -4,86 +4,77 @@ export type ClientOptions = {
   baseUrl: 'http://localhost:5173' | (string & {});
 };
 
-export type AccountUpdate = {
-  username: string;
+export type SetupPayload = {
+  admin_username: string;
+  admin_password: string;
+  admin_email: string;
+};
+
+export type IsSetupResponse = {
+  is_setup: boolean;
+  db_backend: string;
+};
+
+export type OidcSetupResponse = {
+  settings: UserSettings;
+  from_env: Array<string>;
+  site_url: string;
+};
+
+export type UserSettings = {
+  oidc_enabled?: boolean | null;
+  oidc_issuer?: string | null;
+  oidc_client_id?: string | null;
+  oidc_client_secret?: string | null;
+  oidc_scopes?: string | null;
+  oidc_group_sync?: boolean | null;
+  oidc_group_claim?: string | null;
+  oidc_image_sync?: boolean | null;
+  oidc_pkce?: boolean | null;
+  sso_instant_redirect?: boolean | null;
+  sso_create_user?: boolean | null;
+};
+
+export type LoginReq = {
+  email: string;
+  password: string;
+};
+
+export type KeyRes = {
+  key: string;
+};
+
+export type OidcUrlQuery = {
+  redirect_to?: string | null;
+};
+
+export type OidcCallbackQuery = {
+  code?: string | null;
+  state?: string | null;
+  error?: string | null;
 };
 
 export type AuthConfig = {
+  sso_type: SsoType;
   instant_redirect: boolean;
   mail_enabled: boolean;
-  sso_type: SsoType;
 };
 
-export type AvatarPath = {
-  uuid: string;
-};
+export const SsoType = { OIDC: 'Oidc', NONE: 'None' } as const;
 
-export type AvatarUpdate = {
-  avatar: string;
-};
+export type SsoType = (typeof SsoType)[keyof typeof SsoType];
 
-export type ChangeUserEmail = {
-  new_email: string;
-  uuid: string;
-};
-
-export type CreateGroupRequest = {
-  name: string;
-};
-
-export type CreateNode = {
-  address: string;
-  cpu_limit?: number | null;
-  disk_limit_mb?: number | null;
-  memory_limit_mb?: number | null;
-  name: string;
-  secure: boolean;
-};
-
-export type CreateNodeRes = {
-  uuid: string;
-};
-
-export type CreateUser = {
-  email: string;
-  name: string;
-  password?: string | null;
-};
-
-export type CreateUserResponse = {
-  uuid: string;
-};
-
-export type DeleteGroupRequest = {
-  uuid: string;
-};
-
-export type DeleteNode = {
-  uuid: string;
-};
-
-export type DeleteUserRequest = {
-  uuid: string;
-};
-
-export type DetailUserInfo = {
-  email: string;
-  groups: Array<SimpleGroupInfo>;
-  name: string;
-  oidc_user: boolean;
-  permissions: Array<string>;
-  uuid: string;
-};
-
-export type EditGroupRequest = {
-  name: string;
-  permissions: Array<string>;
-  users: Array<string>;
-  uuid: string;
+export type PasswordUpdate = {
+  old_password: string;
+  new_password: string;
 };
 
 export type EmailChange = {
   new_email: string;
+};
+
+export type AccountUpdate = {
+  username: string;
 };
 
 export type EmailChangeConfirm = {
@@ -91,24 +82,122 @@ export type EmailChangeConfirm = {
   old_code: string;
 };
 
+export type AvatarUpdate = {
+  avatar: string;
+};
+
+export type UserInfo = {
+  uuid: string;
+  name: string;
+  email: string;
+  permissions: Array<string>;
+  oidc_user: boolean;
+};
+
+export type AvatarPath = {
+  uuid: string;
+};
+
+export type UserAvatarResetRequest = {
+  uuid: string;
+};
+
+export type UserListInfo = {
+  uuid: string;
+  name: string;
+  email: string;
+  groups: Array<SimpleGroupInfo>;
+};
+
+export type SimpleGroupInfo = {
+  uuid: string;
+  name: string;
+};
+
+export type CreateUser = {
+  name: string;
+  email: string;
+  password?: string | null;
+};
+
+export type CreateUserResponse = {
+  uuid: string;
+};
+
+export type DeleteUserRequest = {
+  uuid: string;
+};
+
+export type UserEditReq = {
+  uuid: string;
+  name: string;
+  groups: Array<string>;
+};
+
+export type UserViewPath = {
+  uuid: string;
+};
+
+export type DetailUserInfo = {
+  uuid: string;
+  name: string;
+  email: string;
+  groups: Array<SimpleGroupInfo>;
+  permissions: Array<string>;
+  oidc_user: boolean;
+};
+
+export type MailActiveResponse = {
+  active: boolean;
+};
+
+export type ResetUserPassword = {
+  uuid: string;
+  new_password: string;
+};
+
+export type ChangeUserEmail = {
+  uuid: string;
+  new_email: string;
+};
+
 export type GeneralSettings = {
   site_url: string;
 };
 
-export type GroupCreateResponse = {
-  uuid: string;
+export type UserSettingsResponse = {
+  settings: UserSettings;
+  from_env: Array<string>;
 };
 
-export type GroupDetails = {
-  id: string;
-  name: string;
-  permissions: Array<string>;
-  users: Array<SimpleUserInfo>;
+export type MailSettingsResponse = {
+  settings: MailSettings;
+  from_env: Array<string>;
 };
 
-export type GroupDetailsResponse = {
-  admin_group: string;
-  group: GroupDetails;
+export type MailSettings = {
+  smtp_enabled?: boolean | null;
+  smtp_server?: string | null;
+  smtp_port?: number | null;
+  smtp_username?: string | null;
+  smtp_password?: string | null;
+  smtp_from_address?: string | null;
+  smtp_from_name?: string | null;
+  smtp_use_tls?: boolean | null;
+};
+
+export type ResetRequest = {
+  email: string;
+};
+
+export type ResetPasswordPayload = {
+  token: string;
+  new_password: string;
+};
+
+export type ListGroupResponse = {
+  groups: Array<GroupInfo>;
+  admin_group?: string | null;
 };
 
 export type GroupInfo = {
@@ -118,176 +207,231 @@ export type GroupInfo = {
   users: Array<SimpleUserInfo>;
 };
 
+export type SimpleUserInfo = {
+  id: string;
+  name: string;
+};
+
+export type CreateGroupRequest = {
+  name: string;
+};
+
+export type GroupCreateResponse = {
+  uuid: string;
+};
+
+export type DeleteGroupRequest = {
+  uuid: string;
+};
+
+export type EditGroupRequest = {
+  uuid: string;
+  name: string;
+  permissions: Array<string>;
+  users: Array<string>;
+};
+
 export type GroupViewPath = {
   uuid: string;
 };
 
-export type IsSetupResponse = {
-  db_backend: string;
-  is_setup: boolean;
+export type GroupDetailsResponse = {
+  group: GroupDetails;
+  admin_group: string;
 };
 
-export type KeyRes = {
-  key: string;
+export type GroupDetails = {
+  id: string;
+  name: string;
+  permissions: Array<string>;
+  users: Array<SimpleUserInfo>;
 };
 
-export type ListGroupResponse = {
-  admin_group?: string | null;
-  groups: Array<GroupInfo>;
+export type CreateNode = {
+  name: string;
+  address: string;
+  secure: boolean;
+  disk_limit_mb?: number | null;
+  memory_limit_mb?: number | null;
+  cpu_limit?: number | null;
 };
 
-export type LoginReq = {
-  email: string;
-  password: string;
-};
-
-export type MailActiveResponse = {
-  active: boolean;
-};
-
-export type MailSettings = {
-  smtp_enabled?: boolean | null;
-  smtp_from_address?: string | null;
-  smtp_from_name?: string | null;
-  smtp_password?: string | null;
-  smtp_port?: number | null;
-  smtp_server?: string | null;
-  smtp_use_tls?: boolean | null;
-  smtp_username?: string | null;
-};
-
-export type MailSettingsResponse = {
-  from_env: Array<string>;
-  settings: MailSettings;
+export type CreateNodeRes = {
+  uuid: string;
 };
 
 export type NodeInfo = {
-  address: string;
-  connected: boolean;
-  cpu_limit?: number | null;
-  disk_limit_mb?: number | null;
   id: string;
-  memory_limit_mb?: number | null;
   name: string;
+  address: string;
   port: number;
   secure: boolean;
+  disk_limit_mb?: number | null;
+  memory_limit_mb?: number | null;
+  cpu_limit?: number | null;
   token: string;
+  connected: boolean;
+};
+
+export type DeleteNode = {
+  uuid: string;
 };
 
 export type NodeInfoRequest = {
   uuid: string;
 };
 
-export type OidcCallbackQuery = {
-  code?: string | null;
-  error?: string | null;
-  state?: string | null;
-};
-
-export type OidcSetupResponse = {
-  from_env: Array<string>;
-  settings: UserSettings;
-  site_url: string;
-};
-
-export type OidcUrlQuery = {
-  redirect_to?: string | null;
-};
-
-export type PasswordUpdate = {
-  new_password: string;
-  old_password: string;
-};
-
-export type ResetPasswordPayload = {
-  new_password: string;
-  token: string;
-};
-
-export type ResetRequest = {
-  email: string;
-};
-
-export type ResetUserPassword = {
-  new_password: string;
-  uuid: string;
-};
-
-export const SsoType = { OIDC: 'Oidc', NONE: 'None' } as const;
-
-export type SsoType = (typeof SsoType)[keyof typeof SsoType];
-
-export type SetupPayload = {
-  admin_email: string;
-  admin_password: string;
-  admin_username: string;
-};
-
-export type SimpleGroupInfo = {
-  name: string;
-  uuid: string;
-};
-
-export type SimpleUserInfo = {
-  id: string;
-  name: string;
-};
-
 export type UpdateNode = {
+  name: string;
   address: string;
-  cpu_limit?: number | null;
+  secure: boolean;
   disk_limit_mb?: number | null;
   memory_limit_mb?: number | null;
+  cpu_limit?: number | null;
+};
+
+export type ListEggsResponse = {
+  eggs: Array<EggListItem>;
+};
+
+export type EggListItem = {
+  uuid: string;
   name: string;
-  secure: boolean;
+  author: string;
+  description?: string | null;
 };
 
-export type UserAvatarResetRequest = {
-  uuid: string;
-};
-
-export type UserEditReq = {
-  groups: Array<string>;
+/**
+ * PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
+ */
+export type EggBody = {
   name: string;
-  uuid: string;
+  author: string;
+  description?: string | null;
+  icon?: string | null;
+  tags?: Array<string>;
+  features?: Array<string> | null;
+  /**
+   * label -> image, order preserved
+   */
+  docker_images: {
+    [key: string]: string;
+  };
+  file_denylist?: Array<string>;
+  /**
+   * label -> command, order preserved
+   */
+  startup_commands: {
+    [key: string]: string;
+  };
+  config: EggConfig;
+  scripts: EggScripts;
+  meta?: EggMeta | null;
+  variables: Array<EggVariable>;
 };
 
-export type UserInfo = {
-  email: string;
+/**
+ * `files`/`startup`/`logs` accept a JSON-encoded string or an object; they
+ * are always stored and returned as objects (or null).
+ */
+export type EggConfig = {
+  files?: unknown;
+  startup?: unknown;
+  logs?: unknown;
+  stop?: string | null;
+};
+
+export type EggScripts = {
+  installation: EggInstallScript;
+};
+
+export type EggInstallScript = {
+  script?: string | null;
+  container: string;
+  entrypoint: string;
+};
+
+export type EggMeta = {
+  update_url?: string | null;
+};
+
+export type EggVariable = {
   name: string;
-  oidc_user: boolean;
-  permissions: Array<string>;
+  description: string;
+  env_variable: string;
+  default_value: string;
+  user_viewable?: boolean;
+  user_editable?: boolean;
+  rules?: Array<string>;
+  sort?: number | null;
+};
+
+export type CreateEggResponse = {
   uuid: string;
 };
 
-export type UserListInfo = {
-  email: string;
-  groups: Array<SimpleGroupInfo>;
+/**
+ * PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
+ */
+export type EditEggRequest = {
+  uuid: string;
   name: string;
+  author: string;
+  description?: string | null;
+  icon?: string | null;
+  tags?: Array<string>;
+  features?: Array<string> | null;
+  /**
+   * label -> image, order preserved
+   */
+  docker_images: {
+    [key: string]: string;
+  };
+  file_denylist?: Array<string>;
+  /**
+   * label -> command, order preserved
+   */
+  startup_commands: {
+    [key: string]: string;
+  };
+  config: EggConfig;
+  scripts: EggScripts;
+  meta?: EggMeta | null;
+  variables: Array<EggVariable>;
+};
+
+export type EggUuid = {
   uuid: string;
 };
 
-export type UserSettings = {
-  oidc_client_id?: string | null;
-  oidc_client_secret?: string | null;
-  oidc_enabled?: boolean | null;
-  oidc_group_claim?: string | null;
-  oidc_group_sync?: boolean | null;
-  oidc_image_sync?: boolean | null;
-  oidc_issuer?: string | null;
-  oidc_pkce?: boolean | null;
-  oidc_scopes?: string | null;
-  sso_create_user?: boolean | null;
-  sso_instant_redirect?: boolean | null;
-};
-
-export type UserSettingsResponse = {
-  from_env: Array<string>;
-  settings: UserSettings;
-};
-
-export type UserViewPath = {
+/**
+ * PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
+ */
+export type EggInfo = {
   uuid: string;
+  name: string;
+  author: string;
+  description?: string | null;
+  icon?: string | null;
+  tags?: Array<string>;
+  features?: Array<string> | null;
+  /**
+   * label -> image, order preserved
+   */
+  docker_images: {
+    [key: string]: string;
+  };
+  file_denylist?: Array<string>;
+  /**
+   * label -> command, order preserved
+   */
+  startup_commands: {
+    [key: string]: string;
+  };
+  config: EggConfig;
+  scripts: EggScripts;
+  meta?: EggMeta | null;
+  variables: Array<EggVariable>;
 };
 
 export type IsSetupData = {
@@ -1733,3 +1877,178 @@ export type UpdateNodeResponses = {
    */
   200: unknown;
 };
+
+export type DeleteEggData = {
+  body: EggUuid;
+  path?: never;
+  query?: never;
+  url: '/api/eggs';
+};
+
+export type DeleteEggErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DeleteEggError = DeleteEggErrors[keyof DeleteEggErrors];
+
+export type DeleteEggResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ListEggsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/eggs';
+};
+
+export type ListEggsErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ListEggsResponses = {
+  200: ListEggsResponse;
+};
+
+export type ListEggsResponse2 = ListEggsResponses[keyof ListEggsResponses];
+
+export type CreateEggData = {
+  /**
+   * PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
+   */
+  body: EggBody;
+  path?: never;
+  query?: never;
+  url: '/api/eggs';
+};
+
+export type CreateEggErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateEggError = CreateEggErrors[keyof CreateEggErrors];
+
+export type CreateEggResponses = {
+  200: CreateEggResponse;
+};
+
+export type CreateEggResponse2 = CreateEggResponses[keyof CreateEggResponses];
+
+export type EditEggData = {
+  /**
+   * PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
+   */
+  body: EditEggRequest;
+  path?: never;
+  query?: never;
+  url: '/api/eggs';
+};
+
+export type EditEggErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type EditEggError = EditEggErrors[keyof EditEggErrors];
+
+export type EditEggResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type EggInfoData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/eggs/{uuid}';
+};
+
+export type EggInfoErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type EggInfoResponses = {
+  /**
+   * PLCN_v3 egg minus `_comment`, `exported_at` and `uuid`.
+   */
+  200: EggInfo;
+};
+
+export type EggInfoResponse = EggInfoResponses[keyof EggInfoResponses];

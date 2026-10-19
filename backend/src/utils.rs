@@ -31,16 +31,26 @@ pub enum UpdateMessage {
   Nodes {
     uuid: Uuid,
   },
+  Eggs {
+    uuid: Uuid,
+  },
 }
 
 pub fn permissions() -> Vec<&'static str> {
   let mut perms = permission::permissions();
-  perms.extend_from_slice(&[NodeViewPerm::name(), NodeEditPerm::name()]);
+  perms.extend_from_slice(&[
+    NodeViewPerm::name(),
+    NodeEditPerm::name(),
+    EggViewPerm::name(),
+    EggEditPerm::name(),
+  ]);
   perms
 }
 
 permission!(NodeViewPerm, "node:view");
 permission!(NodeEditPerm, "node:edit");
+permission!(EggViewPerm, "egg:view");
+permission!(EggEditPerm, "egg:edit");
 
 pub fn client() -> Client {
   Client::builder()

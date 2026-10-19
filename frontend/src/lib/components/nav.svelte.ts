@@ -1,6 +1,7 @@
 import Settings from '@lucide/svelte/icons/settings';
 import House from '@lucide/svelte/icons/house';
 import Server from '@lucide/svelte/icons/server';
+import Egg from '@lucide/svelte/icons/egg';
 import { Permission } from '$lib/permissions.svelte';
 import Users from '@lucide/svelte/icons/users';
 import User from '@lucide/svelte/icons/user';
@@ -18,6 +19,12 @@ export const items: NavGroup[] = [
         icon: Server,
         label: 'Nodes',
         requiredPermission: Permission.NODE_VIEW
+      },
+      {
+        href: '/eggs',
+        icon: Egg,
+        label: 'Eggs',
+        requiredPermission: Permission.EGG_VIEW
       }
     ],
     label: 'Servers'

@@ -6,12 +6,17 @@ export enum UpdateType {
   User = 'User',
   UserPermissions = 'UserPermissions',
   Group = 'Group',
-  Nodes = 'Nodes'
+  Nodes = 'Nodes',
+  Eggs = 'Eggs'
 }
 
 export type UpdateMessage =
   | {
-      type: UpdateType.User | UpdateType.Group | UpdateType.Nodes;
+      type:
+        | UpdateType.User
+        | UpdateType.Group
+        | UpdateType.Nodes
+        | UpdateType.Eggs;
       uuid: string;
     }
   | {
@@ -53,6 +58,11 @@ const handleMessage = (msg: UpdateMessage, user: string) => {
     case UpdateType.Nodes: {
       invalidate('/api/nodes').catch(() => {});
       invalidate(`/api/nodes/${msg.uuid}`).catch(() => {});
+      break;
+    }
+    case UpdateType.Eggs: {
+      invalidate('/api/eggs').catch(() => {});
+      invalidate(`/api/eggs/${msg.uuid}`).catch(() => {});
       break;
     }
     default: {

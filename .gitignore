@@ -5,7 +5,6 @@ backend/Cargo.lock
 postgres/
 /test/
 /result
-egg.d.ts
 
 # Devenv
 .devenv*

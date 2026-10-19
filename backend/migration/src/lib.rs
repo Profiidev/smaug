@@ -3,6 +3,7 @@ pub use sea_orm_migration::prelude::*;
 pub struct Migrator;
 
 mod m20260123_145152_node;
+mod m20260713_131936_eggs;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -16,6 +17,7 @@ impl MigratorTrait for Migrator {
       Box::new(centaurus::db::migrations::m5_setup::Migration),
       Box::new(centaurus::db::migrations::m6_user_oidc_subject::Migration),
       Box::new(m20260123_145152_node::Migration),
+      Box::new(m20260713_131936_eggs::Migration),
     ]
   }
 }

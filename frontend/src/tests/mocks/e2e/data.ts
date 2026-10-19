@@ -52,6 +52,17 @@ export const adminUser = {
   uuid: 'user-admin'
 };
 
+/** `readonly` scenario: the admin minus `egg:edit`, for read-only egg pages. */
+export const userOf = (cookies: Record<string, string>) =>
+  cookies.mock_scenario === 'readonly'
+    ? {
+        ...adminUser,
+        permissions: adminUser.permissions.filter(
+          (p) => p !== Permission.EGG_EDIT
+        )
+      }
+    : adminUser;
+
 const simpleUser = { id: 'user-1', name: 'Bob User' },
   simpleGroup = { name: 'Admins', uuid: 'group-admins' };
 
@@ -166,3 +177,68 @@ export const noteUsers = {
   empty: [] as unknown[]
 };
 export const simpleGroups = { default: [simpleGroup], empty: [] as unknown[] };
+
+// Eggs. `eggInfo` is the API shape (config as objects, no `meta.version`).
+export const eggList = {
+  default: {
+    eggs: [
+      {
+        author: 'dev@example.com',
+        description: 'Paper Minecraft server',
+        name: 'Paper',
+        uuid: 'egg-paper'
+      },
+      {
+        author: 'ops@example.com',
+        description: null,
+        name: 'Valheim',
+        uuid: 'egg-valheim'
+      }
+    ]
+  },
+  empty: { eggs: [] as unknown[] }
+};
+
+export const eggInfo = {
+  author: 'dev@example.com',
+  config: {
+    files: {
+      'server.properties': {
+        find: { 'server-port': '{{server.allocations.default.port}}' },
+        parser: 'properties'
+      }
+    },
+    logs: {},
+    startup: { done: ')! For help, type ' },
+    stop: 'stop'
+  },
+  description: 'Paper Minecraft server',
+  docker_images: { 'Java 21': 'ghcr.io/pelican-eggs/yolks:java_21' },
+  features: ['eula'],
+  file_denylist: [],
+  icon: null,
+  meta: { update_url: null },
+  name: 'Paper',
+  scripts: {
+    installation: {
+      container: 'ghcr.io/pelican-eggs/installers:java_21',
+      entrypoint: 'bash',
+      script: 'echo install'
+    }
+  },
+  startup_commands: { Default: 'java -jar {{SERVER_JARFILE}}' },
+  tags: ['minecraft'],
+  uuid: 'egg-paper',
+  variables: [
+    {
+      default_value: 'server.jar',
+      description: 'Jar to run',
+      env_variable: 'SERVER_JARFILE',
+      name: 'Server Jar File',
+      rules: ['required', 'string'],
+      sort: 1,
+      user_editable: true,
+      user_viewable: true
+    }
+  ]
+};
