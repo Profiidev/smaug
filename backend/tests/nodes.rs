@@ -40,6 +40,21 @@ async fn info(server: &TestServer, uuid: Uuid) -> Value {
 }
 
 #[tokio::test]
+async fn node_ports_above_i16_range_round_trip() {
+  let (server, _) = TestServer::start_with_admin().await;
+  let mut body = node_body("high-port");
+  body["address"] = json!("http://127.0.0.1:65535");
+  let uuid = create(&server, body).await;
+  assert_eq!(info(&server, uuid).await["port"], json!(65535));
+
+  let mut update = node_body("high-port");
+  update["address"] = json!("http://127.0.0.1:40000");
+  let resp = server.post(&format!("/nodes/{uuid}"), update).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  assert_eq!(info(&server, uuid).await["port"], json!(40000));
+}
+
+#[tokio::test]
 async fn node_crud_flow() {
   let (server, _) = TestServer::start_with_admin().await;
   let list: Value = server.get("/nodes").await.json().await.unwrap();
@@ -315,15 +330,8 @@ async fn node_changes_are_broadcast() {
 // the handshake callback's error type is fixed by tungstenite
 #[allow(clippy::result_large_err)]
 async fn fake_wings(token: String) -> u16 {
-  // ponytail: ports are stored as i16, so pick one below 32768 instead of an ephemeral one
-  let mut listener = None;
-  for port in 20000..32000 {
-    if let Ok(l) = TcpListener::bind(("127.0.0.1", port)).await {
-      listener = Some(l);
-      break;
-    }
-  }
-  let listener = listener.expect("no free port below 32768");
+  // Ephemeral ports are usually above 32767, which also covers ports that do not fit in i16.
+  let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
   let port = listener.local_addr().unwrap().port();
 
   spawn(async move {

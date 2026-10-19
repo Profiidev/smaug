@@ -355,6 +355,9 @@ test.describe('nodes without node:edit', () => {
       page.getByRole('switch', { name: 'Unlimited CPU' })
     ).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Save Changes' })
+    ).toBeDisabled();
     await expectNoHorizontalOverflow(page);
   });
 });

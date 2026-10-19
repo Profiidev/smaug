@@ -196,6 +196,8 @@ async fn pg_node_flow() {
 
   let mut update = body("alpha 2");
   update["memory_limit_mb"] = json!(512.0);
+  // Above i16: the port column must be a full integer on Postgres.
+  update["address"] = json!("http://127.0.0.1:40000");
   let resp = server.post(&format!("/nodes/{uuid}"), update).await;
   assert_eq!(resp.status(), StatusCode::OK);
   let info: Value = server
@@ -207,6 +209,7 @@ async fn pg_node_flow() {
   assert_eq!(info["name"], "alpha 2");
   assert_eq!(info["memory_limit_mb"], 512.0);
   assert_eq!(info["cpu_limit"], 2);
+  assert_eq!(info["port"], 40000);
 
   let resp = server.delete("/nodes", json!({ "uuid": uuid })).await;
   assert_eq!(resp.status(), StatusCode::OK);

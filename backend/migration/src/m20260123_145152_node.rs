@@ -14,7 +14,7 @@ impl MigrationTrait for Migration {
           .col(pk_uuid(Node::Id))
           .col(string(Node::Name))
           .col(string(Node::Address))
-          .col(tiny_unsigned(Node::Port))
+          .col(integer(Node::Port))
           .col(boolean(Node::Secure))
           .col(double_null(Node::DiskLimitMb))
           .col(double_null(Node::MemoryLimitMb))

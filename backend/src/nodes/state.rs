@@ -42,7 +42,7 @@ impl Wings {
     &self,
     uuid: Uuid,
     addr: &str,
-    port: i16,
+    port: u16,
     secure: bool,
     token: &str,
   ) -> Result<()> {
