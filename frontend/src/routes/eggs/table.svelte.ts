@@ -1,17 +1,12 @@
 import { renderComponent } from '@tanstack/svelte-table';
 import {
   type TableColumnDef,
-  createColumn
+  createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
-
-// TODO: replace with the generated $lib/client EggListItem/EggInfo type once backend egg routes exist.
-export interface EggListItem {
-  author: string;
-  description: string | null;
-  name: string;
-  uuid: string;
-}
+import type { EggListItem } from '$lib/client';
+import MutedCell from './MutedCell.svelte';
+import NameCell from './NameCell.svelte';
 
 export const columns = ({
   canEdit,
@@ -20,9 +15,26 @@ export const columns = ({
   canEdit: boolean;
   deleteEgg: (egg: EggListItem) => void;
 }): TableColumnDef<EggListItem>[] => [
-  createColumn('name', 'Name'),
-  createColumn('author', 'Author'),
-  createColumn('description', 'Description', (value: string | null) => value ?? ''),
+  {
+    ...createColumnHeader<EggListItem>('name', 'Name'),
+    cell: ({ row }) =>
+      renderComponent(NameCell, {
+        href: `/eggs/${row.original.uuid}`,
+        name: row.original.name
+      })
+  },
+  {
+    ...createColumnHeader<EggListItem>('author', 'Author'),
+    cell: ({ row }) => renderComponent(MutedCell, { text: row.original.author })
+  },
+  {
+    ...createColumnHeader<EggListItem>('description', 'Description'),
+    cell: ({ row }) =>
+      renderComponent(MutedCell, {
+        class: 'block max-w-md truncate',
+        text: row.original.description
+      })
+  },
   {
     accessorKey: 'actions',
     cell: ({ row }) =>

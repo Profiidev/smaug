@@ -1,17 +1,7 @@
+import { eggInfo } from '$lib/client';
 import type { PageLoad } from './$types';
-import type { EggJson } from '../schema.svelte';
 
-export const load: PageLoad = ({ params }) => {
-  // TODO: replace with eggInfo({ fetch, path: { uuid: params.uuid } }) from $lib/client
-  // once backend egg routes exist. Resolving to a 404-shaped result for now so the
-  // page's existing not-found redirect fires, matching real backend behavior.
-  const eggRes: Promise<{ data?: EggJson; response: { status: number } }> = Promise.resolve({
-    data: undefined,
-    response: { status: 404 }
-  });
-
-  return {
-    eggRes,
-    uuid: params.uuid
-  };
-};
+export const load = (({ fetch, params }) => ({
+  eggRes: eggInfo({ fetch, path: { uuid: params.uuid } }),
+  uuid: params.uuid
+})) satisfies PageLoad;

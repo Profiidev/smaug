@@ -24,7 +24,7 @@ export const items: NavGroup[] = [
         href: '/eggs',
         icon: Egg,
         label: 'Eggs',
-        //requiredPermission: Permission.EGG_VIEW
+        requiredPermission: Permission.EGG_VIEW
       }
     ],
     label: 'Servers'
