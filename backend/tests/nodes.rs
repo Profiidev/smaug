@@ -325,8 +325,9 @@ async fn node_changes_are_broadcast() {
   assert_eq!(next().await, json!({ "type": "Nodes", "uuid": uuid }));
 }
 
-/// Minimal Wings stand-in (mirrors `wings/src/ws.rs`): accepts the websocket
-/// and signs the handshake response with `token`. Returns its port.
+/// Minimal Wings stand-in (mirrors `wings/src/auth.rs`): verifies the signed
+/// handshake, signs the response with `token` and accepts the websocket.
+/// Returns its port.
 // the handshake callback's error type is fixed by tungstenite
 #[allow(clippy::result_large_err)]
 async fn fake_wings(token: String) -> u16 {
@@ -341,9 +342,11 @@ async fn fake_wings(token: String) -> u16 {
         let sign =
           |req: &tokio_tungstenite::tungstenite::handshake::server::Request,
            mut res: tokio_tungstenite::tungstenite::handshake::server::Response| {
-            let ts = req.headers()["x-wings-timestamp"].to_str().unwrap();
-            SignData::from_timestamp(ts.to_string())
-              .add_to_header_map(res.headers_mut(), &token)
+            let data =
+              SignData::validate_header_map(req.headers(), &token, "GET", req.uri().path(), b"")
+                .unwrap();
+            data
+              .add_response_to_header_map(res.headers_mut(), &token)
               .unwrap();
             Ok(res)
           };

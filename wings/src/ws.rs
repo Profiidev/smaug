@@ -4,31 +4,24 @@ use axum::{
     WebSocketUpgrade,
     ws::{self, WebSocket},
   },
+  middleware::from_fn,
   response::Response,
   routing::any,
 };
-use centaurus::error::Result;
-use http::HeaderMap;
-use shared::{auth::SignData, msg::WingsMessage};
+use shared::msg::WingsMessage;
 use tracing::info;
 
-use crate::auth::{Auth, WingsToken};
+use crate::auth;
 
 pub fn router() -> Router {
-  Router::new().route("/", any(init_connection))
+  Router::new()
+    .route("/", any(init_connection))
+    .layer(from_fn(auth::verify))
 }
 
-async fn init_connection(
-  auth: Auth,
-  token: WingsToken,
-  ws: WebSocketUpgrade,
-) -> Result<(HeaderMap, Response)> {
-  let data = SignData::from_timestamp(auth.timestamp);
-  let headers = data.to_header_map(&token.0)?;
-
+async fn init_connection(ws: WebSocketUpgrade) -> Response {
   info!("Established wings websocket connection");
-
-  Ok((headers, ws.on_upgrade(connection)))
+  ws.on_upgrade(connection)
 }
 
 async fn connection(mut socket: WebSocket) {
