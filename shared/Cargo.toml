@@ -4,16 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-centaurus = { version = "0.17.0", default-features = false, features = [
+centaurus = { version = "0.17.7", default-features = false, features = [
   "error"
 ] }
 chrono = "0.4.45"
 hex = "0.4.3"
 hmac = "0.13.0"
 http = "1.5.0"
-rand = "0.10.2"
+rand = "0.10.3"
 serde = { version = "1.0.229", features = ["derive"] }
-sha2 = "0.11.0"
+sha2 = "0.11.1"
 
 [lib]
 path = "src/lib.rs"
