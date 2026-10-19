@@ -13,10 +13,12 @@ pub struct Model {
   pub docker_images: Json,
   pub file_denylist: Json,
   pub features: Option<Json>,
-  pub startup: String,
+  pub startup_commands: Json,
   pub config: Json,
   pub install_script: Json,
   pub update_url: Option<String>,
+  pub icon: Option<String>,
+  pub tags: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

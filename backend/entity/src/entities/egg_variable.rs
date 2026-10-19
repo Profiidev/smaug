@@ -14,8 +14,8 @@ pub struct Model {
   pub default_value: String,
   pub user_viewable: bool,
   pub user_editable: bool,
-  pub rules: String,
-  pub field_type: String,
+  pub sort: Option<i16>,
+  pub rules: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

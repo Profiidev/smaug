@@ -3,7 +3,7 @@ use sea_orm_migration::{prelude::*, schema::*};
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const EGG_VARIABLE_EGG_ID_INDEX_NAME: &str = "egg_variable.egg_id";
+const EGG_VARIABLE_ENV_INDEX_NAME: &str = "egg_variable.egg_id_env_variable";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -20,10 +20,12 @@ impl MigrationTrait for Migration {
           .col(json(Egg::DockerImages))
           .col(json(Egg::FileDenylist))
           .col(json_null(Egg::Features))
-          .col(string(Egg::Startup))
+          .col(json(Egg::StartupCommands))
           .col(json(Egg::Config))
           .col(json(Egg::InstallScript))
           .col(string_null(Egg::UpdateUrl))
+          .col(text_null(Egg::Icon))
+          .col(json(Egg::Tags))
           .to_owned(),
       )
       .await?;
@@ -41,8 +43,8 @@ impl MigrationTrait for Migration {
           .col(string(EggVariable::DefaultValue))
           .col(boolean(EggVariable::UserViewable))
           .col(boolean(EggVariable::UserEditable))
-          .col(string(EggVariable::Rules))
-          .col(string(EggVariable::FieldType))
+          .col(small_integer_null(EggVariable::Sort))
+          .col(json(EggVariable::Rules))
           .foreign_key(
             ForeignKey::create()
               .from(EggVariable::Table, EggVariable::EggId)
@@ -58,9 +60,11 @@ impl MigrationTrait for Migration {
       .create_index(
         Index::create()
           .if_not_exists()
-          .name(EGG_VARIABLE_EGG_ID_INDEX_NAME)
+          .name(EGG_VARIABLE_ENV_INDEX_NAME)
           .table(EggVariable::Table)
           .col(EggVariable::EggId)
+          .col(EggVariable::EnvVariable)
+          .unique()
           .to_owned(),
       )
       .await
@@ -70,7 +74,8 @@ impl MigrationTrait for Migration {
     manager
       .drop_index(
         Index::drop()
-          .name(EGG_VARIABLE_EGG_ID_INDEX_NAME)
+          .if_exists()
+          .name(EGG_VARIABLE_ENV_INDEX_NAME)
           .to_owned(),
       )
       .await?;
@@ -78,10 +83,14 @@ impl MigrationTrait for Migration {
     manager
       .drop_table(
         Table::drop()
+          .if_exists()
           .table(EggVariable::Table)
-          .table(Egg::Table)
           .to_owned(),
       )
+      .await?;
+
+    manager
+      .drop_table(Table::drop().if_exists().table(Egg::Table).to_owned())
       .await
   }
 }
@@ -96,10 +105,12 @@ enum Egg {
   DockerImages,
   FileDenylist,
   Features,
-  Startup,
+  StartupCommands,
   Config,
   InstallScript,
   UpdateUrl,
+  Icon,
+  Tags,
 }
 
 #[derive(DeriveIden)]
@@ -113,6 +124,6 @@ enum EggVariable {
   DefaultValue,
   UserViewable,
   UserEditable,
+  Sort,
   Rules,
-  FieldType,
 }
