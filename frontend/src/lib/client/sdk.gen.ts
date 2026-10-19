@@ -64,6 +64,9 @@ import type {
   EggInfoData,
   EggInfoErrors,
   EggInfoResponses,
+  EggSourceData,
+  EggSourceErrors,
+  EggSourceResponses,
   GetGeneralSettingsData,
   GetGeneralSettingsErrors,
   GetGeneralSettingsResponses,
@@ -886,3 +889,12 @@ export const eggInfo = <ThrowOnError extends boolean = false>(
   (options.client ?? client).get<EggInfoResponses, EggInfoErrors, ThrowOnError>(
     { url: '/api/eggs/{uuid}', ...options }
   );
+
+export const eggSource = <ThrowOnError extends boolean = false>(
+  options: Options<EggSourceData, ThrowOnError>
+): RequestResult<EggSourceResponses, EggSourceErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    EggSourceResponses,
+    EggSourceErrors,
+    ThrowOnError
+  >({ url: '/api/eggs/{uuid}/source', ...options });

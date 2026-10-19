@@ -6,6 +6,8 @@
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Trash from '@lucide/svelte/icons/trash';
   import Download from '@lucide/svelte/icons/download';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import * as DropdownMenu from '@profidev/pleiades/components/ui/dropdown-menu';
   import { Permission } from '$lib/permissions.svelte';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
@@ -35,6 +37,8 @@
   import ConfigFields from '../ConfigFields.svelte';
   import SaveBar from '../SaveBar.svelte';
   import SectionErrorDot from '../SectionErrorDot.svelte';
+  import UpdateDialog from '../UpdateDialog.svelte';
+  import { checkEggUpdate, type EggUpdate } from '../update';
 
   const { data } = $props();
 
@@ -46,6 +50,9 @@
   let saved: EggForm | undefined = $state.raw();
   let saving = $state(false);
   let saveFailed = $state(false);
+  let checking = $state(false);
+  let update: EggUpdate | undefined = $state.raw();
+  let updateOpen = $state(false);
 
   const sections = [
     {
@@ -135,6 +142,47 @@
     a.download = `egg-${slugify(values.name)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success('Export downloaded', {
+      description: `${a.download} was saved.`
+    });
+  };
+
+  const checkUpdate = async () => {
+    if (!saved) return;
+    if (!saved.updateUrl) {
+      toast.info('No update URL', {
+        description:
+          'Add an Update URL in General to check this egg for updates.'
+      });
+      return;
+    }
+
+    checking = true;
+    try {
+      update = await checkEggUpdate(data.uuid, saved);
+    } catch (e) {
+      toast.error("Couldn't check for updates", {
+        description: e instanceof Error ? e.message : undefined,
+        action: { label: 'Retry', onClick: checkUpdate }
+      });
+      return;
+    } finally {
+      checking = false;
+    }
+
+    if (update.changed.length) {
+      updateOpen = true;
+    } else {
+      toast.success(`${eggName} is up to date`, {
+        description: 'The source has no changes.'
+      });
+    }
+  };
+
+  const onapplied = (egg: EggForm) => {
+    saveFailed = false;
+    saved = egg;
+    eggName = egg.name;
   };
 
   const onsubmit = async (values: EggForm) => {
@@ -174,10 +222,24 @@
         {eggName}
       {/if}
     </h3>
+    <Button
+      variant="outline"
+      class="ml-auto cursor-pointer"
+      onclick={checkUpdate}
+      disabled={checking || readonly || !saved}
+    >
+      {#if checking}
+        <Spinner />
+        Checking…
+      {:else}
+        <RefreshCw />
+        Check for updates
+      {/if}
+    </Button>
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
-          <Button {...props} variant="outline" class="ml-auto cursor-pointer">
+          <Button {...props} variant="outline" class="ml-2 cursor-pointer">
             <Download />
             Export
           </Button>
@@ -278,6 +340,8 @@
     {#snippet footer()}{/snippet}
   </BaseForm>
 </div>
+<UpdateDialog bind:open={updateOpen} {update} {onapplied} />
+
 <FormDialog
   title={`Delete egg ${eggName}?`}
   description="This cannot be undone. The egg and its variables, scripts and config files are removed."

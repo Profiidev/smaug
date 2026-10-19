@@ -76,6 +76,10 @@ export const handlers = [
       ? (new HttpResponse(null, { status: 404 }) as never)
       : j({ ...data.eggInfo, uuid: params.uuid })
   ),
+  // Every egg's source matches the installed egg (up to date).
+  gen.handleEggSource(({ params }) =>
+    j({ source: { ...data.eggInfo, uuid: params.uuid } })
+  ),
   gen.handleCreateEgg(() => j({ uuid: 'egg-new' })),
   gen.handleEditEgg(ok),
   gen.handleDeleteEgg(ok),

@@ -153,12 +153,14 @@ export const eggList = {
       {
         author: 'dev@example.com',
         description: 'Paper Minecraft server',
+        has_update_url: true,
         name: 'Paper',
         uuid: 'egg-paper'
       },
       {
         author: 'ops@example.com',
         description: null,
+        has_update_url: true,
         name: 'Valheim',
         uuid: 'egg-valheim'
       }

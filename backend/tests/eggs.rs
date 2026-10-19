@@ -46,8 +46,8 @@ async fn egg_crud_flow() {
   assert_eq!(
     list,
     json!({ "eggs": [
-      { "uuid": other_uuid, "name": "Another", "author": "dev@example.com", "description": null },
-      { "uuid": uuid, "name": "Paper", "author": "dev@example.com", "description": "Minecraft" },
+      { "uuid": other_uuid, "name": "Another", "author": "dev@example.com", "description": null, "has_update_url": false },
+      { "uuid": uuid, "name": "Paper", "author": "dev@example.com", "description": "Minecraft", "has_update_url": false },
     ] })
   );
 
@@ -124,6 +124,31 @@ async fn egg_error_paths() {
       .await
       .status(),
     StatusCode::NOT_FOUND
+  );
+
+  // update source: missing egg, egg without update URL, unreachable update URL
+  assert_eq!(
+    server
+      .get(&format!("/eggs/{missing}/source"))
+      .await
+      .status(),
+    StatusCode::NOT_FOUND
+  );
+  let no_url = create(&server, egg_body()).await;
+  assert_eq!(
+    server.get(&format!("/eggs/{no_url}/source")).await.status(),
+    StatusCode::BAD_REQUEST
+  );
+  let mut unreachable = egg_body();
+  unreachable["name"] = json!("Unreachable");
+  unreachable["meta"] = json!({ "update_url": "http://127.0.0.1:1/egg.json" });
+  let unreachable = create(&server, unreachable).await;
+  assert_eq!(
+    server
+      .get(&format!("/eggs/{unreachable}/source"))
+      .await
+      .status(),
+    StatusCode::BAD_GATEWAY
   );
 
   // 400 from validation, on create and on edit (which validates before lookup)
