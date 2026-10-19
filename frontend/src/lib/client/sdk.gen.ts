@@ -116,6 +116,9 @@ import type {
   NodeInfoData,
   NodeInfoErrors,
   NodeInfoResponses,
+  NodeTokenRegenerateData,
+  NodeTokenRegenerateErrors,
+  NodeTokenRegenerateResponses,
   ResetPasswordData,
   ResetPasswordErrors,
   ResetPasswordResponses,
@@ -808,6 +811,19 @@ export const updateNode = <ThrowOnError extends boolean = false>(
       ...options.headers
     }
   });
+
+export const nodeTokenRegenerate = <ThrowOnError extends boolean = false>(
+  options: Options<NodeTokenRegenerateData, ThrowOnError>
+): RequestResult<
+  NodeTokenRegenerateResponses,
+  NodeTokenRegenerateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    NodeTokenRegenerateResponses,
+    NodeTokenRegenerateErrors,
+    ThrowOnError
+  >({ url: '/api/nodes/{uuid}/token', ...options });
 
 export const deleteEgg = <ThrowOnError extends boolean = false>(
   options: Options<DeleteEggData, ThrowOnError>

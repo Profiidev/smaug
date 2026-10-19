@@ -37,6 +37,7 @@
       }
     } else {
       toast.success('Node created successfully.');
+      sessionStorage.setItem('newNodeToken', res.data.token);
       setTimeout(() => {
         goto(`/nodes/${res.data.uuid}/setup`);
       });

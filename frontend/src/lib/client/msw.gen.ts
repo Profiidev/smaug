@@ -62,6 +62,7 @@ import type {
   ListUsersSimpleResponses,
   MailActiveResponses,
   NodeInfoResponses,
+  NodeTokenRegenerateResponses,
   ResetPasswordData,
   ResetPasswordResponses,
   ResetUserAvatarData,
@@ -1769,6 +1770,52 @@ export function handleUpdateNode(
   );
 }
 
+export type HandleNodeTokenRegenerateResponse = {
+  body: NodeTokenRegenerateResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/nodes/{uuid}/token` operation.
+ */
+export function handleNodeTokenRegenerate(
+  response?:
+    | HandleNodeTokenRegenerateResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/nodes/:uuid/token`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
 export type HandleDeleteEggResponse = {
   body: DeleteEggResponses[200];
   status?: 200;
@@ -2143,6 +2190,10 @@ export type MswHandlerFactories = {
    */
   updateNode: typeof handleUpdateNode;
   /**
+   * Handler for the `POST /api/nodes/{uuid}/token` operation.
+   */
+  nodeTokenRegenerate: typeof handleNodeTokenRegenerate;
+  /**
    * Handler for the `DELETE /api/eggs` operation.
    */
   deleteEgg: typeof handleDeleteEgg;
@@ -2232,6 +2283,7 @@ export function createMswHandlers(
     createNode: wrap(handleCreateNode),
     nodeInfo: wrap(handleNodeInfo),
     updateNode: wrap(handleUpdateNode),
+    nodeTokenRegenerate: wrap(handleNodeTokenRegenerate),
     deleteEgg: wrap(handleDeleteEgg),
     listEggs: wrap(handleListEggs),
     createEgg: wrap(handleCreateEgg),
@@ -2263,6 +2315,7 @@ export function createMswHandlers(
       invoke(pick.sendResetLink, overrides.sendResetLink),
       invoke(pick.resetPassword, overrides.resetPassword),
       invoke(pick.userInfo, overrides.userInfo),
+      invoke(pick.nodeTokenRegenerate, overrides.nodeTokenRegenerate),
       invoke(pick.getOidcSettings, overrides.getOidcSettings),
       invoke(pick.initOidc, overrides.initOidc),
       invoke(pick.key, overrides.key),

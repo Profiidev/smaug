@@ -45,6 +45,10 @@ export type CreateNode = {
 };
 
 export type CreateNodeRes = {
+  /**
+   * Only returned here and on regenerate, it can not be viewed later.
+   */
+  token: string;
   uuid: string;
 };
 
@@ -315,7 +319,6 @@ export type NodeInfo = {
   name: string;
   port: number;
   secure: boolean;
-  token: string;
 };
 
 export type NodeInfoRequest = {
@@ -375,6 +378,10 @@ export type SimpleGroupInfo = {
 export type SimpleUserInfo = {
   id: string;
   name: string;
+};
+
+export type TokenRegenerateRes = {
+  token: string;
 };
 
 export type UpdateNode = {
@@ -1877,6 +1884,33 @@ export type UpdateNodeResponses = {
    */
   200: unknown;
 };
+
+export type NodeTokenRegenerateData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/nodes/{uuid}/token';
+};
+
+export type NodeTokenRegenerateErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type NodeTokenRegenerateResponses = {
+  200: TokenRegenerateRes;
+};
+
+export type NodeTokenRegenerateResponse =
+  NodeTokenRegenerateResponses[keyof NodeTokenRegenerateResponses];
 
 export type DeleteEggData = {
   body: EggUuid;

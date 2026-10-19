@@ -87,7 +87,8 @@ export const handlers = [
       ? (new HttpResponse(null, { status: 404 }) as never)
       : j({ ...data.nodeInfo, id: params.uuid })
   ),
-  gen.handleCreateNode(() => j({ uuid: 'node-new' })),
+  gen.handleCreateNode(() => j({ token: 'node-new-token', uuid: 'node-new' })),
+  gen.handleNodeTokenRegenerate(() => j({ token: 'node-regenerated-token' })),
   gen.handleUpdateNode(ok),
   gen.handleDeleteNode(ok),
 

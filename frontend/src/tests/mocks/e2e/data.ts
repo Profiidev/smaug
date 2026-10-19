@@ -221,8 +221,7 @@ export const nodeInfo = {
   memory_limit_mb: null,
   name: 'Node One',
   port: 443,
-  secure: true,
-  token: 'node-token-123'
+  secure: true
 };
 
 export const nodeList = {
@@ -237,8 +236,7 @@ export const nodeList = {
       memory_limit_mb: 4096,
       name: 'Node Two',
       port: 8000,
-      secure: false,
-      token: 'node-token-456'
+      secure: false
     }
   ],
   empty: [] as unknown[]
