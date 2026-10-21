@@ -959,8 +959,18 @@ async fn power_follows_actions_and_survives_edits() {
   let mut body = c.body();
   body["skip_scripts"] = json!(true);
   body["start_on_completion"] = json!(true);
-  let uuid = c.create(body).await;
+  let uuid = c.create(body.clone()).await;
   assert_eq!(power(uuid).await, (true, 0, false));
+
+  // not installed turns it off, nothing may run on missing files
+  body["allocations"] = json!([{ "ip": "10.0.0.7", "port": 30001 }]);
+  let other = c.create(body).await;
+  assert_eq!(
+    c.action(other, "install", json!({ "installed": false }))
+      .await,
+    StatusCode::OK
+  );
+  assert_eq!(power(other).await, (false, 1, false));
 
   // a reinstall turns it off, with a new generation for wings
   assert_eq!(c.action(uuid, "reinstall", json!({})).await, StatusCode::OK);
