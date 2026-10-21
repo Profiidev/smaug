@@ -61,7 +61,7 @@
     const { uuid } = res.data;
     toast.success('Egg created successfully.');
     setTimeout(() => {
-      goto(`/eggs/${uuid}`);
+      goto(`/eggs/${uuid}/general`);
     });
   };
 </script>

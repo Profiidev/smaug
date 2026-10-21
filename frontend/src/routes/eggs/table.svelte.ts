@@ -27,7 +27,7 @@ export const columns = ({
     cell: ({ row }) =>
       renderComponent(NameCell, {
         failed: failed[row.original.uuid],
-        href: `/eggs/${row.original.uuid}`,
+        href: `/eggs/${row.original.uuid}/general`,
         name: row.original.name,
         onreview:
           updates[row.original.uuid] && review
@@ -52,7 +52,7 @@ export const columns = ({
     cell: ({ row }) =>
       renderComponent(Actions, {
         delete_disabled: !canEdit,
-        edit: `/eggs/${row.original.uuid}`,
+        edit: `/eggs/${row.original.uuid}/general`,
         edit_disabled: !canEdit,
         remove: () => deleteEgg(row.original)
       }),

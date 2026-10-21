@@ -6,7 +6,7 @@ import { deleteEgg } from '$lib/client';
 import { toast } from '@profidev/pleiades/components/util/general';
 import ListPage from '$routes/eggs/+page.svelte';
 import CreatePage from '$routes/eggs/create/+page.svelte';
-import EditPage from '$routes/eggs/[uuid]/+page.svelte';
+import EditPage from '$routes/eggs/[uuid]/[tab=eggtab]/+page.svelte';
 import { type EggImport, importEgg } from '$routes/eggs/schema.svelte';
 import { adminUser, eggInfo, eggList } from '$mocks/e2e/data';
 import { Permission } from '$lib/permissions.svelte';
@@ -105,7 +105,7 @@ describe('eggs list page', () => {
     expect(await screen.findByText('2 eggs')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Paper' })).toHaveAttribute(
       'href',
-      '/eggs/egg-paper'
+      '/eggs/egg-paper/general'
     );
   });
 

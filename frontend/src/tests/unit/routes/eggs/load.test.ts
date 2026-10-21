@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { load as listLoad } from '$routes/eggs/+page';
-import { load as detailLoad } from '$routes/eggs/[uuid]/+page';
-import { jsonFetch, runLoad } from '$test_helpers/load';
+import { load as rootLoad } from '$routes/eggs/[uuid]/+page';
+import { load as detailLoad } from '$routes/eggs/[uuid]/[tab=eggtab]/+page';
+import { match } from '../../../../params/eggtab';
+import { catchRedirect, jsonFetch, runLoad } from '$test_helpers/load';
 import { eggInfo, eggList } from '$mocks/e2e/data';
 
 const url = (q = '') => new URL(`http://localhost/eggs${q}`);
@@ -84,4 +86,51 @@ describe('egg detail load', () => {
       expect(res.response?.status).toBe(status);
     }
   );
+});
+
+describe('egg detail load and tabs', () => {
+  it('does not read the tab param (switching tabs must not reload)', () => {
+    const params = new Proxy(
+      { uuid: 'egg-paper' },
+      {
+        get: (t, k) => {
+          if (k === 'tab') {
+            throw new Error('load read params.tab');
+          }
+          return t[k as 'uuid'];
+        }
+      }
+    );
+    const result = runLoad(detailLoad, {
+      fetch: jsonFetch(eggInfo),
+      params
+    });
+    expect(Object.keys(result).toSorted()).toEqual(['eggRes', 'uuid']);
+  });
+});
+
+describe('eggtab param matcher', () => {
+  it.each(['general', 'variables', 'install', 'runtime', 'config'])(
+    'accepts %s',
+    (tab) => {
+      expect(match(tab)).toBe(true);
+    }
+  );
+
+  it.each(['settings', 'bogus', '', 'General', 'general/', 'install-script'])(
+    'rejects %j',
+    (tab) => {
+      expect(match(tab)).toBe(false);
+    }
+  );
+});
+
+describe('egg [uuid] without a tab', () => {
+  it('redirects to the general tab', async () => {
+    const redirect = await catchRedirect(() =>
+      (rootLoad as (e: unknown) => unknown)({ params: { uuid: 'egg-paper' } })
+    );
+    expect(redirect.status).toBe(307);
+    expect(redirect.location).toBe('/eggs/egg-paper/general');
+  });
 });

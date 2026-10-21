@@ -31,7 +31,26 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
 
   { path: '/eggs', ready: (p) => p.getByRole('heading', { name: 'Eggs' }) },
   { path: '/eggs/create', ready: (p) => p.getByLabel('Egg Name') },
-  { path: '/eggs/egg-paper', ready: (p) => p.getByLabel('Egg Name') },
+  {
+    path: '/eggs/egg-paper/general',
+    ready: (p) => p.getByLabel('Egg Name')
+  },
+  {
+    path: '/eggs/egg-paper/variables',
+    ready: (p) => p.getByRole('button', { name: 'Add variable' })
+  },
+  {
+    path: '/eggs/egg-paper/install',
+    ready: (p) => p.getByLabel('Install Container Image')
+  },
+  {
+    path: '/eggs/egg-paper/runtime',
+    ready: (p) => p.getByRole('button', { name: 'Add image' })
+  },
+  {
+    path: '/eggs/egg-paper/config',
+    ready: (p) => p.getByLabel('File Path')
+  },
 
   {
     path: '/servers',
