@@ -50,6 +50,7 @@
     Startup variables ({$formData.variables.length})
   </span>
   <Button
+    class="cursor-pointer"
     size="sm"
     variant="outline"
     onclick={addVariable}
@@ -70,6 +71,7 @@
       </Card.Title>
       <Card.Action>
         <Button
+          class="cursor-pointer"
           size="icon-sm"
           variant="destructive"
           type="button"

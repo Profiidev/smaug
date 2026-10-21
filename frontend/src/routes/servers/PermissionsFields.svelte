@@ -63,6 +63,7 @@
     </span>
   </div>
   <Button
+    class="cursor-pointer"
     size="sm"
     variant="outline"
     type="button"
@@ -98,7 +99,7 @@
       size="icon-sm"
       variant="destructive"
       type="button"
-      class="mt-6"
+      class="mt-6 cursor-pointer"
       aria-label="Remove grant"
       disabled={props.disabled}
       onclick={() => removeGrant(i)}

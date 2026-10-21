@@ -120,10 +120,12 @@
   };
 </script>
 
-<div class="flex h-full max-h-screen min-h-0 flex-col gap-4 p-4">
-  <div class="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-2">
+<!-- Header and card stack as one centered group; the min-h-0 flex chain caps the card so only the stage fields scroll. -->
+<div class="flex h-full max-h-screen min-h-0 flex-col justify-center p-4">
+  <div class="mx-auto flex min-h-0 w-full max-w-4xl flex-col gap-4">
     <div class="ml-7 flex items-center md:m-0">
       <Button
+        class="cursor-pointer"
         size="icon"
         variant="ghost"
         href="/servers"
@@ -133,35 +135,36 @@
       </Button>
       <h3 class="ml-2 text-xl font-medium">Create server</h3>
     </div>
+    {#if options && (!options.nodes.length || !options.eggs.length)}
+      <Alert.Root>
+        <Info />
+        <Alert.Title>Nothing to create a server on yet</Alert.Title>
+        <Alert.Description>
+          A server needs at least one node and one egg. Add them first.
+        </Alert.Description>
+      </Alert.Root>
+    {/if}
+    {#if stages && wizard}
+      <!-- Undo MultistepForm's centering wrapper (h-full, p-4) so the card sits right under the header. -->
+      <div
+        class="flex min-h-0 flex-col [&>div]:h-auto [&>div]:min-h-0 [&>div]:flex-col [&>div]:items-stretch [&>div]:p-0"
+      >
+        {#key attempt}
+          <MultistepForm
+            {stages}
+            data={wizard}
+            {initStep}
+            class="min-h-0 w-full [&>[data-slot=card-content]]:flex [&>[data-slot=card-content]]:min-h-0 [&>[data-slot=card-content]]:flex-col"
+            onsubmit={submit}
+            cancelHref="/servers"
+          />
+        {/key}
+      </div>
+    {:else}
+      <div class="grid gap-4" aria-busy="true">
+        <Skeleton class="h-8 w-48" />
+        <Skeleton class="h-64 w-full" />
+      </div>
+    {/if}
   </div>
-  {#if options && (!options.nodes.length || !options.eggs.length)}
-    <Alert.Root class="mx-auto max-w-4xl">
-      <Info />
-      <Alert.Title>Nothing to create a server on yet</Alert.Title>
-      <Alert.Description>
-        A server needs at least one node and one egg. Add them first.
-      </Alert.Description>
-    </Alert.Root>
-  {/if}
-  {#if stages && wizard}
-    <!-- -m cancels MultistepForm's p-4; the wrapper gives it the remaining height so only the stage fields scroll. -->
-    <div class="-mx-4 -mt-4 min-h-0 grow">
-      {#key attempt}
-        <MultistepForm
-          {stages}
-          data={wizard}
-          {initStep}
-          class="max-h-full min-h-0 w-full max-w-4xl [&>[data-slot=card-content]]:flex [&>[data-slot=card-content]]:min-h-0 [&>[data-slot=card-content]]:flex-col"
-          onsubmit={submit}
-          cancelHref="/servers"
-          submitLabel="Create server"
-        />
-      {/key}
-    </div>
-  {:else}
-    <div class="mx-auto grid w-full max-w-4xl gap-4" aria-busy="true">
-      <Skeleton class="h-8 w-48" />
-      <Skeleton class="h-64 w-full" />
-    </div>
-  {/if}
 </div>

@@ -147,21 +147,30 @@ const permissionsObject = z.object({
 
 type Ctx = z.RefinementCtx;
 
-const allocKey = ({ ip, port }: { ip: string; port: number }) =>
-  `${ip.trim().toLowerCase()}|${port}`;
+/** Trimmed, lowercased; any all-zero IPv6 form (`0:0::0`) becomes `::`. */
+const normIp = (ip: string) => {
+  const v = ip.trim().toLowerCase();
+  return v.includes(':') && /^[0:]+$/.test(v) ? '::' : v;
+};
+
+/** `::` covers everything; `0.0.0.0` covers IPv4 (mirrors the backend). */
+const covers = (a: string, b: string) =>
+  a === '::' || (a === '0.0.0.0' && !b.includes(':'));
 
 const checkAllocations = (data: z.infer<typeof generalObject>, ctx: Ctx) => {
-  const seen = new Set<string>();
-  for (const [i, a] of data.allocations.entries()) {
-    const key = allocKey(a);
-    if (seen.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Duplicate allocation.',
-        path: ['allocations', i, 'port']
-      });
+  const rows = data.allocations.map((a) => ({
+    ip: normIp(a.ip),
+    port: a.port
+  }));
+  for (const [i, a] of rows.entries()) {
+    const earlier = rows.slice(0, i).filter((b) => b.port === a.port);
+    let message = 'Overlaps another allocation on the same port.';
+    if (earlier.some((b) => b.ip === a.ip)) {
+      message = 'Duplicate allocation.';
+    } else if (!earlier.some((b) => covers(a.ip, b.ip) || covers(b.ip, a.ip))) {
+      continue;
     }
-    seen.add(key);
+    ctx.addIssue({ code: 'custom', message, path: ['allocations', i, 'port'] });
   }
 };
 

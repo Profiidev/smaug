@@ -5,8 +5,7 @@
   import Server from '@lucide/svelte/icons/server';
   import Table from '@profidev/pleiades/components/table/clean-table.svelte';
   import * as Empty from '@profidev/pleiades/components/ui/empty';
-  import * as NativeSelect from '@profidev/pleiades/components/ui/native-select';
-  import { Separator } from '@profidev/pleiades/components/ui/separator';
+  import * as Select from '@profidev/pleiades/components/ui/select';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { z } from 'zod';
@@ -29,13 +28,14 @@
   let user: UserInfo | undefined = $state();
   // Undefined while loading; drives the table skeleton, count and empty state.
   let servers: ServerRow[] | undefined = $state();
-  let status = $state('');
+  // 'all' rather than '': bits-ui reads an empty value as "nothing selected".
+  let status = $state('all');
 
   let canEdit = $derived(
     user?.permissions.includes(Permission.SERVER_EDIT) ?? false
   );
   let filtered = $derived(
-    status ? servers?.filter((s) => s.status === status) : servers
+    status === 'all' ? servers : servers?.filter((s) => s.status === status)
   );
 
   $effect(() => {
@@ -94,23 +94,23 @@
     <!-- The empty state carries the same action; avoid duplicate controls. -->
     {#if servers?.length !== 0}
       <div class="ml-auto flex flex-wrap gap-2">
-        <NativeSelect.Root
-          aria-label="Filter by status"
-          bind:value={status}
-          disabled={!servers}
-        >
-          <NativeSelect.Option value="">All statuses</NativeSelect.Option>
-          {#each Object.values(ServerStatus) as value (value)}
-            <NativeSelect.Option {value}
-              >{STATUS[value].label}</NativeSelect.Option
-            >
-          {/each}
-        </NativeSelect.Root>
+        <Select.Root type="single" bind:value={status} disabled={!servers}>
+          <Select.Trigger aria-label="Filter by status" class="cursor-pointer">
+            {status === 'all'
+              ? 'All statuses'
+              : STATUS[status as ServerStatus].label}
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Item value="all">All statuses</Select.Item>
+            {#each Object.values(ServerStatus) as value (value)}
+              <Select.Item {value}>{STATUS[value].label}</Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
         {@render create()}
       </div>
     {/if}
   </div>
-  <Separator />
   {#if servers?.length === 0}
     <Empty.Root class="border border-dashed">
       <Empty.Header>
@@ -145,7 +145,7 @@
 {#snippet create()}
   <Button class="cursor-pointer" href="/servers/create" disabled={!canEdit}>
     <Plus />
-    Create server
+    Create
   </Button>
 {/snippet}
 

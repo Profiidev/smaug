@@ -165,8 +165,12 @@ describe('server edit page access', () => {
   it('fills the selects from the loaded options', async () => {
     await mount();
     await openTab('Startup');
-    expect(screen.getByLabelText('Image name')).toHaveValue('Java 21');
-    expect(screen.getByLabelText('Startup command')).toHaveValue('');
+    expect(screen.getByLabelText('Image name').textContent?.trim()).toBe(
+      'Java 21'
+    );
+    expect(screen.getByLabelText('Startup command').textContent?.trim()).toBe(
+      'Custom'
+    );
   });
 
   it('hides the save bar on the Status tab only', async () => {

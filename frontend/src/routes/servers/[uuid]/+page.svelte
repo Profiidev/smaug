@@ -176,7 +176,7 @@
       size="icon"
       variant="ghost"
       href="/servers"
-      class="mr-2"
+      class="mr-2 cursor-pointer"
       aria-label="Back to servers"
     >
       <ArrowLeft class="size-5" />

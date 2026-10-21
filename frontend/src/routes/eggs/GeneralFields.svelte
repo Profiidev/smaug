@@ -126,6 +126,7 @@
         />
         {#if $formData.icon}
           <Button
+            class="cursor-pointer"
             size="sm"
             variant="destructive"
             type="button"

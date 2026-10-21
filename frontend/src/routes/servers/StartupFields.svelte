@@ -4,7 +4,7 @@
   import { Badge } from '@profidev/pleiades/components/ui/badge';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import { Label } from '@profidev/pleiades/components/ui/label';
-  import * as NativeSelect from '@profidev/pleiades/components/ui/native-select';
+  import * as Select from '@profidev/pleiades/components/ui/select';
   import { Separator } from '@profidev/pleiades/components/ui/separator';
   import { Switch } from '@profidev/pleiades/components/ui/switch';
   import * as Item from '@profidev/pleiades/components/ui/item';
@@ -34,7 +34,8 @@
 
   let formData = $derived(props.formData.form);
 
-  const CUSTOM = '';
+  // bits-ui treats an empty value as "nothing selected", so Custom needs a real one.
+  const CUSTOM = '__custom__';
   const id = $props.id();
 
   let commands = $derived(Object.entries(egg?.startup_commands ?? {}));
@@ -125,6 +126,7 @@
       <div class="flex items-center gap-2">
         <Badge variant="outline">Overridden</Badge>
         <Button
+          class="cursor-pointer"
           size="sm"
           variant="ghost"
           type="button"
@@ -137,17 +139,22 @@
       </div>
     {/if}
   </div>
-  <NativeSelect.Root
-    id="{id}-command"
+  <Select.Root
+    type="single"
     value={commandLabel}
     disabled={props.disabled}
-    onchange={(e) => pickCommand(e.currentTarget.value)}
+    onValueChange={pickCommand}
   >
-    {#each commands as [label] (label)}
-      <NativeSelect.Option value={label}>{label}</NativeSelect.Option>
-    {/each}
-    <NativeSelect.Option value={CUSTOM}>Custom</NativeSelect.Option>
-  </NativeSelect.Root>
+    <Select.Trigger id="{id}-command" class="w-full cursor-pointer">
+      {commandLabel === CUSTOM ? 'Custom' : commandLabel}
+    </Select.Trigger>
+    <Select.Content>
+      {#each commands as [label] (label)}
+        <Select.Item value={label}>{label}</Select.Item>
+      {/each}
+      <Select.Item value={CUSTOM}>Custom</Select.Item>
+    </Select.Content>
+  </Select.Root>
   <FormTextarea
     {...props}
     key="startup"
@@ -168,17 +175,22 @@
 <div class="grid gap-4 md:grid-cols-2">
   <div class="grid content-start gap-2">
     <Label for="{id}-image">Image name</Label>
-    <NativeSelect.Root
-      id="{id}-image"
+    <Select.Root
+      type="single"
       value={imageLabel}
       disabled={props.disabled || imageDisabled}
-      onchange={(e) => pickImage(e.currentTarget.value)}
+      onValueChange={pickImage}
     >
-      {#each images as [label] (label)}
-        <NativeSelect.Option value={label}>{label}</NativeSelect.Option>
-      {/each}
-      <NativeSelect.Option value={CUSTOM}>Custom image</NativeSelect.Option>
-    </NativeSelect.Root>
+      <Select.Trigger id="{id}-image" class="w-full cursor-pointer">
+        {imageLabel === CUSTOM ? 'Custom image' : imageLabel}
+      </Select.Trigger>
+      <Select.Content>
+        {#each images as [label] (label)}
+          <Select.Item value={label}>{label}</Select.Item>
+        {/each}
+        <Select.Item value={CUSTOM}>Custom image</Select.Item>
+      </Select.Content>
+    </Select.Root>
   </div>
   <div class="grid gap-1">
     <FormInput

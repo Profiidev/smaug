@@ -1,11 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within
-} from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import Harness from '$test_helpers/ServerFieldsHarness.svelte';
 import GeneralFields from '$routes/servers/GeneralFields.svelte';
 import StartupFields from '$routes/servers/StartupFields.svelte';
@@ -319,6 +313,22 @@ describe('StartupFields', () => {
 
   const commandSelect = () => screen.getByLabelText('Startup command');
   const imageSelect = () => screen.getByLabelText('Image name');
+  const shown = (el: HTMLElement) => el.textContent?.trim();
+  // The bits-ui Select opens on pointerdown, which jsdom can't drive; use the keyboard.
+  const open = async (select: HTMLElement) =>
+    fireEvent.keyDown(select, { key: 'ArrowDown' });
+  const choose = async (select: HTMLElement, name: string) => {
+    await open(select);
+    // Items select on pointerup.
+    await fireEvent.pointerUp(await screen.findByRole('option', { name }));
+    await tick();
+  };
+  const listed = async (select: HTMLElement) => {
+    await open(select);
+    return (await screen.findAllByRole('option')).map((o) =>
+      o.textContent?.trim()
+    );
+  };
 
   it('shows the install switches only in create mode', () => {
     startup();
@@ -352,20 +362,20 @@ describe('StartupFields', () => {
       startup: 'java -jar {{SERVER_JARFILE}}',
       startupOverridden: false
     });
-    expect(commandSelect()).toHaveValue('Default');
+    expect(shown(commandSelect())).toBe('Default');
     expect(screen.queryByText('Overridden')).not.toBeInTheDocument();
     expect(
       screen.getByText('Follows the egg. Egg updates change it.')
     ).toBeInTheDocument();
   });
 
-  it('lists the egg commands plus Custom', () => {
+  it('lists the egg commands plus Custom', async () => {
     startup();
-    expect(
-      within(commandSelect())
-        .getAllByRole('option')
-        .map((o) => o.textContent)
-    ).toEqual(['Default', 'Aikar', 'Custom']);
+    expect(await listed(commandSelect())).toEqual([
+      'Default',
+      'Aikar',
+      'Custom'
+    ]);
   });
 
   it('switches to Custom with the Overridden badge when the text is edited', async () => {
@@ -377,7 +387,7 @@ describe('StartupFields', () => {
       target: { value: 'java -jar mine.jar' }
     });
     expect(value().startupOverridden).toBe(true);
-    expect(commandSelect()).toHaveValue('');
+    expect(shown(commandSelect())).toBe('Custom');
     expect(screen.getByText('Overridden')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -401,10 +411,10 @@ describe('StartupFields', () => {
       startup: 'java -jar {{SERVER_JARFILE}}',
       startupOverridden: false
     });
-    await fireEvent.change(commandSelect(), { target: { value: 'Aikar' } });
+    await choose(commandSelect(), 'Aikar');
     expect(value().startup).toBe('java -XX:+UseG1GC -jar {{SERVER_JARFILE}}');
     expect(value().startupOverridden).toBe(true);
-    await fireEvent.change(commandSelect(), { target: { value: 'Default' } });
+    await choose(commandSelect(), 'Default');
     expect(value().startupOverridden).toBe(false);
   });
 
@@ -413,61 +423,57 @@ describe('StartupFields', () => {
       startup: 'java -jar {{SERVER_JARFILE}}',
       startupOverridden: false
     });
-    await fireEvent.change(commandSelect(), { target: { value: '' } });
+    await choose(commandSelect(), 'Custom');
     expect(value().startup).toBe('java -jar {{SERVER_JARFILE}}');
     expect(value().startupOverridden).toBe(true);
-    expect(commandSelect()).toHaveValue('');
+    expect(shown(commandSelect())).toBe('Custom');
     expect(screen.getByText('Overridden')).toBeInTheDocument();
     expect(screen.getByLabelText('Command')).not.toBeDisabled();
     await fireEvent.input(screen.getByLabelText('Command'), {
       target: { value: 'java -jar mine.jar' }
     });
     expect(value().startup).toBe('java -jar mine.jar');
-    expect(commandSelect()).toHaveValue('');
+    expect(shown(commandSelect())).toBe('Custom');
     await fireEvent.click(
       screen.getByRole('button', { name: 'Reset to default' })
     );
-    expect(commandSelect()).toHaveValue('Default');
+    expect(shown(commandSelect())).toBe('Default');
     expect(screen.queryByText('Overridden')).not.toBeInTheDocument();
   });
 
   it('switches to Custom image with the hint when Custom image is picked', async () => {
     const { value } = startup();
-    await fireEvent.change(imageSelect(), { target: { value: '' } });
-    expect(imageSelect()).toHaveValue('');
+    await choose(imageSelect(), 'Custom image');
+    expect(shown(imageSelect())).toBe('Custom image');
     expect(value().image).toBe('ghcr.io/yolks:java_21');
     expect(
       screen.getByText('Custom image. Must be pullable by the node.')
     ).toBeInTheDocument();
-    await fireEvent.change(imageSelect(), { target: { value: 'Java 21' } });
-    expect(imageSelect()).toHaveValue('Java 21');
+    await choose(imageSelect(), 'Java 21');
+    expect(shown(imageSelect())).toBe('Java 21');
     expect(screen.queryByText(/Must be pullable/)).not.toBeInTheDocument();
   });
 
   it('picks an egg image and switches to Custom image when typed', async () => {
     const { value } = startup();
-    expect(imageSelect()).toHaveValue('Java 21');
+    expect(shown(imageSelect())).toBe('Java 21');
     expect(screen.queryByText(/Must be pullable/)).not.toBeInTheDocument();
-    await fireEvent.change(imageSelect(), { target: { value: 'Java 17' } });
+    await choose(imageSelect(), 'Java 17');
     expect(value().image).toBe('ghcr.io/yolks:java_17');
     await fireEvent.input(screen.getByLabelText('Image'), {
       target: { value: 'my/image:1' }
     });
-    expect(imageSelect()).toHaveValue('');
+    expect(shown(imageSelect())).toBe('Custom image');
     expect(
       screen.getByText('Custom image. Must be pullable by the node.')
     ).toBeInTheDocument();
-    await fireEvent.change(imageSelect(), { target: { value: '' } });
+    await choose(imageSelect(), 'Custom image');
     expect(value().image).toBe('my/image:1');
   });
 
-  it('offers only Custom without an egg and cannot reset', () => {
+  it('offers only Custom without an egg and cannot reset', async () => {
     startup({}, { egg: undefined });
-    expect(
-      within(commandSelect())
-        .getAllByRole('option')
-        .map((o) => o.textContent)
-    ).toEqual(['Custom']);
+    expect(await listed(commandSelect())).toEqual(['Custom']);
     expect(
       screen.getByRole('button', { name: 'Reset to default' })
     ).toBeDisabled();
@@ -560,6 +566,16 @@ describe('ResourcesFields', () => {
       screen.getByRole('switch', { name: 'Unlimited Storage' })
     ).toBeChecked();
     expect(screen.getByText('No storage limit.')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['CPU limit (millicores)', 'Unlimited CPU'],
+    ['Memory limit (MiB)', 'Unlimited Memory']
+  ])('renders %s inside its switch row', (input, toggle) => {
+    mount(ResourcesFields);
+    expect(
+      screen.getByLabelText(input).closest('[data-slot="item"]')
+    ).toContainElement(screen.getByRole('switch', { name: toggle }));
   });
 
   it('reveals the default when a switch is turned off and hides it again', async () => {

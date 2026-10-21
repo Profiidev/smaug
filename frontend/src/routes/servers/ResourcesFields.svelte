@@ -62,18 +62,21 @@
           bind:checked={$formData[limit.switchKey]}
         />
       </Item.Actions>
+      {#if !$formData[limit.switchKey]}
+        <Item.Footer>
+          <div class="w-full md:max-w-xs">
+            <FormInput
+              {...props}
+              key={limit.key}
+              label="{limit.label} limit ({limit.unit})"
+              type="number"
+              min={0}
+            />
+          </div>
+        </Item.Footer>
+      {/if}
     </Item.Root>
-    {#if !$formData[limit.switchKey]}
-      <div class="md:max-w-xs">
-        <FormInput
-          {...props}
-          key={limit.key}
-          label="{limit.label} limit ({limit.unit})"
-          type="number"
-          min={0}
-        />
-      </div>
-    {:else if $errors[limit.key]}
+    {#if $formData[limit.switchKey] && $errors[limit.key]}
       <!-- A server error on a hidden limit still needs to be seen. -->
       <Form.Field form={props.formData} name={limit.key}>
         <Form.FieldErrors />

@@ -41,6 +41,15 @@ beforeEach(() => {
 
 const tick = async (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
+/** The bits-ui Select: opens from the keyboard (jsdom can't drive pointerdown), items select on pointerup. */
+const chooseStatus = async (name: string) => {
+  await fireEvent.keyDown(screen.getByLabelText('Filter by status'), {
+    key: 'ArrowDown'
+  });
+  await fireEvent.pointerUp(await screen.findByRole('option', { name }));
+  await tick();
+};
+
 const result = (status: number, body: unknown) =>
   ({
     data: status === 200 ? body : undefined,
@@ -110,9 +119,7 @@ describe('servers list page', () => {
     async (list) => {
       renderList(listData(list));
       expect(await screen.findByText('No servers yet')).toBeInTheDocument();
-      expect(
-        screen.getAllByRole('link', { name: 'Create server' })
-      ).toHaveLength(1);
+      expect(screen.getAllByRole('link', { name: 'Create' })).toHaveLength(1);
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
       expect(
         screen.queryByLabelText('Filter by status')
@@ -123,16 +130,17 @@ describe('servers list page', () => {
   it('filters by status', async () => {
     renderList();
     await screen.findByText('2 servers');
-    await fireEvent.change(screen.getByLabelText('Filter by status'), {
-      target: { value: 'installing' }
-    });
+    await chooseStatus('Installing');
+    expect(screen.getByLabelText('Filter by status')).toHaveTextContent(
+      'Installing'
+    );
     expect(await screen.findByText('1 server')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'survival' })).toBeNull();
     expect(screen.getByRole('link', { name: 'creative' })).toBeInTheDocument();
-    await fireEvent.change(screen.getByLabelText('Filter by status'), {
-      target: { value: 'suspended' }
-    });
+    await chooseStatus('Suspended');
     expect(await screen.findByText('0 servers')).toBeInTheDocument();
+    await chooseStatus('All statuses');
+    expect(await screen.findByText('2 servers')).toBeInTheDocument();
   });
 
   it('searches by node and allocation', async () => {
@@ -150,9 +158,10 @@ describe('servers list page', () => {
     renderList();
     await screen.findByText('2 servers');
     await vi.waitFor(() =>
-      expect(
-        screen.getByRole('link', { name: 'Create server' })
-      ).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('link', { name: 'Create' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
     );
   });
 
@@ -160,9 +169,10 @@ describe('servers list page', () => {
     renderList(listData(servers, readonlyUser));
     await screen.findByText('2 servers');
     await vi.waitFor(() =>
-      expect(
-        screen.getByRole('link', { name: 'Create server' })
-      ).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('link', { name: 'Create' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
     );
     const row = screen.getByRole('link', { name: 'survival' }).closest('tr')!;
     for (const b of row.querySelectorAll('button')) {
@@ -277,9 +287,7 @@ describe('server create page', () => {
   };
 
   const submitWizard = async () => {
-    await fireEvent.click(
-      screen.getByRole('button', { name: /Create server/ })
-    );
+    await fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await tick(50);
   };
 
@@ -350,11 +358,15 @@ describe('server create page', () => {
     expect(screen.getByLabelText('Server Jar File')).toHaveValue('server.jar');
     await fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
     await tick(50);
-    expect(screen.getByLabelText('Startup command')).toHaveValue('Default');
+    expect(screen.getByLabelText('Startup command').textContent?.trim()).toBe(
+      'Default'
+    );
     expect(screen.getByLabelText('Command')).toHaveValue(
       'java -jar {{SERVER_JARFILE}}'
     );
-    expect(screen.getByLabelText('Image name')).toHaveValue('Java 17');
+    expect(screen.getByLabelText('Image name').textContent?.trim()).toBe(
+      'Java 17'
+    );
   });
 
   it('reloads the egg stages after confirming an egg change', async () => {
@@ -376,7 +388,9 @@ describe('server create page', () => {
     await tick();
     await next();
     expect(screen.getByLabelText('Command')).toHaveValue('./run.sh');
-    expect(screen.getByLabelText('Image name')).toHaveValue('Alpine');
+    expect(screen.getByLabelText('Image name').textContent?.trim()).toBe(
+      'Alpine'
+    );
     await next();
     expect(screen.getByText('No variables')).toBeInTheDocument();
   });

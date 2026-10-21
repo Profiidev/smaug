@@ -56,6 +56,12 @@ const pick = async (page: Page, label: string, option: string) => {
   await page.getByRole('option', { name: option }).click();
 };
 
+/** Opens the bits-ui Select `trigger` and picks `option`. */
+const choose = async (page: Page, trigger: Locator, option: string) => {
+  await trigger.click();
+  await page.getByRole('option', { exact: true, name: option }).click();
+};
+
 /** Fills the General stage with valid values (owner is prefilled). */
 const fillGeneral = async (page: Page, egg = 'Paper') => {
   await page.getByLabel('Name', { exact: true }).fill('Survival');
@@ -98,7 +104,7 @@ test.describe('servers list', () => {
     ).toBeVisible();
 
     await expect(
-      page.getByRole('link', { name: 'Create server' })
+      page.getByRole('link', { exact: true, name: 'Create' })
     ).toHaveAttribute('href', '/servers/create');
     await expectNoHorizontalOverflow(page);
   });
@@ -130,12 +136,12 @@ test.describe('servers list', () => {
     await gotoReady(page, '/servers');
     const filter = page.getByLabel('Filter by status');
 
-    await filter.selectOption({ label: 'Suspended' });
+    await choose(page, filter, 'Suspended');
     await expect(row(page, 'Banned Realm')).toBeVisible();
     await expect(row(page, 'Survival SMP')).toBeHidden();
     await expect(page.getByText('1 server', { exact: true })).toBeVisible();
 
-    await filter.selectOption({ label: 'All statuses' });
+    await choose(page, filter, 'All statuses');
     await expect(page.getByText('5 servers')).toBeVisible();
   });
 
@@ -145,9 +151,9 @@ test.describe('servers list', () => {
 
     await expect(page.getByText('No servers yet')).toBeVisible();
     // The empty state carries the only create action and no filter.
-    await expect(page.getByRole('link', { name: 'Create server' })).toHaveCount(
-      1
-    );
+    await expect(
+      page.getByRole('link', { exact: true, name: 'Create' })
+    ).toHaveCount(1);
     await expect(page.getByLabel('Filter by status')).toBeHidden();
     await expectNoHorizontalOverflow(page);
   });
@@ -238,6 +244,25 @@ test.describe('servers list', () => {
 test.describe('server create', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
+  test('keeps the header right above the wizard card', async ({ page }) => {
+    await gotoReady(page, '/servers/create');
+    await expect(page.getByLabel('Name', { exact: true })).toBeVisible();
+    const header = (await page
+      .getByRole('link', { name: 'Back to servers' })
+      .boundingBox())!;
+    const card = (await page
+      .locator('[data-slot=card]')
+      .first()
+      .boundingBox())!;
+    // Directly above the card (gap-4), not pinned to the page top.
+    const gap = card.y - (header.y + header.height);
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(24);
+    // Left-aligned with the card; mobile shifts it past the sidebar trigger (ml-7).
+    expect(header.x - card.x).toBeGreaterThanOrEqual(0);
+    expect(header.x - card.x).toBeLessThanOrEqual(29);
+  });
+
   test('creates a server and posts the form', async ({ network, page }) => {
     const bodies: unknown[] = [];
     network.use(
@@ -281,10 +306,18 @@ test.describe('server create', () => {
     // Resources: limit CPU, keep the rest unlimited.
     await expect(stageTitle(page, 'Resources')).toBeVisible();
     await page.getByRole('switch', { name: 'Unlimited CPU' }).click();
+    // The limit input sits inside its switch's bordered row.
+    await expect(
+      page
+        .locator('[data-slot=item]', {
+          has: page.getByRole('switch', { name: 'Unlimited CPU' })
+        })
+        .getByLabel('CPU limit (millicores)')
+    ).toBeVisible();
     await page.getByLabel('CPU limit (millicores)').fill('1500');
     await page.getByLabel('Backup limit').fill('3');
     await expectNoHorizontalOverflow(page);
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     await expect(page).toHaveURL(/\/servers\/srv-new$/);
     await expect(page.getByText('Server created successfully.')).toBeVisible();
@@ -375,6 +408,13 @@ test.describe('server create', () => {
     await next(page);
     await expect(page.getByText('Duplicate allocation.')).toBeVisible();
 
+    // 0.0.0.0 already covers every IPv4 address on that port.
+    await submitWith(
+      page,
+      async () => page.getByLabel('IP address').nth(1).fill('127.0.0.1'),
+      page.getByText('Overlaps another allocation on the same port.')
+    );
+
     // Port range.
     await submitWith(
       page,
@@ -441,9 +481,7 @@ test.describe('server create', () => {
     await expect(page.getByText('Follows the egg.')).toBeVisible();
 
     // Picking a non-default egg command overrides.
-    await page
-      .getByLabel('Startup command')
-      .selectOption({ label: 'Aikar flags' });
+    await choose(page, page.getByLabel('Startup command'), 'Aikar flags');
     await expect(command).toHaveValue(
       'java -XX:+UseG1GC -jar {{SERVER_JARFILE}}'
     );
@@ -452,7 +490,7 @@ test.describe('server create', () => {
     await page.getByRole('button', { name: 'Reset to default' }).click();
     await expect(command).toHaveValue('java -jar {{SERVER_JARFILE}}');
     await expect(page.getByText('Overridden')).toBeHidden();
-    await expect(page.getByLabel('Startup command')).toHaveValue('Default');
+    await expect(page.getByLabel('Startup command')).toHaveText('Default');
 
     // Typing overrides and switches the select to Custom.
     await command.fill('java -jar custom.jar');
@@ -460,12 +498,12 @@ test.describe('server create', () => {
     await expect(
       page.getByText('This server uses its own command.')
     ).toBeVisible();
-    await expect(page.getByLabel('Startup command')).toHaveValue('');
+    await expect(page.getByLabel('Startup command')).toHaveText('Custom');
 
     // Picking Custom keeps the text editable and marks it overridden.
     await page.getByRole('button', { name: 'Reset to default' }).click();
-    await page.getByLabel('Startup command').selectOption({ label: 'Custom' });
-    await expect(page.getByLabel('Startup command')).toHaveValue('');
+    await choose(page, page.getByLabel('Startup command'), 'Custom');
+    await expect(page.getByLabel('Startup command')).toHaveText('Custom');
     await expect(command).toHaveValue('java -jar {{SERVER_JARFILE}}');
     await expect(page.getByText('Overridden')).toBeVisible();
     await expect(
@@ -473,7 +511,7 @@ test.describe('server create', () => {
     ).toBeVisible();
     await expect(command).toBeEditable();
     await command.fill('java -jar picked.jar');
-    await expect(page.getByLabel('Startup command')).toHaveValue('');
+    await expect(page.getByLabel('Startup command')).toHaveText('Custom');
   });
 
   test('picks an egg image or a custom one', async ({ page }) => {
@@ -483,24 +521,24 @@ test.describe('server create', () => {
 
     const image = page.getByLabel('Image', { exact: true });
     const select = page.getByLabel('Image name');
-    await select.selectOption({ label: 'Java 17' });
+    await choose(page, select, 'Java 17');
     await expect(image).toHaveValue('ghcr.io/pelican-eggs/yolks:java_17');
     await expect(page.getByText('Custom image. Must be')).toBeHidden();
 
     await image.fill('registry.example/custom:1');
-    await expect(select).toHaveValue('');
+    await expect(select).toHaveText('Custom image');
     await expect(page.getByText('Custom image. Must be')).toBeVisible();
 
     // Picking Custom image switches to custom mode and keeps the field.
-    await select.selectOption({ label: 'Java 17' });
-    await select.selectOption({ label: 'Custom image' });
-    await expect(select).toHaveValue('');
+    await choose(page, select, 'Java 17');
+    await choose(page, select, 'Custom image');
+    await expect(select).toHaveText('Custom image');
     await expect(image).toHaveValue('ghcr.io/pelican-eggs/yolks:java_17');
     await expect(page.getByText('Custom image. Must be')).toBeVisible();
     await image.fill('');
     await next(page);
     await expect(page.getByText('Image is required.')).toBeVisible();
-    await expect(select).toHaveValue('');
+    await expect(select).toHaveText('Custom image');
   });
 
   test('validates variables against egg rules', async ({ page }) => {
@@ -685,7 +723,7 @@ test.describe('server create', () => {
     await page.getByLabel('CPU limit (millicores)').fill('-1');
     await page.getByLabel('Memory limit (MiB)').fill('');
     await page.getByLabel('Backup limit').fill('-2');
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
     await expect(
       page.getByText('CPU must be 0 or more millicores.')
     ).toBeVisible();
@@ -699,7 +737,7 @@ test.describe('server create', () => {
     await page.getByRole('switch', { name: 'Unlimited CPU' }).click();
     await page.getByRole('switch', { name: 'Unlimited Memory' }).click();
     await page.getByLabel('Backup limit').fill('0');
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
     await expect(page).toHaveURL(/\/servers\/srv-new$/);
   });
 
@@ -718,7 +756,7 @@ test.describe('server create', () => {
     await next(page);
     await next(page);
     await next(page);
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     // Jumps back to the first stage with an error.
     await expect(
@@ -749,7 +787,7 @@ test.describe('server create', () => {
     await next(page);
     await next(page);
     await next(page);
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     await expect(
       page.getByText("Couldn't create server: an allocation is already in use.")
@@ -771,7 +809,7 @@ test.describe('server create', () => {
     await next(page);
     await next(page);
     await next(page);
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     await expect(stageTitle(page, 'General')).toBeVisible();
     await expect(page.getByText('Too many allocations.')).toBeVisible();
@@ -791,7 +829,7 @@ test.describe('server create', () => {
     await next(page);
     await next(page);
     await next(page);
-    await page.getByRole('button', { name: 'Create server' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     await expect(page.getByText('Odd failure.')).toBeVisible();
     await expect(stageTitle(page, 'Resources')).toBeVisible();
@@ -843,7 +881,7 @@ test.describe('servers without server:edit', () => {
 
     await expect(row(page, 'Survival SMP')).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Create server' })
+      page.getByRole('link', { exact: true, name: 'Create' })
     ).toHaveAttribute('aria-disabled', 'true');
     // Owners and write grantees edit without server:edit; the page enforces access.
     const edit = row(page, 'Survival SMP').getByRole('link').last();
@@ -1195,11 +1233,9 @@ test.describe('server edit (admin)', () => {
     await expect(
       page.getByRole('switch', { name: 'Run install script' })
     ).toHaveCount(0);
-    await page
-      .getByLabel('Startup command')
-      .selectOption({ label: 'Aikar flags' });
+    await choose(page, page.getByLabel('Startup command'), 'Aikar flags');
     await expect(page.getByText('Overridden')).toBeVisible();
-    await page.getByLabel('Image name').selectOption({ label: 'Java 17' });
+    await choose(page, page.getByLabel('Image name'), 'Java 17');
 
     await openTab(page, 'Variables');
     await page.getByLabel('Max Players').fill('64');

@@ -209,7 +209,7 @@
       size="icon"
       variant="ghost"
       href="/eggs"
-      class="mr-2"
+      class="mr-2 cursor-pointer"
       aria-label="Back to eggs"
     >
       <ArrowLeft class="size-5" />

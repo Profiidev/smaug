@@ -43,6 +43,7 @@
       </span>
     </div>
     <Button
+      class="cursor-pointer"
       size="sm"
       variant="outline"
       type="button"
@@ -67,6 +68,7 @@
               <Collapsible.Trigger>
                 {#snippet child({ props: triggerProps })}
                   <Button
+                    class="cursor-pointer"
                     {...triggerProps}
                     size="icon-sm"
                     variant="ghost"
@@ -89,6 +91,7 @@
             </Card.Title>
             <Card.Action>
               <Button
+                class="cursor-pointer"
                 size="icon-sm"
                 variant="destructive"
                 type="button"
@@ -124,6 +127,7 @@
               <div class="flex items-center justify-between gap-2">
                 <span class="text-sm font-medium">Find entries</span>
                 <Button
+                  class="cursor-pointer"
                   size="sm"
                   variant="ghost"
                   type="button"

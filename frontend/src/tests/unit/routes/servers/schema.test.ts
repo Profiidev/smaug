@@ -220,6 +220,58 @@ describe('generalStage', () => {
       'allocations.3.port': ['Duplicate allocation.']
     });
   });
+
+  const OVERLAP = 'Overlaps another allocation on the same port.';
+  const pair = (a: string, b: string, portB = 2000) =>
+    issues(
+      generalStage,
+      general({
+        allocations: [
+          { ip: a, port: 2000 },
+          { ip: b, port: portB }
+        ]
+      })
+    );
+
+  it.each([
+    ['0.0.0.0', '127.0.0.1'],
+    ['127.0.0.1', '0.0.0.0'],
+    ['::', '10.0.0.5'],
+    ['10.0.0.5', '::'],
+    ['::', '::1'],
+    ['::1', '::'],
+    ['0.0.0.0', '::'],
+    ['::', '0.0.0.0'],
+    ['0:0::0', '127.0.0.1']
+  ])('flags %s and %s on the same port as overlapping', (a, b) => {
+    expect(pair(a, b)).toEqual({ 'allocations.1.port': [OVERLAP] });
+  });
+
+  it.each([
+    ['0.0.0.0', '::1'],
+    ['::1', '0.0.0.0'],
+    ['0.0.0.0', '::ffff:127.0.0.1'],
+    ['10.0.0.5', '10.0.0.6']
+  ])('accepts %s and %s on the same port', (a, b) => {
+    expect(pair(a, b)).toEqual({});
+  });
+
+  it.each([
+    ['0.0.0.0', '127.0.0.1'],
+    ['::', '::1'],
+    ['0.0.0.0', '0.0.0.0']
+  ])('accepts %s and %s on different ports', (a, b) => {
+    expect(pair(a, b, 2001)).toEqual({});
+  });
+
+  it.each([
+    ['0.0.0.0', '0.0.0.0'],
+    ['::', '0:0::0']
+  ])('keeps the duplicate message for %s and %s', (a, b) => {
+    expect(pair(a, b)).toEqual({
+      'allocations.1.port': ['Duplicate allocation.']
+    });
+  });
 });
 
 describe('startupStage', () => {
@@ -671,6 +723,17 @@ describe('mapFieldErrors', () => {
       first: undefined,
       other: [`bad ${field}`],
       sections: {}
+    });
+  });
+
+  it('maps a backend overlap message onto the allocation row', () => {
+    const message = 'Overlaps another allocation on the same port.';
+    expect(
+      mapFieldErrors({ errors: [{ field: 'allocations.1', message }] }, form)
+    ).toEqual({
+      first: 'general',
+      other: [],
+      sections: { general: { 'allocations.1.ip': message } }
     });
   });
 

@@ -135,7 +135,7 @@ const finishWizard = async (page: Page) => {
     // oxlint-disable-next-line no-await-in-loop
     await expect(ready).toBeVisible();
   }
-  await page.getByRole('button', { name: 'Create Egg' }).click();
+  await page.getByRole('button', { exact: true, name: 'Create' }).click();
 };
 
 test.describe('eggs list', () => {
@@ -155,7 +155,9 @@ test.describe('eggs list', () => {
         'Server templates that define how game servers are installed and run.'
       )
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Create egg' })).toBeVisible();
+    await expect(
+      page.getByRole('link', { exact: true, name: 'Create' })
+    ).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Import JSON' })
     ).toBeVisible();
@@ -178,12 +180,14 @@ test.describe('eggs list', () => {
     await gotoReady(page, '/eggs');
     await expect(page.getByText('No eggs yet')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Create egg' })).toHaveCount(1);
+    await expect(
+      page.getByRole('link', { exact: true, name: 'Create' })
+    ).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Import JSON' })).toHaveCount(
       1
     );
     await expectNoHorizontalOverflow(page);
-    await page.getByRole('link', { name: 'Create egg' }).click();
+    await page.getByRole('link', { exact: true, name: 'Create' }).click();
     await expect(page).toHaveURL(/\/eggs\/create$/);
   });
 
@@ -322,6 +326,27 @@ test.describe('eggs list', () => {
 test.describe('egg create wizard', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
+  test('keeps the header right above the wizard card', async ({ page }) => {
+    await gotoReady(page, '/eggs/create');
+    await expect(
+      page.getByRole('heading', { name: 'Create egg' })
+    ).toBeVisible();
+    const header = (await page
+      .getByRole('link', { name: 'Back to eggs' })
+      .boundingBox())!;
+    const card = (await page
+      .locator('[data-slot=card]')
+      .first()
+      .boundingBox())!;
+    // Directly above the card (gap-4), not pinned to the page top.
+    const gap = card.y - (header.y + header.height);
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(24);
+    // Left-aligned with the card; mobile shifts it past the sidebar trigger (ml-7).
+    expect(header.x - card.x).toBeGreaterThanOrEqual(0);
+    expect(header.x - card.x).toBeLessThanOrEqual(29);
+  });
+
   test('only the stage fields scroll, cards keep their height', async ({
     page
   }) => {
@@ -441,7 +466,7 @@ test.describe('egg create wizard', () => {
     await expect(
       page.getByRole('button', { name: 'Add config file' })
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Create Egg' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     await expect(page.getByText('Egg created successfully.')).toBeVisible();
     await expect(page).toHaveURL(/\/eggs\/egg-new$/);
@@ -608,7 +633,7 @@ test.describe('egg create wizard', () => {
     await expect(card.getByLabel('File Path')).toBeHidden();
     await expect(card.getByText('3 find entries')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Create Egg' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
     await expect(page).toHaveURL(/\/eggs\/egg-new$/);
     const config = create.bodies[0].config as Record<string, string>;
     expect(JSON.parse(config.files)['config.yml']).toEqual({
@@ -969,7 +994,7 @@ test.describe('eggs without egg:edit', () => {
       page.getByRole('cell', { exact: true, name: 'Paper' })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Create egg' })
+      page.getByRole('link', { exact: true, name: 'Create' })
     ).toHaveAttribute('aria-disabled', 'true');
     await expect(
       page.getByRole('row', { name: /Paper/ }).getByRole('button').last()
