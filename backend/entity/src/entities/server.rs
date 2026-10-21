@@ -20,6 +20,8 @@ pub struct Model {
   #[sea_orm(column_type = "Text")]
   pub image: String,
   pub install_state: ServerInstallState,
+  /// Bumped on every (re)install, wings runs each generation once.
+  pub install_generation: i64,
   pub suspended: bool,
   pub start_on_completion: bool,
   pub cpu_limit: i32,

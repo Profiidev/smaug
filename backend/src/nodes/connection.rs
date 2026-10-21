@@ -8,13 +8,14 @@ use std::{
 
 use centaurus::{bail, db::init::Connection, error::Result, eyre::Context};
 use dashmap::DashMap;
-use entity::sea_orm_active_enums::ServerInstallState;
+use entity::{sea_orm_active_enums::ServerInstallState, server};
 use futures_util::{SinkExt, StreamExt};
 use reqwest::Method;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde_json::Value;
 use shared::msg::{
-  Event, Power, PowerRequest, Runtime, ServerState, SyncRequest, SyncResponse, WingsMessage,
+  Event, InstallResult, Power, PowerRequest, Runtime, ServerState, SyncRequest, SyncResponse,
+  WingsMessage,
 };
 use tokio::{
   spawn,
@@ -200,29 +201,60 @@ impl Link {
       .await
       .context("Invalid sync response from wings")?;
 
-    if !res.orphans.is_empty() {
-      warn!("Wings {} has unknown servers: {:?}", self.uuid, res.orphans);
+    // the DB is the source of truth, servers it does not know are deleted
+    for orphan in &res.orphans {
+      info!(
+        "Deleting server {} unknown to the panel from wings {}",
+        orphan, self.uuid
+      );
+      self
+        .push(Method::DELETE, &format!("/servers/{orphan}"), None)
+        .await;
     }
     self.states.clear();
-    for (uuid, state) in &res.states {
-      self.states.insert(*uuid, *state);
+    for (uuid, observed) in &res.servers {
+      if !res.orphans.contains(uuid) {
+        self.states.insert(*uuid, observed.state);
+      }
     }
 
-    for mut server in servers {
-      let state = res.states.get(&server.id).copied().unwrap_or_default();
+    for server in servers {
       let uuid = server.id;
-      if server.install_state == ServerInstallState::Installing && state != ServerState::Installing
-      {
-        // wings lost the install (restart, or the request never arrived)
-        server.install_state = ServerInstallState::InstallFailed;
-        self.db.server().save(server).await?;
-      } else if server.suspended && state != ServerState::Offline {
+      let observed = res.servers.get(&uuid).copied().unwrap_or_default();
+      if server.suspended && is_up(observed.state) {
         self.power(uuid, Power::Kill).await;
+      }
+      if let Some(result) = observed.last_install {
+        // catches up on an InstallFinished missed while disconnected
+        self.apply_install(server, result).await?;
       }
       self
         .updater
         .broadcast(UpdateMessage::Servers { uuid })
         .await;
+    }
+    Ok(())
+  }
+
+  /// Applies a finished install if it is the one the panel waits for. A
+  /// pending install that has not finished is (re)started by the sync itself.
+  async fn apply_install(&self, mut server: server::Model, result: InstallResult) -> Result<()> {
+    let waiting = server.node_id == self.uuid
+      && server.install_state == ServerInstallState::Installing
+      && server.install_generation as u64 == result.generation;
+    if !waiting {
+      return Ok(());
+    }
+    let uuid = server.id;
+    server.install_state = if result.ok {
+      ServerInstallState::Installed
+    } else {
+      ServerInstallState::InstallFailed
+    };
+    let start = result.ok && server.start_on_completion && !server.suspended;
+    self.db.server().save(server).await?;
+    if start {
+      self.power(uuid, Power::Start).await;
     }
     Ok(())
   }
@@ -241,21 +273,9 @@ impl Link {
         self.states.insert(uuid, state);
         uuid
       }
-      Event::InstallFinished { uuid, ok } => {
-        let mut server = self.db.server().find_by_id(uuid).await?;
-        if server.node_id != self.uuid || server.install_state != ServerInstallState::Installing {
-          return Ok(());
-        }
-        server.install_state = if ok {
-          ServerInstallState::Installed
-        } else {
-          ServerInstallState::InstallFailed
-        };
-        let start = ok && server.start_on_completion && !server.suspended;
-        self.db.server().save(server).await?;
-        if start {
-          self.power(uuid, Power::Start).await;
-        }
+      Event::InstallFinished { uuid, result } => {
+        let server = self.db.server().find_by_id(uuid).await?;
+        self.apply_install(server, result).await?;
         uuid
       }
     };
@@ -278,6 +298,14 @@ impl Link {
         .await;
     }
   }
+}
+
+/// Whether the process is (about to be) up and would need a kill.
+fn is_up(state: ServerState) -> bool {
+  matches!(
+    state,
+    ServerState::Starting | ServerState::Running | ServerState::Stopping
+  )
 }
 
 async fn connection_task(

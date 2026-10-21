@@ -27,7 +27,8 @@ pub enum Event {
   },
   InstallFinished {
     uuid: Uuid,
-    ok: bool,
+    #[serde(flatten)]
+    result: InstallResult,
   },
 }
 
@@ -63,6 +64,9 @@ pub struct ServerSpec {
   /// Gitignore-style patterns users may not read or write.
   pub file_denylist: Vec<String>,
   pub install: InstallSpec,
+  /// Generation of the install the panel wants run, `None` when none is
+  /// pending. Wings runs it once, unless its last install already has it.
+  pub install_generation: Option<u64>,
 }
 
 /// How to stop the server gracefully, before falling back to SIGTERM/SIGKILL.
@@ -164,6 +168,24 @@ pub enum ServerState {
   Starting,
   Running,
   Stopping,
+  /// Exited without a stop or kill request. Followed by `Starting` when
+  /// `restart_on_crash` restarts it.
+  Crashed,
+}
+
+/// What wings observed, next to the desired state it stores.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Observed {
+  pub state: ServerState,
+  /// The last install that finished. Lets the panel catch up on
+  /// `InstallFinished` events it missed while disconnected.
+  pub last_install: Option<InstallResult>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InstallResult {
+  pub generation: u64,
+  pub ok: bool,
 }
 
 /// Full desired set for one node, sent on every (re)connect.
@@ -176,5 +198,6 @@ pub struct SyncRequest {
 pub struct SyncResponse {
   /// Servers wings stores that the panel did not list. Never deleted by wings.
   pub orphans: Vec<Uuid>,
-  pub states: HashMap<Uuid, ServerState>,
+  /// Every stored server, orphans included.
+  pub servers: HashMap<Uuid, Observed>,
 }

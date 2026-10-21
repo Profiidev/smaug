@@ -11,7 +11,7 @@ use kube::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use shared::msg::{Event, Runtime, ServerSpec, ServerState};
+use shared::msg::{Event, InstallResult, Observed, Runtime, ServerSpec, ServerState};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
@@ -36,8 +36,8 @@ pub struct Desired {
   pub power: DesiredPower,
   /// Bumped on restart; the runtime restarts servers started before it.
   pub restarted_at: Option<DateTime<Utc>>,
-  /// Bumped on (re)install; the runtime installs when it is ahead of the installed one.
-  pub install_generation: u64,
+  /// Bumped on kill; the runtime kills (no stop steps) servers started before it.
+  pub killed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -47,18 +47,13 @@ pub enum DesiredPower {
   Stopped,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Default)]
-pub struct Observed {
-  pub state: ServerState,
-}
-
 impl Desired {
   pub fn new(server: ServerSpec) -> Self {
     Self {
       server,
       power: DesiredPower::default(),
       restarted_at: None,
-      install_generation: 0,
+      killed_at: None,
     }
   }
 }
@@ -75,7 +70,7 @@ pub struct Store {
 #[derive(Clone)]
 enum Backend {
   // ponytail: lost on restart, the panel resyncs everything on reconnect
-  Memory(Arc<DashMap<Uuid, (Desired, ServerState)>>),
+  Memory(Arc<DashMap<Uuid, (Desired, Observed)>>),
   Kube(Api<GameServer>),
 }
 
@@ -122,6 +117,17 @@ impl Store {
     })
   }
 
+  pub async fn observed(&self, uuid: Uuid) -> Result<Option<Observed>> {
+    Ok(match &self.backend {
+      Backend::Memory(map) => map.get(&uuid).map(|e| e.1),
+      Backend::Kube(api) => api
+        .get_opt(&name(uuid))
+        .await
+        .context("Failed to get GameServer")?
+        .map(|gs| gs.status.unwrap_or_default()),
+    })
+  }
+
   /// Creates or replaces the desired state, keeping the observed state.
   pub async fn put(&self, desired: Desired) -> Result<()> {
     let uuid = desired.server.uuid;
@@ -130,7 +136,7 @@ impl Store {
         map
           .entry(uuid)
           .and_modify(|e| e.0 = desired.clone())
-          .or_insert((desired, ServerState::default()));
+          .or_insert((desired, Observed::default()));
       }
       Backend::Kube(api) => {
         let mut gs = GameServer::new(&name(uuid), desired);
@@ -164,7 +170,7 @@ impl Store {
   }
 
   /// Every stored server with its observed state.
-  pub async fn list(&self) -> Result<Vec<(Uuid, ServerState)>> {
+  pub async fn list(&self) -> Result<Vec<(Uuid, Observed)>> {
     Ok(match &self.backend {
       Backend::Memory(map) => map.iter().map(|e| (*e.key(), e.1)).collect(),
       Backend::Kube(api) => api
@@ -172,20 +178,46 @@ impl Store {
         .await
         .context("Failed to list GameServers")?
         .into_iter()
-        .map(|gs| {
-          let state = gs.status.map(|s| s.state).unwrap_or_default();
-          (gs.spec.server.uuid, state)
-        })
+        .map(|gs| (gs.spec.server.uuid, gs.status.unwrap_or_default()))
         .collect(),
     })
   }
 
   /// Records the observed state and reports it to the panel.
   pub async fn set_state(&self, uuid: Uuid, state: ServerState) -> Result<()> {
+    self
+      .update_observed(uuid, |o| o.state = state, json!({ "state": state }))
+      .await?;
+    // no receiver means no panel is connected, it gets the state on its next sync
+    let _ = self.events.send(Event::State { uuid, state });
+    Ok(())
+  }
+
+  /// Records the end of an install and reports it to the panel. Called by the runtime.
+  #[allow(unused)]
+  pub async fn finish_install(&self, uuid: Uuid, result: InstallResult) -> Result<()> {
+    self
+      .update_observed(
+        uuid,
+        |o| o.last_install = Some(result),
+        json!({ "last_install": result }),
+      )
+      .await?;
+    let _ = self.events.send(Event::InstallFinished { uuid, result });
+    Ok(())
+  }
+
+  /// `apply` for the memory store, `patch` is the same change as a status merge patch.
+  async fn update_observed(
+    &self,
+    uuid: Uuid,
+    apply: impl FnOnce(&mut Observed),
+    patch: serde_json::Value,
+  ) -> Result<()> {
     match &self.backend {
       Backend::Memory(map) => {
         if let Some(mut e) = map.get_mut(&uuid) {
-          e.1 = state;
+          apply(&mut e.1);
         }
       }
       Backend::Kube(api) => {
@@ -193,21 +225,13 @@ impl Store {
           .patch_status(
             &name(uuid),
             &PatchParams::default(),
-            &Patch::Merge(json!({ "status": Observed { state } })),
+            &Patch::Merge(json!({ "status": patch })),
           )
           .await
           .context("Failed to update GameServer status")?;
       }
     }
-    // no receiver means no panel is connected, it gets the state on its next sync
-    let _ = self.events.send(Event::State { uuid, state });
     Ok(())
-  }
-
-  /// Reports the end of an install to the panel. Called by the runtime.
-  #[allow(unused)]
-  pub fn finish_install(&self, uuid: Uuid, ok: bool) {
-    let _ = self.events.send(Event::InstallFinished { uuid, ok });
   }
 }
 
@@ -253,6 +277,7 @@ pub(crate) mod test {
         entrypoint: "bash".into(),
         script: None,
       },
+      install_generation: None,
     }
   }
 
@@ -262,6 +287,11 @@ pub(crate) mod test {
     let uuid = Uuid::new_v4();
     store.put(Desired::new(spec(uuid))).await.unwrap();
     store.set_state(uuid, ServerState::Running).await.unwrap();
+    let result = InstallResult {
+      generation: 2,
+      ok: true,
+    };
+    store.finish_install(uuid, result).await.unwrap();
 
     let mut desired = Desired::new(spec(uuid));
     desired.server.image = "new".into();
@@ -270,7 +300,13 @@ pub(crate) mod test {
     assert_eq!(store.get(uuid).await.unwrap(), Some(desired));
     assert_eq!(
       store.list().await.unwrap(),
-      vec![(uuid, ServerState::Running)]
+      vec![(
+        uuid,
+        Observed {
+          state: ServerState::Running,
+          last_install: Some(result),
+        }
+      )]
     );
 
     store.delete(uuid).await.unwrap();

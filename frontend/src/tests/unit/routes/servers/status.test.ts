@@ -15,6 +15,7 @@ const statuses = Object.keys(STATUS) as ServerStatus[];
 describe('STATUS map', () => {
   it('covers every server status', () => {
     expect(statuses.toSorted()).toEqual([
+      'crashed',
       'install_failed',
       'installing',
       'not_installed',
@@ -86,6 +87,7 @@ describe('availableActions', () => {
     'running',
     'starting',
     'stopping',
+    'crashed',
     'offline',
     'install_failed',
     'not_installed'

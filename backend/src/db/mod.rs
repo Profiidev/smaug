@@ -331,6 +331,7 @@ mod test {
       startup_overridden: false,
       image: "img".into(),
       install_state: entity::sea_orm_active_enums::ServerInstallState::InstallFailed,
+      install_generation: 0,
       suspended: false,
       start_on_completion: true,
       cpu_limit: 0,

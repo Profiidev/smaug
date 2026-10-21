@@ -4,7 +4,7 @@ use std::{
 };
 
 use centaurus::{db::init::Connection, error::Result};
-use entity::{egg, server};
+use entity::{egg, sea_orm_active_enums::ServerInstallState, server};
 use regex::{Captures, Regex};
 use serde_json::Value;
 use shared::msg::{
@@ -70,6 +70,8 @@ pub fn build(
     startup_done: startup_done(&config.startup),
     config_files: config_files(&config.files, &values),
     file_denylist: serde_json::from_value(egg.file_denylist.clone())?,
+    install_generation: (server.install_state == ServerInstallState::Installing)
+      .then_some(server.install_generation as u64),
     install: InstallSpec {
       image: install.container,
       entrypoint: install.entrypoint,

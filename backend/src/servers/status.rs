@@ -10,6 +10,8 @@ pub enum ServerStatus {
   Running,
   Starting,
   Stopping,
+  /// Exited on its own; `restart_on_crash` may start it again.
+  Crashed,
   Offline,
   NotInstalled,
   Installing,
@@ -30,6 +32,7 @@ pub(super) fn status(server: &server::Model, runtime: Option<ServerState>) -> Se
       Some(ServerState::Starting) => ServerStatus::Starting,
       Some(ServerState::Running) => ServerStatus::Running,
       Some(ServerState::Stopping) => ServerStatus::Stopping,
+      Some(ServerState::Crashed) => ServerStatus::Crashed,
       _ => ServerStatus::Offline,
     },
   }
@@ -52,6 +55,7 @@ fn allowed(status: ServerStatus, action: Action) -> bool {
     ServerStatus::Running
     | ServerStatus::Starting
     | ServerStatus::Stopping
+    | ServerStatus::Crashed
     | ServerStatus::Offline
     | ServerStatus::InstallFailed
     | ServerStatus::NotInstalled => action != A::Unsuspend,
@@ -86,6 +90,7 @@ pub(super) mod test {
       startup_overridden: false,
       image: "img".into(),
       install_state: ServerInstallState::Installed,
+      install_generation: 0,
       suspended: false,
       start_on_completion: true,
       cpu_limit: 1000,
@@ -126,6 +131,7 @@ pub(super) mod test {
       (ServerState::Starting, ServerStatus::Starting),
       (ServerState::Running, ServerStatus::Running),
       (ServerState::Stopping, ServerStatus::Stopping),
+      (ServerState::Crashed, ServerStatus::Crashed),
       (ServerState::Offline, ServerStatus::Offline),
       (ServerState::Installing, ServerStatus::Offline),
     ] {
@@ -152,6 +158,7 @@ pub(super) mod test {
         ServerStatus::Stopping,
         [true, true, true, false, true, true],
       ),
+      (ServerStatus::Crashed, [true, true, true, false, true, true]),
       (ServerStatus::Offline, [true, true, true, false, true, true]),
       (
         ServerStatus::InstallFailed,

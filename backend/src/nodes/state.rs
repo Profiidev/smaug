@@ -108,14 +108,6 @@ impl Wings {
     }
   }
 
-  pub async fn install(&self, node: Uuid, server: Uuid) {
-    if let Some(link) = self.link(node) {
-      link
-        .push(Method::POST, &format!("/servers/{server}/install"), None)
-        .await;
-    }
-  }
-
   pub async fn power(&self, node: Uuid, server: Uuid, action: Power) {
     if let Some(link) = self.link(node) {
       link.power(server, action).await;

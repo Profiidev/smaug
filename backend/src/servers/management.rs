@@ -8,6 +8,7 @@ use centaurus::{
 use chrono::Utc;
 use entity::{sea_orm_active_enums::ServerInstallState, server};
 use http::StatusCode;
+use shared::msg::Power;
 use tracing::info;
 use uuid::Uuid;
 
@@ -327,6 +328,7 @@ pub(super) async fn create_server(
     } else {
       ServerInstallState::Installing
     },
+    install_generation: if req.skip_scripts { 0 } else { 1 },
     suspended: false,
     start_on_completion: req.start_on_completion,
     cpu_limit: 0,
@@ -342,9 +344,11 @@ pub(super) async fn create_server(
   db.server()
     .create(server.clone(), allocations, variables)
     .await?;
+  // a pending install is part of the spec; without one no InstallFinished
+  // comes, so start right away
   spec::push(&db, &wings, &server).await;
-  if !req.skip_scripts {
-    wings.install(req.node, id).await;
+  if req.skip_scripts && req.start_on_completion {
+    wings.power(req.node, id, Power::Start).await;
   }
   info!("Created server with ID {}", id);
 

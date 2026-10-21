@@ -30,9 +30,10 @@ pub(super) async fn reinstall_server(
   let (mut server, _) = load(&db, auth.user_id, req.uuid, Access::Write).await?;
   ensure_allowed(&server, Action::Reinstall)?;
   server.install_state = ServerInstallState::Installing;
-  let node = server.node_id;
-  db.server().save(server).await?;
-  wings.install(node, req.uuid).await;
+  server.install_generation += 1;
+  db.server().save(server.clone()).await?;
+  // the spec carries the new install generation, wings runs it once
+  spec::push(&db, &wings, &server).await;
   info!("Reinstalling server with ID {}", req.uuid);
 
   updater
