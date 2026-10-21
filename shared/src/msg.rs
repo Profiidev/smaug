@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
+use chrono::{DateTime, Utc};
+use http::HeaderName;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -41,6 +43,58 @@ pub enum Event {
     uuid: Uuid,
     generation: u64,
   },
+  /// Flushed every 250 ms or 256 lines.
+  Logs {
+    uuid: Uuid,
+    lines: Vec<LogLine>,
+  },
+  /// Every running server, sent every 2 s.
+  Metrics {
+    servers: Vec<ServerMetrics>,
+  },
+  /// End of an operation started with `202 {op}`.
+  OpFinished {
+    op: Uuid,
+    uuid: Uuid,
+    ok: bool,
+    error: Option<String>,
+    result: Option<OpResult>,
+  },
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct LogLine {
+  pub at: DateTime<Utc>,
+  pub stream: LogStream,
+  pub line: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogStream {
+  Console,
+  Install,
+  // wings' own messages, e.g. "Pulling image…"
+  Daemon,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ServerMetrics {
+  pub uuid: Uuid,
+  /// 1000 = one full core.
+  pub cpu_millicores: u64,
+  pub memory_bytes: u64,
+  pub memory_limit_bytes: u64,
+  pub disk_bytes: u64,
+  pub net_rx_bps: u64,
+  pub net_tx_bps: u64,
+  pub uptime_ms: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum OpResult {
+  Stream { sha256: String, size: u64 },
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,6 +252,8 @@ pub enum ServerState {
   /// Exited without a stop or kill request. Followed by `Starting` when
   /// `restart_on_crash` restarts it.
   Crashed,
+  /// A backup is being restored, the server is stopped meanwhile.
+  Restoring,
 }
 
 /// What wings observed, next to the desired state it stores.
@@ -248,4 +304,244 @@ pub struct PrepareRequest {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct PrepareResponse {
   pub disk_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct CommandRequest {
+  pub line: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FileKind {
+  File,
+  Dir,
+  Symlink,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct FileEntry {
+  pub name: String,
+  pub kind: FileKind,
+  pub size: u64,
+  /// Unix permission bits.
+  pub mode: u32,
+  pub modified: DateTime<Utc>,
+  /// Guessed from the name, `None` for directories.
+  pub mime: Option<String>,
+}
+
+/// Paths are relative to the server root, `/` is the root.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct PathQuery {
+  pub path: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct MkdirRequest {
+  pub path: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct RenameRequest {
+  pub moves: Vec<Move>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct Move {
+  pub from: String,
+  pub to: String,
+}
+
+/// Copies `path` to `name copy.ext` next to it.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct CopyRequest {
+  pub path: String,
+}
+
+/// Directories are deleted recursively.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct DeleteRequest {
+  pub paths: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsageResponse {
+  pub bytes: u64,
+}
+
+pub const DEFAULT_CHUNK_SIZE: u64 = 8 * 1024 * 1024;
+pub const DEFAULT_WINDOW: u32 = 4;
+/// Set on the final chunk of an out-stream.
+pub const STREAM_END: HeaderName = HeaderName::from_static("x-stream-end");
+pub const STREAM_SHA256: HeaderName = HeaderName::from_static("x-stream-sha256");
+pub const STREAM_SIZE: HeaderName = HeaderName::from_static("x-stream-size");
+
+/// What an out-stream produces.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum StreamSource {
+  /// tar.zst of the server files, `ignore` are gitignore globs.
+  Backup { ignore: Vec<String> },
+}
+
+/// What an in-stream feeds.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum StreamTarget {
+  /// Requires `size`, chunks may arrive in any order.
+  File { path: String },
+  /// tar.zst, `truncate` empties the server root first.
+  Restore { truncate: bool },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct OpenOutStream {
+  pub source: StreamSource,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct OpenInStream {
+  pub target: StreamTarget,
+  pub size: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StreamOpened {
+  pub stream: Uuid,
+  pub chunk_size: u64,
+  pub window: u32,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct CompleteStream {
+  pub sha256: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct StreamStatus {
+  /// Every chunk below is done.
+  pub next: u32,
+  /// Chunks at or above `next` wings already holds.
+  pub received: Vec<u32>,
+}
+
+/// `202` body of a slow request, see [`Event::OpFinished`].
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OpStarted {
+  pub op: Uuid,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorCode {
+  BadRequest,
+  Denied,
+  NotFound,
+  Conflict,
+  Busy,
+  TooLarge,
+  Unsupported,
+  Quota,
+  Internal,
+}
+
+/// Body of every wings error response.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct ErrorBody {
+  pub code: ErrorCode,
+  pub message: String,
+}
+
+#[cfg(test)]
+mod test {
+  use serde_json::json;
+
+  use super::*;
+
+  fn round_trip<T: Serialize + for<'de> Deserialize<'de> + PartialEq + std::fmt::Debug>(
+    value: T,
+    expected: Value,
+  ) {
+    assert_eq!(serde_json::to_value(&value).unwrap(), expected);
+    assert_eq!(serde_json::from_value::<T>(expected).unwrap(), value);
+  }
+
+  #[test]
+  fn events() {
+    let uuid = Uuid::nil();
+    let at = DateTime::from_timestamp_millis(1_000).unwrap();
+    round_trip(
+      Event::Logs {
+        uuid,
+        lines: vec![LogLine {
+          at,
+          stream: LogStream::Daemon,
+          line: "hi".into(),
+        }],
+      },
+      json!({"type": "Logs", "uuid": uuid, "lines": [
+        {"at": "1970-01-01T00:00:01Z", "stream": "daemon", "line": "hi"}
+      ]}),
+    );
+    round_trip(
+      Event::OpFinished {
+        op: uuid,
+        uuid,
+        ok: true,
+        error: None,
+        result: Some(OpResult::Stream {
+          sha256: "ab".into(),
+          size: 3,
+        }),
+      },
+      json!({"type": "OpFinished", "op": uuid, "uuid": uuid, "ok": true, "error": null,
+        "result": {"type": "stream", "sha256": "ab", "size": 3}}),
+    );
+    round_trip(
+      Event::State {
+        uuid,
+        state: ServerState::Restoring,
+      },
+      json!({"type": "State", "uuid": uuid, "state": "restoring"}),
+    );
+  }
+
+  #[test]
+  fn requests() {
+    round_trip(
+      OpenInStream {
+        target: StreamTarget::Restore { truncate: true },
+        size: None,
+      },
+      json!({"target": {"type": "restore", "truncate": true}, "size": null}),
+    );
+    round_trip(
+      OpenOutStream {
+        source: StreamSource::Backup {
+          ignore: vec!["*.log".into()],
+        },
+      },
+      json!({"source": {"type": "backup", "ignore": ["*.log"]}}),
+    );
+    round_trip(
+      ErrorBody {
+        code: ErrorCode::TooLarge,
+        message: "x".into(),
+      },
+      json!({"code": "too_large", "message": "x"}),
+    );
+    round_trip(
+      FileEntry {
+        name: "a".into(),
+        kind: FileKind::Symlink,
+        size: 1,
+        mode: 0o644,
+        modified: DateTime::from_timestamp_millis(0).unwrap(),
+        mime: None,
+      },
+      json!({"name": "a", "kind": "symlink", "size": 1, "mode": 420,
+        "modified": "1970-01-01T00:00:00Z", "mime": null}),
+    );
+  }
 }

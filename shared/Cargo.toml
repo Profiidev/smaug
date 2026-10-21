@@ -8,12 +8,12 @@ centaurus = { version = "0.17.7", default-features = false, features = [
   "error",
   "http"
 ] }
-chrono = "0.4.45"
+chrono = { version = "0.4.45", features = ["serde"] }
 hex = "0.4.3"
 hmac = "0.13.0"
 http = "1.5.0"
 rand = "0.10.3"
-schemars = { version = "1.2.3", features = ["uuid1"] }
+schemars = { version = "1.2.3", features = ["chrono04", "uuid1"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"

@@ -488,6 +488,7 @@ impl Link {
         self.apply_stopped(uuid, generation).await?;
         uuid
       }
+      Event::Logs { .. } | Event::Metrics { .. } | Event::OpFinished { .. } => return Ok(()),
     };
     self
       .updater

@@ -36,7 +36,9 @@ pub(super) fn status(server: &server::Model, runtime: Option<ServerState>) -> Se
       Some(ServerState::Running) => ServerStatus::Running,
       Some(ServerState::Stopping) => ServerStatus::Stopping,
       Some(ServerState::Crashed) => ServerStatus::Crashed,
-      Some(ServerState::Offline | ServerState::Installing) => ServerStatus::Offline,
+      Some(ServerState::Offline | ServerState::Installing | ServerState::Restoring) => {
+        ServerStatus::Offline
+      }
       None => ServerStatus::Unknown,
     },
   }
