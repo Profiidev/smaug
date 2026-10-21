@@ -1,6 +1,6 @@
 use std::{
   collections::{BTreeMap, HashMap},
-  path::{Path, PathBuf},
+  path::PathBuf,
   pin::Pin,
   time::Duration,
 };
@@ -9,25 +9,32 @@ use bollard::{
   container::LogOutput,
   errors::Error as DockerError,
   models::{
-    ContainerCreateBody, HostConfig, HostConfigLogConfig, NetworkCreateRequest, PortBinding,
+    ContainerCreateBody, HostConfig, HostConfigLogConfig, Mount, MountTypeEnum, MountVolumeOptions,
+    NetworkConnectRequest, NetworkCreateRequest, PortBinding, RestartPolicy, RestartPolicyNameEnum,
+    VolumeCreateRequest,
   },
   query_parameters::{
     AttachContainerOptionsBuilder, CreateContainerOptionsBuilder, CreateImageOptionsBuilder,
     EventsOptionsBuilder, KillContainerOptionsBuilder, LogsOptionsBuilder,
-    RemoveContainerOptionsBuilder,
+    RemoveContainerOptionsBuilder, RemoveVolumeOptionsBuilder, UploadToContainerOptionsBuilder,
   },
 };
 use centaurus::{error::Result, eyre::Context};
 use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, TryStreamExt};
-use shared::msg::{ServerSpec, Signal};
+use shared::{
+  auth::agent_token,
+  msg::{ServerSpec, Signal},
+};
 use tokio::{io::AsyncWrite, sync::mpsc, time::timeout};
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::config::Config;
+
 const LABEL: &str = "smaug.server";
 /// Same uid/gid as Pterodactyl's default `pterodactyl` user.
-pub const CONTAINER_UID: u32 = 988;
+const CONTAINER_UID: u32 = 988;
 const PULL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 // Pterodactyl defaults for everything below.
 const DNS: [&str; 2] = ["1.1.1.1", "1.0.0.1"];
@@ -61,20 +68,10 @@ pub struct Container {
   pub started_at: Option<DateTime<Utc>>,
 }
 
-/// Host paths of one server.
-pub struct Paths {
-  pub root: PathBuf,
-  pub files: PathBuf,
-}
-
-impl Paths {
-  pub fn new(data_dir: &Path, uuid: Uuid) -> Self {
-    let root = data_dir.join(uuid.to_string());
-    Self {
-      files: root.join("files"),
-      root,
-    }
-  }
+/// A running agent: where to reach it and how to authenticate.
+pub struct Agent {
+  pub url: String,
+  pub token: String,
 }
 
 #[derive(Clone)]
@@ -84,14 +81,39 @@ pub struct Docker {
   /// Gateway of `network`, what Pterodactyl calls `docker.network.interface`.
   pub interface: String,
   timezone: String,
+  agent_image: String,
+  agent_network: String,
+  /// The wings token, agent tokens are derived from it.
+  secret: String,
+  install_log_dir: PathBuf,
 }
 
+/// Game container and the server's volume.
 pub fn name(uuid: Uuid) -> String {
   format!("smaug-{uuid}")
 }
 
 fn installer_name(uuid: Uuid) -> String {
   format!("smaug-{uuid}_installer")
+}
+
+fn agent_name(uuid: Uuid) -> String {
+  format!("smaug-{uuid}_agent")
+}
+
+/// The server's volume at `target`. `no_copy` keeps image content out of it,
+/// like the bind mount Wings uses.
+fn volume(uuid: Uuid, target: &str) -> Mount {
+  Mount {
+    target: Some(target.into()),
+    source: Some(name(uuid)),
+    typ: Some(MountTypeEnum::VOLUME),
+    volume_options: Some(MountVolumeOptions {
+      no_copy: Some(true),
+      ..Default::default()
+    }),
+    ..Default::default()
+  }
 }
 
 fn not_found(err: &DockerError) -> bool {
@@ -105,16 +127,133 @@ fn not_found(err: &DockerError) -> bool {
 }
 
 impl Docker {
-  pub async fn new(network: &str, timezone: &str) -> Result<Self> {
+  pub async fn new(config: &Config) -> Result<Self> {
     let client = bollard::Docker::connect_with_defaults().context("Failed to connect to docker")?;
-    let interface = ensure_network(&client, network).await?;
+    let network = &config.docker_network;
+    let interface = ensure_network(&client, network, false).await?;
     info!("Using docker network {network} with interface {interface}");
+    ensure_network(&client, &config.agent_network, true).await?;
+    join_network(&client, &config.agent_network).await?;
     Ok(Self {
       client,
-      network: network.into(),
+      network: network.clone(),
       interface,
-      timezone: timezone.into(),
+      timezone: config.timezone.clone(),
+      agent_image: config.agent_image.clone(),
+      agent_network: config.agent_network.clone(),
+      secret: config.token.clone(),
+      install_log_dir: config.install_log_dir.clone(),
     })
+  }
+
+  /// Creates the server's volume, limited to `disk_mb` where the filesystem
+  /// supports it (XFS with pquota). Elsewhere the agent's disk scan is the limit.
+  /// ponytail: the size is set once, a later `disk_mb` change is only enforced by the scan
+  pub async fn ensure_volume(&self, spec: &ServerSpec) -> Result<()> {
+    let request = |size: bool| VolumeCreateRequest {
+      name: Some(name(spec.uuid)),
+      driver: Some("local".into()),
+      driver_opts: (size && spec.limits.disk_mb > 0)
+        .then(|| HashMap::from([("size".into(), format!("{}m", spec.limits.disk_mb))])),
+      labels: Some(labels(spec.uuid)),
+      ..Default::default()
+    };
+    match self.client.create_volume(request(true)).await {
+      Err(err) if err.to_string().contains("quota") => {
+        self
+          .client
+          .create_volume(request(false))
+          .await
+          .context("Failed to create volume")?;
+      }
+      res => {
+        res.context("Failed to create volume")?;
+      }
+    }
+    Ok(())
+  }
+
+  /// Starts the server's agent, recreating it when `agent_image` changed.
+  pub async fn ensure_agent(&self, uuid: Uuid) -> Result<Agent> {
+    let name = agent_name(uuid);
+    let image = match self.client.inspect_image(&self.agent_image).await {
+      Err(err) if not_found(&err) => {
+        self.pull(&self.agent_image).await?;
+        self.client.inspect_image(&self.agent_image).await
+      }
+      res => res,
+    }
+    .context("Failed to inspect agent image")?;
+
+    let current = match self.client.inspect_container(&name, None).await {
+      Err(err) if not_found(&err) => None,
+      res => Some(res.context("Failed to inspect agent")?),
+    };
+    let outdated = current.as_ref().is_some_and(|c| c.image != image.id);
+    if outdated {
+      info!("Agent image changed, recreating agent of {uuid}");
+      self.remove(&name).await?;
+    }
+    if current.is_none() || outdated {
+      let host = HostConfig {
+        mounts: Some(vec![volume(uuid, "/data")]),
+        network_mode: Some(self.agent_network.clone()),
+        readonly_rootfs: Some(true),
+        cap_drop: Some(vec!["ALL".into()]),
+        // chown and reading or writing files of the container user
+        cap_add: Some(vec!["CHOWN".into(), "DAC_OVERRIDE".into(), "FOWNER".into()]),
+        security_opt: Some(vec!["no-new-privileges".into()]),
+        restart_policy: Some(RestartPolicy {
+          name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
+          ..Default::default()
+        }),
+        pids_limit: Some(64),
+        ..Default::default()
+      };
+      let config = ContainerCreateBody {
+        image: image.id.clone(),
+        user: Some("0:0".into()),
+        env: Some(vec![
+          format!("TOKEN={}", self.agent_token(uuid)?),
+          "ROOT=/data".into(),
+        ]),
+        labels: Some(labels(uuid)),
+        host_config: Some(host),
+        ..Default::default()
+      };
+      let options = CreateContainerOptionsBuilder::default().name(&name).build();
+      self
+        .client
+        .create_container(Some(options), config)
+        .await
+        .context("Failed to create agent")?;
+    }
+    // starting a running container is a no-op (304)
+    self
+      .client
+      .start_container(&name, None)
+      .await
+      .context("Failed to start agent")?;
+
+    let info = self
+      .client
+      .inspect_container(&name, None)
+      .await
+      .context("Failed to inspect agent")?;
+    let ip = info
+      .network_settings
+      .and_then(|n| n.networks)
+      .and_then(|n| n.get(&self.agent_network)?.ip_address.clone())
+      .filter(|ip| !ip.is_empty())
+      .ok_or_else(|| centaurus::eyre::eyre!("Agent of {uuid} has no ip"))?;
+    Ok(Agent {
+      url: format!("http://{ip}:8000"),
+      token: self.agent_token(uuid)?,
+    })
+  }
+
+  fn agent_token(&self, uuid: Uuid) -> Result<String> {
+    agent_token(&self.secret, uuid)
   }
 
   pub async fn inspect(&self, uuid: Uuid) -> Result<Option<Container>> {
@@ -174,14 +313,14 @@ impl Docker {
 
   /// Recreates and starts the server container. Attaches before starting so no
   /// output is missed.
-  pub async fn start(&self, spec: &ServerSpec, paths: &Paths) -> Result<(Stdin, Output)> {
+  pub async fn start(&self, spec: &ServerSpec) -> Result<(Stdin, Output)> {
     let image = self.pull(&spec.image).await?;
     let name = name(spec.uuid);
     self.remove(&name).await?;
 
     let (exposed, bindings) = self.ports(spec);
     let host = HostConfig {
-      binds: Some(vec![format!("{}:/home/container", paths.files.display())]),
+      mounts: Some(vec![volume(spec.uuid, "/home/container")]),
       port_bindings: Some(bindings),
       readonly_rootfs: Some(true),
       cap_drop: Some(SERVER_CAP_DROP.map(String::from).to_vec()),
@@ -260,24 +399,28 @@ impl Docker {
     }
   }
 
-  pub async fn teardown(&self, uuid: Uuid, paths: &Paths) -> Result<()> {
-    self.remove(&name(uuid)).await?;
-    self.remove(&installer_name(uuid)).await?;
-    match tokio::fs::remove_dir_all(&paths.root).await {
-      Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-      res => Ok(res.context("Failed to remove server data")?),
+  pub async fn teardown(&self, uuid: Uuid) -> Result<()> {
+    for name in [name(uuid), installer_name(uuid), agent_name(uuid)] {
+      self.remove(&name).await?;
     }
+    let options = RemoveVolumeOptionsBuilder::default().force(true).build();
+    match self.client.remove_volume(&name(uuid), Some(options)).await {
+      Err(err) if not_found(&err) => (),
+      res => res.context("Failed to remove volume")?,
+    }
+    let _ = tokio::fs::remove_file(self.install_log(uuid)).await;
+    Ok(())
+  }
+
+  pub fn install_log(&self, uuid: Uuid) -> PathBuf {
+    self.install_log_dir.join(format!("{uuid}.log"))
   }
 
   /// Runs the install script like Wings: `install.image` as root, `files` at
   /// `/mnt/server`, the script at `/mnt/install/install.sh`. Like Wings, the
   /// script's exit code does not fail the install, only errors running it do.
-  pub async fn install(&self, spec: &ServerSpec, script: &str, paths: &Paths) -> Result<()> {
+  pub async fn install(&self, spec: &ServerSpec, script: &str) -> Result<()> {
     let name = installer_name(spec.uuid);
-    let script_dir = paths.root.join("install");
-    tokio::fs::create_dir_all(&script_dir).await?;
-    tokio::fs::create_dir_all(&paths.files).await?;
-    tokio::fs::write(script_dir.join("install.sh"), script).await?;
     self.remove(&name).await?;
     let image = self.pull(&spec.install.image).await?;
 
@@ -287,10 +430,7 @@ impl Docker {
       cpu => cpu.max(INSTALL_CPU),
     };
     let host = HostConfig {
-      binds: Some(vec![
-        format!("{}:/mnt/server", paths.files.display()),
-        format!("{}:/mnt/install:ro", script_dir.display()),
-      ]),
+      mounts: Some(vec![volume(spec.uuid, "/mnt/server")]),
       cap_drop: Some(INSTALL_CAP_DROP.map(String::from).to_vec()),
       ..self.host_config(memory, cpu, INSTALL_PIDS)
     };
@@ -317,7 +457,10 @@ impl Docker {
       .create_container(Some(options), config)
       .await
       .context("Failed to create install container")?;
-    let res = self.run_installer(&name).await;
+    let res = match self.upload_script(&name, script).await {
+      Ok(()) => self.run_installer(&name).await,
+      Err(err) => Err(err),
+    };
 
     let mut log = format!(
       "Smaug Server Installation Log\n\n|\n| Details\n| ------------------------------\n  Server UUID:          {}\n  Container Image:      {}\n  Container Entrypoint: {}\n\n|\n| Environment Variables\n| ------------------------------\n",
@@ -339,13 +482,34 @@ impl Docker {
       Ok(code) => log.push_str(&format!("\nInstaller exited with code {code}\n")),
       Err(err) => log.push_str(&format!("\nInstaller failed: {err:?}\n")),
     }
-    if let Err(err) = tokio::fs::write(paths.root.join("install.log"), log).await {
+    let written = async {
+      tokio::fs::create_dir_all(&self.install_log_dir).await?;
+      tokio::fs::write(self.install_log(spec.uuid), log).await
+    };
+    if let Err(err) = written.await {
       warn!("Failed to write install log for {}: {err}", spec.uuid);
     }
 
     self.remove(&name).await?;
-    let _ = tokio::fs::remove_dir_all(&script_dir).await;
     res.map(|_| ())
+  }
+
+  /// Puts the script at `/mnt/install/install.sh` of the created installer,
+  /// so no host directory is needed.
+  async fn upload_script(&self, name: &str, script: &str) -> Result<()> {
+    let mut tar = tar::Builder::new(Vec::new());
+    let mut header = tar::Header::new_gnu();
+    header.set_size(script.len() as u64);
+    header.set_mode(0o755);
+    tar.append_data(&mut header, "mnt/install/install.sh", script.as_bytes())?;
+    let tar = tar.into_inner()?;
+    let options = UploadToContainerOptionsBuilder::default().path("/").build();
+    self
+      .client
+      .upload_to_container(name, Some(options), bollard::body_full(tar.into()))
+      .await
+      .context("Failed to upload install script")?;
+    Ok(())
   }
 
   async fn run_installer(&self, name: &str) -> Result<i64> {
@@ -468,13 +632,14 @@ fn bounded_memory(memory_mb: i64) -> i64 {
 }
 
 /// Creates the bridge network if missing and returns its gateway.
-async fn ensure_network(client: &bollard::Docker, network: &str) -> Result<String> {
+async fn ensure_network(client: &bollard::Docker, network: &str, internal: bool) -> Result<String> {
   let info = match client.inspect_network(network, None).await {
     Err(err) if not_found(&err) => {
       client
         .create_network(NetworkCreateRequest {
           name: network.into(),
           driver: Some("bridge".into()),
+          internal: Some(internal),
           ..Default::default()
         })
         .await
@@ -499,24 +664,80 @@ async fn ensure_network(client: &bollard::Docker, network: &str) -> Result<Strin
   }))
 }
 
-/// Recursively chowns to the container user without following symlinks, like
-/// Wings' `CheckPermissionsOnBoot`.
-pub fn chown_all(root: &Path) -> std::io::Result<()> {
-  for entry in walkdir::WalkDir::new(root) {
-    let entry = entry?;
-    std::os::unix::fs::lchown(entry.path(), Some(CONTAINER_UID), Some(CONTAINER_UID))?;
+/// When wings runs in a container it joins the agent network, otherwise it
+/// could not reach the agents. On the host, bridge IPs are reachable as is.
+async fn join_network(client: &bollard::Docker, network: &str) -> Result<()> {
+  let Ok(hostname) = std::fs::read_to_string("/etc/hostname") else {
+    return Ok(());
+  };
+  let me = match client.inspect_container(hostname.trim(), None).await {
+    Err(err) if not_found(&err) => return Ok(()),
+    res => res.context("Failed to inspect own container")?,
+  };
+  let joined = me
+    .network_settings
+    .and_then(|n| n.networks)
+    .is_some_and(|n| n.contains_key(network));
+  if !joined && let Some(id) = me.id {
+    client
+      .connect_network(
+        network,
+        NetworkConnectRequest {
+          container: id,
+          ..Default::default()
+        },
+      )
+      .await
+      .context("Failed to join agent network")?;
+    info!("Joined docker network {network}");
   }
   Ok(())
 }
 
-/// Bytes used under `root`, symlinks not followed.
-pub fn disk_usage(root: &Path) -> u64 {
-  walkdir::WalkDir::new(root)
-    .into_iter()
-    .filter_map(|e| e.ok()?.metadata().ok())
-    .filter(|m| m.is_file())
-    .map(|m| m.len())
-    .sum()
+#[cfg(test)]
+impl Docker {
+  /// Reads a file from the server's volume through a created, never started container.
+  pub async fn read_file(&self, uuid: Uuid, path: &str) -> String {
+    use std::io::Read;
+
+    let name = format!("smaug-{uuid}_read");
+    let config = ContainerCreateBody {
+      image: Some(self.pull("alpine:3.20").await.unwrap()),
+      host_config: Some(HostConfig {
+        mounts: Some(vec![volume(uuid, "/v")]),
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let options = CreateContainerOptionsBuilder::default().name(&name).build();
+    self
+      .client
+      .create_container(Some(options), config)
+      .await
+      .unwrap();
+    let options = bollard::query_parameters::DownloadFromContainerOptionsBuilder::default()
+      .path(&format!("/v/{path}"))
+      .build();
+    let tar: Vec<u8> = self
+      .client
+      .download_from_container(&name, Some(options))
+      .try_fold(Vec::new(), |mut all, chunk| async move {
+        all.extend_from_slice(&chunk);
+        Ok(all)
+      })
+      .await
+      .unwrap();
+    self.remove(&name).await.unwrap();
+    let mut archive = tar::Archive::new(tar.as_slice());
+    let mut entry = archive.entries().unwrap().next().unwrap().unwrap();
+    let mut content = String::new();
+    entry.read_to_string(&mut content).unwrap();
+    content
+  }
+
+  pub async fn volume_exists(&self, uuid: Uuid) -> bool {
+    self.client.inspect_volume(&name(uuid)).await.is_ok()
+  }
 }
 
 #[cfg(test)]

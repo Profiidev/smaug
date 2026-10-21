@@ -28,6 +28,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "agent"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "eyre",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_norway",
+ "shared",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "walkdir",
+ "xmltree",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1776,6 +1796,16 @@ dependencies = [
  "serde",
  "uncased",
  "version_check",
+]
+
+[[package]]
+name = "filetime"
+version = "0.2.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
+dependencies = [
+ "cfg-if",
+ "libc",
 ]
 
 [[package]]
@@ -5384,6 +5414,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tar"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "testcontainers"
 version = "0.27.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6392,19 +6433,18 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "regex",
+ "reqwest",
  "rustls",
  "schemars 1.2.3",
  "serde",
  "serde_json",
- "serde_norway",
  "shared",
+ "tar",
  "tokio",
  "tower",
  "tower-http 0.7.1",
  "tracing",
  "uuid",
- "walkdir",
- "xmltree",
 ]
 
 [[package]]

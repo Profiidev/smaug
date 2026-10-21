@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use axum::{
-  Json, Router,
+  Extension, Json, Router,
   extract::Path,
   middleware::from_fn,
   routing::{post, put},
@@ -15,8 +15,12 @@ use uuid::Uuid;
 
 use crate::{
   auth,
+  docker::Docker,
   store::{Desired, DesiredPower, Store},
 };
+
+/// The Docker runtime, `None` on Kubernetes.
+pub type Runtime = Extension<Option<Docker>>;
 
 // Wings only stores what the panel asks for. Every rule (suspended, not
 // installed, ...) is checked by the panel.
@@ -29,10 +33,14 @@ pub fn router() -> Router {
 }
 
 /// Replaces the whole desired set. Unlisted servers are reported, not deleted.
-async fn sync(store: Store, Json(req): Json<SyncRequest>) -> Result<Json<SyncResponse>> {
+async fn sync(
+  store: Store,
+  Extension(docker): Runtime,
+  Json(req): Json<SyncRequest>,
+) -> Result<Json<SyncResponse>> {
   let listed: HashSet<Uuid> = req.servers.iter().map(|s| s.uuid).collect();
   for spec in req.servers {
-    upsert(&store, spec).await?;
+    upsert(&store, docker.as_ref(), spec).await?;
   }
 
   let mut res = SyncResponse::default();
@@ -47,13 +55,14 @@ async fn sync(store: Store, Json(req): Json<SyncRequest>) -> Result<Json<SyncRes
 
 async fn put_server(
   store: Store,
+  Extension(docker): Runtime,
   Path(uuid): Path<Uuid>,
   Json(spec): Json<ServerSpec>,
 ) -> Result<()> {
   if spec.uuid != uuid {
     bail!(BAD_REQUEST, "Server uuid does not match the path");
   }
-  upsert(&store, spec).await
+  upsert(&store, docker.as_ref(), spec).await
 }
 
 async fn delete_server(store: Store, Path(uuid): Path<Uuid>) -> Result<()> {
@@ -68,16 +77,31 @@ async fn power(store: Store, Path(uuid): Path<Uuid>, Json(req): Json<PowerReques
 
 /// Sets the spec, keeping power of an existing server, and starts a pending
 /// install that has not run yet.
-async fn upsert(store: &Store, spec: ServerSpec) -> Result<()> {
+pub(crate) async fn upsert(store: &Store, docker: Option<&Docker>, spec: ServerSpec) -> Result<()> {
   let (uuid, pending) = (spec.uuid, spec.install_generation);
+  let mut restored = false;
   let desired = match store.get(uuid).await? {
     Some(existing) => Desired {
       server: spec,
       ..existing
     },
-    None => Desired::new(spec),
+    None => {
+      let mut desired = Desired::new(spec);
+      // the Docker store is lost when wings restarts, only the containers are
+      // left: a running one was meant to run, and the sync response says so
+      if let Some(docker) = docker
+        && docker.inspect(uuid).await?.is_some_and(|c| c.running)
+      {
+        desired.power = DesiredPower::Running;
+        restored = true;
+      }
+      desired
+    }
   };
   store.put(desired).await?;
+  if restored {
+    store.set_state(uuid, ServerState::Running).await?;
+  }
 
   let observed = store.observed(uuid).await?.unwrap_or_default();
   if needs_install(pending, &observed) {
@@ -137,6 +161,7 @@ mod test {
     new_spec.image = "new".into();
     let Json(res) = sync(
       store.clone(),
+      Extension(None),
       Json(SyncRequest {
         servers: vec![new_spec.clone()],
       }),
@@ -172,7 +197,7 @@ mod test {
     let uuid = Uuid::new_v4();
     let mut spec = spec(uuid);
     spec.install_generation = Some(1);
-    upsert(&store, spec.clone()).await.unwrap();
+    upsert(&store, None, spec.clone()).await.unwrap();
     assert_eq!(
       store.observed(uuid).await.unwrap().unwrap().state,
       ServerState::Installing

@@ -3,12 +3,11 @@
 //! Pterodactyl Wings, see `docs/API.md` §6.2.
 
 use std::{
-  path::PathBuf,
   sync::{Arc, LazyLock},
   time::Duration,
 };
 
-use centaurus::{error::Result, eyre::Context};
+use centaurus::error::Result;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use futures::StreamExt;
@@ -23,8 +22,8 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-  config_files,
-  docker::{self, Container, Docker, Output, Paths, Stdin},
+  agent,
+  docker::{self, Container, Docker, Output, Stdin},
   store::{Desired, DesiredPower, Store},
 };
 
@@ -155,19 +154,17 @@ struct Live {
 struct Ctx {
   store: Store,
   docker: Docker,
-  data_dir: PathBuf,
   workers: DashMap<Uuid, Arc<Notify>>,
 }
 
 /// Runs forever. Workers start on the first change of a server, so containers
 /// unknown after a wings restart are never touched until the panel resyncs.
-pub async fn run(store: Store, docker: Docker, data_dir: PathBuf) {
+pub async fn run(store: Store, docker: Docker) {
   let mut changes = store.subscribe_changes();
   let mut events = docker.events();
   let ctx = Arc::new(Ctx {
     store,
     docker,
-    data_dir,
     workers: DashMap::new(),
   });
   // servers stored before the subscription would otherwise wait for their next change
@@ -238,7 +235,6 @@ impl Ctx {
     let desired = self.store.get(uuid).await?;
     let observed = self.store.observed(uuid).await?.unwrap_or_default();
     let container = self.docker.inspect(uuid).await?;
-    let paths = Paths::new(&self.data_dir, uuid);
     live.mem.attached = live.stdin.is_some();
     let now = Instant::now();
 
@@ -246,7 +242,7 @@ impl Ctx {
     let Some(desired) = desired else {
       return Ok(match action {
         Action::Teardown => {
-          self.docker.teardown(uuid, &paths).await?;
+          self.docker.teardown(uuid).await?;
           info!("Removed server {uuid}");
           Next::Gone
         }
@@ -298,7 +294,11 @@ impl Ctx {
           None => true,
           Some(script) => {
             info!("Installing server {uuid}");
-            let res = self.docker.install(&desired.server, script, &paths).await;
+            let res = async {
+              self.docker.ensure_volume(&desired.server).await?;
+              self.docker.install(&desired.server, script).await
+            };
+            let res = res.await;
             res
               .inspect_err(|err| warn!("Install of server {uuid} failed: {err:?}"))
               .is_ok()
@@ -309,7 +309,7 @@ impl Ctx {
         self.store.set_state(uuid, ServerState::Offline).await?;
         Next::Now
       }
-      Action::Start => self.start(&desired, paths, live).await?,
+      Action::Start => self.start(&desired, live).await?,
       Action::Adopt => {
         let (stdin, output) = self.docker.attach(uuid).await?;
         live.stdin = Some(stdin);
@@ -358,33 +358,21 @@ impl Ctx {
     self.docker.signal(uuid, signal).await
   }
 
-  async fn start(&self, desired: &Desired, paths: Paths, live: &mut Live) -> Result<Next> {
+  async fn start(&self, desired: &Desired, live: &mut Live) -> Result<Next> {
     let spec = &desired.server;
     let uuid = spec.uuid;
-    let files = paths.files.clone();
-    let config = spec.config_files.clone();
-    let interface = self.docker.interface.clone();
-    let disk_limit = u64::try_from(spec.limits.disk_mb).unwrap_or(0) * 1024 * 1024;
-    // like Wings before every start: disk check, config files, permissions
-    let prepared = tokio::task::spawn_blocking(move || {
-      std::fs::create_dir_all(&files)?;
-      if disk_limit > 0 && docker::disk_usage(&files) > disk_limit {
-        return Ok(false);
-      }
-      config_files::apply(&files, &config, &interface);
-      docker::chown_all(&files)?;
-      Ok::<_, std::io::Error>(true)
-    })
-    .await
-    .context("Start preparation panicked")?
-    .context("Failed to prepare server files")?;
-    if !prepared {
+    // like Wings before every start: config files, permissions, disk check
+    self.docker.ensure_volume(spec).await?;
+    let helper = self.docker.ensure_agent(uuid).await?;
+    let used = agent::prepare(&helper, &spec.config_files, &self.docker.interface).await?;
+    let limit = u64::try_from(spec.limits.disk_mb).unwrap_or(0) * 1024 * 1024;
+    if limit > 0 && used > limit {
       warn!("Server {uuid} is over its disk limit, not starting");
       return self.give_up(desired).await;
     }
 
     self.store.set_state(uuid, ServerState::Starting).await?;
-    let (stdin, output) = match self.docker.start(spec, &paths).await {
+    let (stdin, output) = match self.docker.start(spec).await {
       Ok(attached) => attached,
       Err(err) => {
         warn!("Failed to start server {uuid}: {err:?}");
@@ -647,13 +635,13 @@ mod test {
     let mut killed = d.clone();
     killed.killed_at = Some(started + chrono::Duration::seconds(1));
     assert_eq!(
-      decide(Some(&killed), &o, c, Memory::default(), now),
+      decide(Some(&killed), &o, c, m, now),
       Action::Stop(StopStep::Kill, timeout)
     );
     // a kill from before this start does not apply
     killed.killed_at = Some(started - chrono::Duration::seconds(1));
     assert_eq!(
-      decide(Some(&killed), &o, c, Memory::default(), now),
+      decide(Some(&killed), &o, c, Memory { stop: None, ..m }, now),
       Action::Stop(StopStep::Graceful, timeout)
     );
   }
@@ -749,13 +737,13 @@ mod test {
     assert!(!line_done(&done, "Loading libraries"));
   }
 
-  /// Full lifecycle against a real Docker. Needs root (chown, removing files the
-  /// installer wrote): `cargo test -p wings -- --ignored docker_lifecycle`.
+  /// Full lifecycle against a real Docker with the agent image in `AGENT_IMAGE`:
+  /// `AGENT_IMAGE=smaug-agent:dev cargo test -p wings -- --ignored docker_lifecycle`.
   #[tokio::test]
-  #[ignore = "needs docker and root"]
+  #[ignore = "needs docker and the agent image"]
   async fn docker_lifecycle() {
     use serde_json::json;
-    use shared::msg::{ConfigFile, ConfigParser, ConfigReplace, InstallSpec};
+    use shared::msg::{ConfigFile, ConfigParser, ConfigReplace, InstallSpec, ServerSpec};
 
     use crate::store::test::memory;
 
@@ -769,121 +757,147 @@ mod test {
       panic!("timed out waiting for {what}");
     }
 
-    let data = std::env::temp_dir().join(format!("smaug-it-{}", Uuid::new_v4()));
+    let config = crate::config::Config {
+      docker_network: "smaug-test".into(),
+      agent_network: "smaug-test-agents".into(),
+      agent_image: std::env::var("AGENT_IMAGE").unwrap_or_else(|_| "smaug-agent:dev".into()),
+      install_log_dir: std::env::temp_dir().join(format!("smaug-it-{}", Uuid::new_v4())),
+      ..Default::default()
+    };
     let store = memory();
-    let docker = Docker::new("smaug-test", "UTC").await.unwrap();
-    tokio::spawn(run(store.clone(), docker.clone(), data.clone()));
+    let docker = Docker::new(&config).await.unwrap();
+    tokio::spawn(run(store.clone(), docker.clone()));
     let uuid = Uuid::new_v4();
-    let state = || async {
-      store
-        .observed(uuid)
-        .await
-        .unwrap()
-        .unwrap_or_default()
-        .state
-    };
-    let started = || async {
+    let body = async {
+      let state = || async {
+        store
+          .observed(uuid)
+          .await
+          .unwrap()
+          .unwrap_or_default()
+          .state
+      };
+      let started = || async {
+        docker
+          .inspect(uuid)
+          .await
+          .unwrap()
+          .and_then(|c| c.started_at)
+      };
+
+      let mut server = spec(uuid);
+      server.image = "alpine:3.20".into();
+      server.install = InstallSpec {
+        image: "alpine:3.20".into(),
+        entrypoint: "ash".into(),
+        script: Some("echo installed > /mnt/server/marker\nexit 3\n".into()),
+      };
+      server.install_generation = Some(1);
+      // alpine runs a shell on the tty, `exit` is its stop command
+      server.stop = StopAction::Command("exit".into());
+      server.stop_timeout_s = 5;
+      server.config_files = vec![ConfigFile {
+        file: "server.properties".into(),
+        parser: ConfigParser::Properties,
+        replace: vec![ConfigReplace {
+          matcher: "server-ip".into(),
+          if_value: None,
+          replace_with: json!("{{config.docker.interface}}"),
+        }],
+      }];
+      store.put(Desired::new(server.clone())).await.unwrap();
+
+      // a failing exit code still counts as installed, like Wings
+      until("install", || async {
+        store
+          .observed(uuid)
+          .await
+          .unwrap()
+          .unwrap_or_default()
+          .last_install
+          == Some(InstallResult {
+            generation: 1,
+            ok: true,
+          })
+      })
+      .await;
+      assert_eq!(docker.read_file(uuid, "marker").await, "installed\n");
+      assert!(docker.install_log(uuid).exists());
+
+      let mut desired = Desired::new(server.clone());
+      desired.power = DesiredPower::Running;
+      store.put(desired).await.unwrap();
+      until("running", || async {
+        state().await == ServerState::Running
+      })
+      .await;
+      let props = docker.read_file(uuid, "server.properties").await;
+      assert_eq!(props, format!("server-ip={}\n", docker.interface));
+
+      // a crash restarts once, a second one within 60 s keeps it stopped
+      let first = started().await;
       docker
-        .inspect(uuid)
+        .signal(uuid, shared::msg::Signal::Kill)
         .await
-        .unwrap()
-        .and_then(|c| c.started_at)
-    };
-
-    let mut server = spec(uuid);
-    server.image = "alpine:3.20".into();
-    server.install = InstallSpec {
-      image: "alpine:3.20".into(),
-      entrypoint: "ash".into(),
-      script: Some("echo installed > /mnt/server/marker\nexit 3\n".into()),
-    };
-    server.install_generation = Some(1);
-    // alpine runs a shell on the tty, `exit` is its stop command
-    server.stop = StopAction::Command("exit".into());
-    server.stop_timeout_s = 5;
-    server.config_files = vec![ConfigFile {
-      file: "server.properties".into(),
-      parser: ConfigParser::Properties,
-      replace: vec![ConfigReplace {
-        matcher: "server-ip".into(),
-        if_value: None,
-        replace_with: json!("{{config.docker.interface}}"),
-      }],
-    }];
-    store.put(Desired::new(server.clone())).await.unwrap();
-
-    // a failing exit code still counts as installed, like Wings
-    until("install", || async {
-      store
-        .observed(uuid)
+        .unwrap();
+      until("restart after crash", || async {
+        state().await == ServerState::Running && started().await.is_some_and(|s| Some(s) != first)
+      })
+      .await;
+      docker
+        .signal(uuid, shared::msg::Signal::Kill)
         .await
-        .unwrap()
-        .unwrap_or_default()
-        .last_install
-        == Some(InstallResult {
-          generation: 1,
-          ok: true,
-        })
-    })
-    .await;
-    let files = data.join(uuid.to_string()).join("files");
-    assert_eq!(
-      std::fs::read_to_string(files.join("marker")).unwrap(),
-      "installed\n"
-    );
-    assert!(data.join(uuid.to_string()).join("install.log").exists());
+        .unwrap();
+      until("crashed", || async {
+        state().await == ServerState::Crashed
+          && store.get(uuid).await.unwrap().unwrap().power == DesiredPower::Stopped
+      })
+      .await;
 
-    let mut desired = Desired::new(server.clone());
-    desired.power = DesiredPower::Running;
-    store.put(desired).await.unwrap();
-    until("running", || async {
-      state().await == ServerState::Running
-    })
-    .await;
-    let props = std::fs::read_to_string(files.join("server.properties")).unwrap();
-    assert_eq!(props, format!("server-ip={}\n", docker.interface));
+      let mut desired = store.get(uuid).await.unwrap().unwrap();
+      desired.power = DesiredPower::Running;
+      store.put(desired.clone()).await.unwrap();
+      until("running again", || async {
+        state().await == ServerState::Running
+      })
+      .await;
 
-    // a crash restarts once, a second one within 60 s keeps it stopped
-    let first = started().await;
-    docker
-      .signal(uuid, shared::msg::Signal::Kill)
-      .await
-      .unwrap();
-    until("restart after crash", || async {
-      state().await == ServerState::Running && started().await.is_some_and(|s| Some(s) != first)
-    })
-    .await;
-    docker
-      .signal(uuid, shared::msg::Signal::Kill)
-      .await
-      .unwrap();
-    until("crashed", || async {
-      state().await == ServerState::Crashed
-        && store.get(uuid).await.unwrap().unwrap().power == DesiredPower::Stopped
-    })
-    .await;
+      // a wings restart loses the store, the panel's sync learns it still runs
+      let fresh = memory();
+      let installed = ServerSpec {
+        install_generation: None,
+        ..server.clone()
+      };
+      crate::servers::upsert(&fresh, Some(&docker), installed)
+        .await
+        .unwrap();
+      assert_eq!(
+        fresh.get(uuid).await.unwrap().unwrap().power,
+        DesiredPower::Running
+      );
+      assert_eq!(
+        fresh.observed(uuid).await.unwrap().unwrap().state,
+        ServerState::Running
+      );
 
-    let mut desired = store.get(uuid).await.unwrap().unwrap();
-    desired.power = DesiredPower::Running;
-    store.put(desired.clone()).await.unwrap();
-    until("running again", || async {
-      state().await == ServerState::Running
-    })
-    .await;
+      // the stop command ends the shell well before the 5 s timeout
+      desired.power = DesiredPower::Stopped;
+      store.put(desired).await.unwrap();
+      until("stopped", || async {
+        state().await == ServerState::Offline && started().await.is_none()
+      })
+      .await;
 
-    // the stop command ends the shell well before the 5 s timeout
-    desired.power = DesiredPower::Stopped;
-    store.put(desired).await.unwrap();
-    until("stopped", || async {
-      state().await == ServerState::Offline && started().await.is_none()
-    })
-    .await;
-
-    store.delete(uuid).await.unwrap();
-    until("teardown", || async {
-      !data.join(uuid.to_string()).exists()
-    })
-    .await;
-    let _ = std::fs::remove_dir_all(&data);
+      store.delete(uuid).await.unwrap();
+      until("teardown", || async { !docker.volume_exists(uuid).await }).await;
+      assert!(!docker.install_log(uuid).exists());
+    };
+    // a failed assertion must not leave the server's containers behind
+    let res = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(body)).await;
+    docker.teardown(uuid).await.unwrap();
+    let _ = std::fs::remove_dir_all(&config.install_log_dir);
+    if let Err(panic) = res {
+      std::panic::resume_unwind(panic);
+    }
   }
 }
