@@ -941,6 +941,48 @@ async fn action_matrix() {
 }
 
 #[tokio::test]
+async fn power_follows_actions_and_survives_edits() {
+  let c = ctx_with_db().await;
+  let db = Database::connect(c.db_url.as_deref().unwrap())
+    .await
+    .unwrap();
+  let power = async |uuid: Uuid| {
+    let m = server::Entity::find_by_id(uuid)
+      .one(&db)
+      .await
+      .unwrap()
+      .unwrap();
+    (m.desired_running, m.power_generation, m.suspended)
+  };
+
+  // skipped scripts with start on completion run right away
+  let mut body = c.body();
+  body["skip_scripts"] = json!(true);
+  body["start_on_completion"] = json!(true);
+  let uuid = c.create(body).await;
+  assert_eq!(power(uuid).await, (true, 0, false));
+
+  // a reinstall turns it off, with a new generation for wings
+  assert_eq!(c.action(uuid, "reinstall", json!({})).await, StatusCode::OK);
+  assert_eq!(power(uuid).await, (false, 1, false));
+
+  // an edit never undoes a suspend
+  assert_eq!(
+    c.action(uuid, "install", json!({ "installed": true }))
+      .await,
+    StatusCode::OK
+  );
+  assert_eq!(
+    c.action(uuid, "suspend", json!({ "suspended": true }))
+      .await,
+    StatusCode::OK
+  );
+  let resp = c.put(uuid, update_body(&c.info(uuid).await)).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  assert_eq!(power(uuid).await, (false, 2, true));
+}
+
+#[tokio::test]
 async fn transfer_moves_node_and_drops_extras() {
   let c = ctx().await;
   let mut body = c.body();

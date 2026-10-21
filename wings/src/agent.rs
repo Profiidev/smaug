@@ -11,6 +11,8 @@ const PREPARE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
   reqwest::Client::builder()
     .timeout(Duration::from_secs(60))
+    // an agent on the internal network answers at once or not at all
+    .connect_timeout(Duration::from_secs(2))
     .build()
     .expect("valid client")
 });
@@ -22,6 +24,7 @@ pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str
     let health = CLIENT
       .get(format!("{}/health", agent.url))
       .bearer_auth(&agent.token)
+      .timeout(Duration::from_secs(2))
       .send()
       .await;
     // any answer means it is up, a rejected token fails the prepare below

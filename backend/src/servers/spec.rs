@@ -8,8 +8,8 @@ use entity::{egg, sea_orm_active_enums::ServerInstallState, server};
 use regex::{Captures, Regex};
 use serde_json::Value;
 use shared::msg::{
-  Allocation, ConfigFile, ConfigParser, ConfigReplace, InstallSpec, Limits, ServerSpec, Signal,
-  StopAction,
+  Allocation, ConfigFile, ConfigParser, ConfigReplace, DesiredPower, InstallSpec, Limits,
+  ServerSpec, Signal, StopAction,
 };
 use tracing::warn;
 
@@ -71,6 +71,11 @@ pub fn build(
     file_denylist: serde_json::from_value(egg.file_denylist.clone())?,
     install_generation: (server.install_state == ServerInstallState::Installing)
       .then_some(server.install_generation as u64),
+    power: match server.desired_running && !server.suspended {
+      true => DesiredPower::Running,
+      false => DesiredPower::Stopped,
+    },
+    power_generation: server.power_generation as u64,
     install: InstallSpec {
       image: install.container,
       entrypoint: install.entrypoint,
@@ -304,6 +309,22 @@ mod test {
     assert_eq!(find("online-mode").if_value.as_deref(), Some("true"));
     assert_eq!(find("online-mode").replace_with, json!("false"));
     assert_eq!(find("max-players").replace_with, json!(20));
+  }
+
+  #[test]
+  fn suspended_never_runs() {
+    let egg = egg_model(
+      json!({ "startup": {} }),
+      json!({ "container": "c", "entrypoint": "e" }),
+    );
+    let mut server = model();
+    server.desired_running = true;
+    server.power_generation = 4;
+    let power = |s: &server::Model| build(s, &egg, &[], []).unwrap();
+    assert_eq!(power(&server).power, DesiredPower::Running);
+    assert_eq!(power(&server).power_generation, 4);
+    server.suspended = true;
+    assert_eq!(power(&server).power, DesiredPower::Stopped);
   }
 
   #[test]

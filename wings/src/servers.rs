@@ -56,6 +56,15 @@ async fn sync(
     }
     res.servers.insert(uuid, observed);
   }
+  // leftovers of servers deleted while the store was lost (wings restart):
+  // a delete from the panel tears them down
+  if let Some(docker) = &docker {
+    for uuid in docker.labelled().await? {
+      if !listed.contains(&uuid) && !res.servers.contains_key(&uuid) {
+        res.orphans.push(uuid);
+      }
+    }
+  }
   Ok(Json(res))
 }
 
@@ -85,10 +94,8 @@ async fn delete_server(
   Query(query): Query<DeleteQuery>,
 ) -> Result<()> {
   // TODO(wings): keep the PVC on Kubernetes too, once its reconciler tears servers down
-  if query.keep_files
-    && let Some(docker) = docker
-  {
-    docker.keep_volume(uuid);
+  if let Some(docker) = docker {
+    docker.keep_volume(uuid, query.keep_files).await?;
   }
   store.delete(uuid).await
 }
@@ -101,25 +108,17 @@ async fn power(store: Store, Path(uuid): Path<Uuid>, Json(req): Json<PowerReques
   store.set_error(uuid, None).await
 }
 
-/// Sets the spec, keeping power of an existing server, and starts a pending
-/// install that has not run yet.
+/// Sets the spec, taking its power when the panel changed it, and starts a
+/// pending install that has not run yet.
 pub(crate) async fn upsert(store: &Store, docker: Option<&Docker>, spec: ServerSpec) -> Result<()> {
   let (uuid, pending) = (spec.uuid, spec.install_generation);
-  if !store.update(uuid, |d| d.server = spec.clone()).await? {
-    let mut desired = Desired::new(spec);
-    // the Docker store is lost when wings restarts, only the containers are
-    // left: a running one was meant to run, and the sync response says so
-    let running = match docker {
-      Some(docker) => docker.inspect(uuid).await?.is_some_and(|c| c.running),
-      None => false,
-    };
-    if running {
-      desired.power = DesiredPower::Running;
-    }
-    store.put(desired).await?;
-    if running {
-      store.set_state(uuid, ServerState::Running).await?;
-    }
+  if let Some(docker) = docker {
+    // listed again, e.g. transferred back: its files are no longer kept for a transfer
+    docker.keep_volume(uuid, false).await?;
+  }
+  if !store.update(uuid, |d| d.set_server(spec.clone())).await? {
+    // the Docker store is lost when wings restarts, the install result is on disk
+    store.put(Desired::new(spec)).await?;
     if let Some(result) = docker.and_then(|d| d.last_install(uuid)) {
       store.finish_install(uuid, result).await?;
     }
@@ -225,6 +224,7 @@ mod test {
         generation,
         ok: true,
       }),
+      stopped_generation: None,
     };
     assert!(!needs_install(None, &Observed::default()));
     assert!(!needs_install(Some(1), &done(1)));

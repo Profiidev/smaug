@@ -128,6 +128,8 @@ pub struct NodeInfo {
   pub connected: bool,
   /// Reported by wings, `None` while disconnected.
   pub runtime: Option<Runtime>,
+  /// Why the node can not be reached or synced, `None` while it works.
+  pub error: Option<String>,
 }
 
 impl NodeInfo {
@@ -143,6 +145,7 @@ impl NodeInfo {
       cpu_limit: node.cpu_limit,
       connected: wings.is_connected(node.id),
       runtime: wings.runtime(node.id),
+      error: wings.node_error(node.id),
     }
   }
 }

@@ -1,10 +1,12 @@
 <script lang="ts">
+  import * as Alert from '@profidev/pleiades/components/ui/alert';
   import { Separator } from '@profidev/pleiades/components/ui/separator';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import * as Card from '@profidev/pleiades/components/ui/card';
   import * as Tabs from '@profidev/pleiades/components/ui/tabs';
   import { Skeleton } from '@profidev/pleiades/components/ui/skeleton';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import CircleAlert from '@lucide/svelte/icons/circle-alert';
   import Trash from '@lucide/svelte/icons/trash';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
@@ -179,6 +181,15 @@
       Delete
     </Button>
   </div>
+  {#if node?.error}
+    <Alert.Root variant="destructive" class="mx-auto max-w-4xl">
+      <CircleAlert />
+      <Alert.Title>Node can't be reached or synced</Alert.Title>
+      <Alert.Description>
+        <p class="font-mono text-xs break-all">{node.error}</p>
+      </Alert.Description>
+    </Alert.Root>
+  {/if}
   <Separator class="my-4" />
   <BaseForm
     class="flex min-h-0 grow flex-col gap-4"

@@ -1,8 +1,7 @@
 use std::{
-  collections::{BTreeMap, HashMap},
+  collections::{BTreeMap, HashMap, HashSet},
   path::PathBuf,
   pin::Pin,
-  sync::Arc,
   time::Duration,
 };
 
@@ -16,13 +15,13 @@ use bollard::{
   },
   query_parameters::{
     AttachContainerOptionsBuilder, CreateContainerOptionsBuilder, CreateImageOptionsBuilder,
-    EventsOptionsBuilder, KillContainerOptionsBuilder, LogsOptionsBuilder,
-    RemoveContainerOptionsBuilder, RemoveVolumeOptionsBuilder, UploadToContainerOptionsBuilder,
+    EventsOptionsBuilder, KillContainerOptionsBuilder, ListContainersOptionsBuilder,
+    ListVolumesOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
+    RemoveVolumeOptionsBuilder, UploadToContainerOptionsBuilder,
   },
 };
 use centaurus::{error::Result, eyre::Context};
 use chrono::{DateTime, Utc};
-use dashmap::DashSet;
 use futures::{Stream, StreamExt, TryStreamExt};
 use shared::{
   auth::agent_token,
@@ -88,8 +87,6 @@ pub struct Docker {
   /// The wings token, agent tokens are derived from it.
   secret: String,
   install_log_dir: PathBuf,
-  /// Servers whose next teardown leaves the volume, see `keep_volume`.
-  kept: Arc<DashSet<Uuid>>,
 }
 
 /// Game container and the server's volume.
@@ -147,7 +144,6 @@ impl Docker {
       agent_network: config.agent_network.clone(),
       secret: config.token.clone(),
       install_log_dir: config.install_log_dir.clone(),
-      kept: Default::default(),
     })
   }
 
@@ -293,7 +289,7 @@ impl Docker {
 
   /// Pulls the image, falling back to a local copy like Wings. A `~` prefix
   /// means local only. Returns the image name to use.
-  async fn pull(&self, image: &str) -> Result<String> {
+  pub async fn pull(&self, image: &str) -> Result<String> {
     if let Some(local) = image.strip_prefix('~') {
       return Ok(local.to_string());
     }
@@ -318,10 +314,9 @@ impl Docker {
     Ok(image.to_string())
   }
 
-  /// Recreates and starts the server container. Attaches before starting so no
-  /// output is missed.
-  pub async fn start(&self, spec: &ServerSpec) -> Result<(Stdin, Output)> {
-    let image = self.pull(&spec.image).await?;
+  /// Recreates and starts the server container from `image`, as returned by
+  /// `pull`. Attaches before starting so no output is missed.
+  pub async fn start(&self, spec: &ServerSpec, image: String) -> Result<(Stdin, Output)> {
     let name = name(spec.uuid);
     self.remove(&name).await?;
 
@@ -406,18 +401,71 @@ impl Docker {
     }
   }
 
-  /// The next teardown of `uuid` leaves its volume, the files of a server
-  /// transferred away stay until the transfer copies them.
+  /// With `keep`, teardowns of `uuid` leave its volume: the files of a server
+  /// transferred away stay until the transfer copies them. On disk, so a
+  /// wings restart neither forgets nor reports it as an orphan.
   // TODO(wings): kept volumes are never removed, clean them up once transfers copy files
-  pub fn keep_volume(&self, uuid: Uuid) {
-    self.kept.insert(uuid);
+  pub async fn keep_volume(&self, uuid: Uuid, keep: bool) -> Result<()> {
+    let marker = self.kept_marker(uuid);
+    if keep {
+      tokio::fs::create_dir_all(&self.install_log_dir).await?;
+      tokio::fs::write(marker, b"").await?;
+    } else if let Err(err) = tokio::fs::remove_file(marker).await
+      && err.kind() != std::io::ErrorKind::NotFound
+    {
+      return Err(err.into());
+    }
+    Ok(())
+  }
+
+  fn kept_marker(&self, uuid: Uuid) -> PathBuf {
+    self.install_log_dir.join(format!("{uuid}.kept"))
+  }
+
+  /// Servers with containers, or with a volume not kept for a transfer.
+  pub async fn labelled(&self) -> Result<HashSet<Uuid>> {
+    let filters = HashMap::from([("label", vec![LABEL])]);
+    let containers = self
+      .client
+      .list_containers(Some(
+        ListContainersOptionsBuilder::default()
+          .all(true)
+          .filters(&filters)
+          .build(),
+      ))
+      .await
+      .context("Failed to list containers")?;
+    let volumes = self
+      .client
+      .list_volumes(Some(
+        ListVolumesOptionsBuilder::default()
+          .filters(&filters)
+          .build(),
+      ))
+      .await
+      .context("Failed to list volumes")?
+      .volumes
+      .unwrap_or_default();
+    let uuid = |labels: Option<&HashMap<String, String>>| labels?.get(LABEL)?.parse().ok();
+    let mut uuids: HashSet<Uuid> = containers
+      .iter()
+      .filter_map(|c| uuid(c.labels.as_ref()))
+      .collect();
+    for volume in &volumes {
+      if let Some(uuid) = uuid(Some(&volume.labels))
+        && !self.kept_marker(uuid).exists()
+      {
+        uuids.insert(uuid);
+      }
+    }
+    Ok(uuids)
   }
 
   pub async fn teardown(&self, uuid: Uuid) -> Result<()> {
     for name in [name(uuid), installer_name(uuid), agent_name(uuid)] {
       self.remove(&name).await?;
     }
-    if self.kept.remove(&uuid).is_none() {
+    if !self.kept_marker(uuid).exists() {
       let options = RemoveVolumeOptionsBuilder::default().force(true).build();
       match self.client.remove_volume(&name(uuid), Some(options)).await {
         Err(err) if not_found(&err) => (),

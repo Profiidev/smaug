@@ -450,6 +450,10 @@ export type NodeInfo = {
   connected: boolean;
   cpu_limit?: number | null;
   disk_limit_mb?: number | null;
+  /**
+   * Why the node can not be reached or synced, `None` while it works.
+   */
+  error?: string | null;
   id: string;
   memory_limit_mb?: number | null;
   name: string;

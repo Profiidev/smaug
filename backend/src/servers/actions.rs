@@ -26,13 +26,11 @@ pub(super) async fn reinstall_server(
   updater: Updater,
   Path(req): Path<ServerUuid>,
 ) -> Result<()> {
-  let (mut server, _) = load(&db, auth.user_id, req.uuid, Access::Write).await?;
+  let (server, _) = load(&db, auth.user_id, req.uuid, Access::Write).await?;
   ensure_allowed(&server, Action::Reinstall)?;
-  server.install_state = ServerInstallState::Installing;
-  server.install_generation += 1;
-  db.server().save(server.clone()).await?;
+  db.server().start_reinstall(server.id).await?;
   // the spec carries the new install generation, wings runs it once
-  wings.put_server(server.node_id, server.id).await;
+  wings.put_server(server.node_id, server.id);
   info!("Reinstalling server with ID {}", req.uuid);
 
   updater
@@ -49,20 +47,20 @@ pub(super) async fn set_server_installed(
   Path(path): Path<ServerUuid>,
   Json(req): Json<InstallRequest>,
 ) -> Result<()> {
-  let (mut server, _) = load(&db, auth.user_id, path.uuid, Access::Admin).await?;
+  let (server, _) = load(&db, auth.user_id, path.uuid, Access::Admin).await?;
   ensure_allowed(&server, Action::Install)?;
   // only flips: installed -> not installed, anything else -> installed
   if req.installed == (server.install_state == ServerInstallState::Installed) {
     bail!(CONFLICT, "Server already has this install state");
   }
-  server.install_state = if req.installed {
+  let state = if req.installed {
     ServerInstallState::Installed
   } else {
     ServerInstallState::NotInstalled
   };
-  db.server().save(server.clone()).await?;
+  db.server().set_install_state(server.id, state).await?;
   // drops a pending install on the node
-  wings.put_server(server.node_id, server.id).await;
+  wings.put_server(server.node_id, server.id);
 
   updater
     .broadcast(UpdateMessage::Servers { uuid: path.uuid })
@@ -78,7 +76,7 @@ pub(super) async fn set_server_suspended(
   Path(path): Path<ServerUuid>,
   Json(req): Json<SuspendRequest>,
 ) -> Result<()> {
-  let (mut server, _) = load(&db, auth.user_id, path.uuid, Access::Admin).await?;
+  let (server, _) = load(&db, auth.user_id, path.uuid, Access::Admin).await?;
   ensure_allowed(
     &server,
     if req.suspended {
@@ -87,12 +85,12 @@ pub(super) async fn set_server_suspended(
       Action::Unsuspend
     },
   )?;
-  server.suspended = req.suspended;
-  let node = server.node_id;
-  db.server().save(server).await?;
-  // unsuspend needs nothing on the node, the panel blocks starts while suspended
+  db.server().set_suspended(server.id, req.suspended).await?;
+  // suspending turned the power off, the kill skips the stop steps;
+  // unsuspend leaves it off and needs nothing on the node
   if req.suspended {
-    wings.power(node, path.uuid, Power::Kill).await;
+    wings.put_server(server.node_id, server.id);
+    wings.power(server.node_id, server.id, Power::Kill);
   }
 
   updater
@@ -133,10 +131,10 @@ pub(super) async fn transfer_server(
   let source = server.node_id;
   server.node_id = req.node;
   db.server().transfer(server.clone(), allocation).await?;
-  wings.put_server(server.node_id, server.id).await;
+  wings.put_server(server.node_id, server.id);
   // TODO(wings): stream the server's files from the source to the target node,
   // until then the source keeps them
-  wings.delete_server(source, path.uuid, true).await;
+  wings.delete_server(source, path.uuid, true);
   info!("Transferred server {} to node {}", path.uuid, req.node);
 
   updater

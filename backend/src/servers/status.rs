@@ -104,6 +104,8 @@ pub(super) mod test {
       backup_limit: 2,
       stop_timeout: 60,
       restart_on_crash: true,
+      desired_running: false,
+      power_generation: 0,
       created_at: Utc::now().fixed_offset(),
     }
   }

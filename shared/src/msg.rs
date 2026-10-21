@@ -35,6 +35,12 @@ pub enum Event {
     uuid: Uuid,
     error: Option<String>,
   },
+  /// Wings stopped the server itself (crash without restart, failed start),
+  /// see [`Observed::stopped_generation`].
+  Stopped {
+    uuid: Uuid,
+    generation: u64,
+  },
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,6 +78,19 @@ pub struct ServerSpec {
   /// Generation of the install the panel wants run, `None` when none is
   /// pending. Wings runs it once, unless its last install already has it.
   pub install_generation: Option<u64>,
+  /// Whether the server should run.
+  pub power: DesiredPower,
+  /// Bumped by the panel on every `power` change. Wings applies `power` only
+  /// when this differs from the generation it applied, so a stop wings made
+  /// itself is not undone by a spec that still carries the old power.
+  pub power_generation: u64,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DesiredPower {
+  Running,
+  #[default]
+  Stopped,
 }
 
 /// How to stop the server gracefully, before falling back to SIGTERM/SIGKILL.
@@ -189,6 +208,10 @@ pub struct Observed {
   /// server. Cleared once the server runs, installs or gets a power request.
   #[serde(default)]
   pub error: Option<String>,
+  /// Power generation at which wings stopped the server itself. The panel
+  /// turns its power off unless it sent a newer generation since.
+  #[serde(default)]
+  pub stopped_generation: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]

@@ -38,10 +38,38 @@ async fn create_with_token(server: &TestServer, body: Value) -> (Uuid, String) {
   (res["uuid"].as_str().unwrap().parse().unwrap(), token)
 }
 
+/// Without `error`, it is set once the first connect attempt failed.
 async fn info(server: &TestServer, uuid: Uuid) -> Value {
   let resp = server.get(&format!("/nodes/{uuid}")).await;
   assert_eq!(resp.status(), StatusCode::OK);
-  resp.json().await.unwrap()
+  let mut info: Value = resp.json().await.unwrap();
+  info.as_object_mut().unwrap().remove("error");
+  info
+}
+
+#[tokio::test]
+async fn unreachable_node_reports_its_error() {
+  let (server, _) = TestServer::start_with_admin().await;
+  let uuid = create(&server, node_body("down")).await;
+  timeout(Duration::from_secs(10), async {
+    loop {
+      let info: Value = server
+        .get(&format!("/nodes/{uuid}"))
+        .await
+        .json()
+        .await
+        .unwrap();
+      if info["error"]
+        .as_str()
+        .is_some_and(|e| e.contains("Failed to connect"))
+      {
+        return;
+      }
+      tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+  })
+  .await
+  .expect("node never reported its connect error");
 }
 
 #[tokio::test]

@@ -2,11 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use centaurus::error::ErrorReportStatusExt;
 use entity::{
-  egg_variable, group_user, sea_orm_active_enums::ServerAccessLevel, server, server_allocation,
-  server_group_access, server_user_access, server_variable,
+  egg_variable, group_user,
+  sea_orm_active_enums::{ServerAccessLevel, ServerInstallState},
+  server, server_allocation, server_group_access, server_user_access, server_variable,
 };
 use http::StatusCode;
-use sea_orm::{QueryOrder, TransactionTrait, prelude::*};
+use sea_orm::{QueryOrder, TransactionTrait, UpdateMany, prelude::*, sea_query::ExprTrait};
 
 pub struct ServerTable<'db> {
   db: &'db DatabaseConnection,
@@ -189,7 +190,10 @@ impl<'db> ServerTable<'db> {
     txn.commit().await
   }
 
-  /// Replaces every column, all allocations and variables and, when given, all grants.
+  /// Replaces the columns the edit form owns (see `SPEC_COLUMNS`), all
+  /// allocations and variables and, when given, all grants. Power, install
+  /// and suspend state are changed only by their own targeted updates, so a
+  /// stale model never undoes them.
   pub async fn update(
     &self,
     server: server::Model,
@@ -199,10 +203,11 @@ impl<'db> ServerTable<'db> {
   ) -> Result<(), DbErr> {
     let txn = self.db.begin().await?;
     let (id, node) = (server.id, server.node_id);
-    server::ActiveModel::from(server)
-      .reset_all()
-      .update(&txn)
-      .await?;
+    let mut model = server::ActiveModel::from(server);
+    for column in SPEC_COLUMNS {
+      model.reset(column);
+    }
+    model.update(&txn).await?;
     server_allocation::Entity::delete_many()
       .filter(server_allocation::Column::ServerId.eq(id))
       .exec(&txn)
@@ -247,11 +252,106 @@ impl<'db> ServerTable<'db> {
     txn.commit().await
   }
 
-  /// Saves the server columns only.
-  pub async fn save(&self, server: server::Model) -> Result<(), DbErr> {
-    server::ActiveModel::from(server)
-      .reset_all()
-      .update(self.db)
+  /// Suspending also turns the server off; unsuspending leaves it off.
+  pub async fn set_suspended(&self, id: Uuid, suspended: bool) -> Result<(), DbErr> {
+    self
+      .update_columns(id, |q| {
+        let q = q.col_expr(server::Column::Suspended, Expr::value(suspended));
+        if suspended {
+          q.col_expr(server::Column::DesiredRunning, Expr::value(false))
+            .col_expr(server::Column::PowerGeneration, next_generation())
+        } else {
+          q
+        }
+      })
+      .await
+  }
+
+  /// A new install generation; the server is off until it finishes.
+  pub async fn start_reinstall(&self, id: Uuid) -> Result<(), DbErr> {
+    self
+      .update_columns(id, |q| {
+        q.col_expr(
+          server::Column::InstallState,
+          Expr::value(ServerInstallState::Installing),
+        )
+        .col_expr(
+          server::Column::InstallGeneration,
+          Expr::col(server::Column::InstallGeneration).add(1),
+        )
+        .col_expr(server::Column::DesiredRunning, Expr::value(false))
+        .col_expr(server::Column::PowerGeneration, next_generation())
+      })
+      .await
+  }
+
+  pub async fn set_install_state(&self, id: Uuid, state: ServerInstallState) -> Result<(), DbErr> {
+    self
+      .update_columns(id, |q| {
+        q.col_expr(server::Column::InstallState, Expr::value(state))
+      })
+      .await
+  }
+
+  /// Records a finished install, only if the server on `node` still waits for
+  /// `generation`. Turns it on when it succeeded and should start on
+  /// completion. Returns whether it was applied.
+  pub async fn finish_install(
+    &self,
+    id: Uuid,
+    node: Uuid,
+    generation: u64,
+    ok: bool,
+  ) -> Result<bool, DbErr> {
+    let (state, start) = if ok {
+      (
+        ServerInstallState::Installed,
+        Expr::col(server::Column::StartOnCompletion)
+          .and(Expr::col(server::Column::Suspended).not()),
+      )
+    } else {
+      (ServerInstallState::InstallFailed, Expr::value(false))
+    };
+    let res = server::Entity::update_many()
+      .col_expr(server::Column::InstallState, Expr::value(state))
+      .col_expr(server::Column::DesiredRunning, start)
+      .col_expr(server::Column::PowerGeneration, next_generation())
+      .filter(server::Column::Id.eq(id))
+      .filter(server::Column::NodeId.eq(node))
+      .filter(server::Column::InstallState.eq(ServerInstallState::Installing))
+      .filter(server::Column::InstallGeneration.eq(generation as i64))
+      .exec(self.db)
+      .await?;
+    Ok(res.rows_affected == 1)
+  }
+
+  /// Turns the server off after wings stopped it at `generation`, unless the
+  /// panel changed its power since. Returns whether it was applied.
+  pub async fn stopped_by_wings(
+    &self,
+    id: Uuid,
+    node: Uuid,
+    generation: u64,
+  ) -> Result<bool, DbErr> {
+    let res = server::Entity::update_many()
+      .col_expr(server::Column::DesiredRunning, Expr::value(false))
+      .filter(server::Column::Id.eq(id))
+      .filter(server::Column::NodeId.eq(node))
+      .filter(server::Column::PowerGeneration.eq(generation as i64))
+      .filter(server::Column::DesiredRunning.eq(true))
+      .exec(self.db)
+      .await?;
+    Ok(res.rows_affected == 1)
+  }
+
+  async fn update_columns(
+    &self,
+    id: Uuid,
+    set: impl FnOnce(UpdateMany<server::Entity>) -> UpdateMany<server::Entity>,
+  ) -> Result<(), DbErr> {
+    set(server::Entity::update_many())
+      .filter(server::Column::Id.eq(id))
+      .exec(self.db)
       .await?;
     Ok(())
   }
@@ -268,9 +368,10 @@ impl<'db> ServerTable<'db> {
       .filter(server_allocation::Column::ServerId.eq(id))
       .exec(&txn)
       .await?;
-    server::ActiveModel::from(server)
-      .reset_all()
-      .update(&txn)
+    server::Entity::update_many()
+      .col_expr(server::Column::NodeId, Expr::value(node))
+      .filter(server::Column::Id.eq(id))
+      .exec(&txn)
       .await?;
     insert_allocations(&txn, id, node, vec![allocation]).await?;
     txn.commit().await
@@ -285,6 +386,26 @@ impl<'db> ServerTable<'db> {
         .rows_affected,
     )
   }
+}
+
+/// What the edit form changes, see `update`.
+const SPEC_COLUMNS: [server::Column; 12] = [
+  server::Column::Name,
+  server::Column::OwnerId,
+  server::Column::EggId,
+  server::Column::Startup,
+  server::Column::StartupOverridden,
+  server::Column::Image,
+  server::Column::CpuLimit,
+  server::Column::MemoryMb,
+  server::Column::DiskMb,
+  server::Column::BackupLimit,
+  server::Column::StopTimeout,
+  server::Column::RestartOnCrash,
+];
+
+fn next_generation() -> Expr {
+  Expr::col(server::Column::PowerGeneration).add(1)
 }
 
 async fn insert_allocations(

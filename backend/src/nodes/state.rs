@@ -5,6 +5,7 @@ use axum::{Extension, extract::FromRequestParts};
 use centaurus::{bail, db::init::Connection, error::Result};
 use dashmap::DashMap;
 use shared::msg::{Power, Runtime, ServerState};
+use tokio::spawn;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
@@ -52,6 +53,11 @@ impl Wings {
   ) -> Result<()> {
     self.check_secure(secure)?;
 
+    let lock = self
+      .wings
+      .get(&uuid)
+      .map(|conn| conn.lock())
+      .unwrap_or_default();
     let conn = WingsConnection::new(
       uuid,
       addr,
@@ -60,6 +66,7 @@ impl Wings {
       token.to_string(),
       self.db.clone(),
       self.updater.clone(),
+      lock,
     );
     self.wings.insert(uuid, conn);
     Ok(())
@@ -88,6 +95,11 @@ impl Wings {
     self.wings.get(&uuid).and_then(|conn| conn.runtime())
   }
 
+  /// Why the node can not be reached or synced.
+  pub fn node_error(&self, uuid: Uuid) -> Option<String> {
+    self.wings.get(&uuid).and_then(|conn| conn.node_error())
+  }
+
   /// Runtime state of `server` on `node`, `None` while unknown.
   pub fn state(&self, node: Uuid, server: Uuid) -> Option<ServerState> {
     self.wings.get(&node).and_then(|conn| conn.state(server))
@@ -95,25 +107,26 @@ impl Wings {
 
   // Server calls are best-effort: skipped while the node is disconnected and
   // only logged on failure. The full sync on reconnect, or the one a failure
-  // triggers, fixes any drift.
+  // triggers, fixes any drift. They run in the background, a request never
+  // waits behind a slow sync; the spec is read from the DB when it is sent.
 
   /// Sends the server's spec as currently stored in the DB.
-  pub async fn put_server(&self, node: Uuid, server: Uuid) {
+  pub fn put_server(&self, node: Uuid, server: Uuid) {
     if let Some(link) = self.link(node) {
-      link.put_server(server).await;
+      spawn(async move { link.put_server(server).await });
     }
   }
 
   /// `keep_files` leaves the server's files on the node, for a transfer.
-  pub async fn delete_server(&self, node: Uuid, server: Uuid, keep_files: bool) {
+  pub fn delete_server(&self, node: Uuid, server: Uuid, keep_files: bool) {
     if let Some(link) = self.link(node) {
-      link.delete_server(server, keep_files).await;
+      spawn(async move { link.delete_server(server, keep_files).await });
     }
   }
 
-  pub async fn power(&self, node: Uuid, server: Uuid, action: Power) {
+  pub fn power(&self, node: Uuid, server: Uuid, action: Power) {
     if let Some(link) = self.link(node) {
-      link.power(server, action).await;
+      spawn(async move { link.power(server, action).await });
     }
   }
 

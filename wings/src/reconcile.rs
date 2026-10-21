@@ -3,13 +3,16 @@
 //! Pterodactyl Wings, see `docs/API.md` §6.2.
 
 use std::{
-  sync::{Arc, LazyLock},
+  sync::{
+    Arc, LazyLock,
+    atomic::{AtomicBool, Ordering},
+  },
   time::Duration,
 };
 
 use centaurus::error::Result;
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
+use dashmap::{DashMap, mapref::entry::Entry};
 use futures::StreamExt;
 use regex::Regex;
 use shared::msg::{InstallResult, Observed, ServerState, StopAction};
@@ -153,6 +156,9 @@ enum Next {
 #[derive(Default)]
 struct Live {
   stdin: Option<Stdin>,
+  /// Cleared by the console pump when the attach stream ends, a broken one is
+  /// re-attached. New for every attach, an old pump can not clear a new one.
+  attached: Arc<AtomicBool>,
   mem: Memory,
 }
 
@@ -198,29 +204,39 @@ pub async fn run(store: Store, docker: Docker) {
 
 impl Ctx {
   fn wake(self: &Arc<Self>, uuid: Uuid, spawn: bool) {
-    if let Some(notify) = self.workers.get(&uuid) {
-      notify.notify_one();
-      return;
-    }
-    if spawn {
-      let notify = Arc::new(Notify::new());
-      self.workers.insert(uuid, notify.clone());
-      tokio::spawn(self.clone().worker(uuid, notify));
+    // one entry lookup, so two wakes never spawn two workers for one server
+    match self.workers.entry(uuid) {
+      Entry::Occupied(e) => e.get().notify_one(),
+      Entry::Vacant(e) if spawn => {
+        let notify = Arc::new(Notify::new());
+        e.insert(notify.clone());
+        tokio::spawn(self.clone().worker(uuid, notify));
+      }
+      Entry::Vacant(_) => (),
     }
   }
 
   async fn worker(self: Arc<Self>, uuid: Uuid, notify: Arc<Notify>) {
     let mut live = Live::default();
     let mut failures = 0;
+    // the error a failed step reported, cleared once a step succeeds again
+    let mut reported: Option<String> = None;
     loop {
       let next = match self.step(uuid, &mut live, &notify).await {
         Ok(next) => {
           failures = 0;
+          if let Some(error) = reported.take()
+            && let Err(err) = self.store.clear_error_if(uuid, &error).await
+          {
+            warn!("Failed to clear error of server {uuid}: {err:?}");
+          }
           next
         }
         Err(err) => {
           warn!("Failed to reconcile server {uuid}: {err:?}");
-          self.report(uuid, Some(format!("{err:#}"))).await;
+          let error = format!("{err:#}");
+          self.report(uuid, Some(error.clone())).await;
+          reported = Some(error);
           failures += 1;
           Next::Wait(backoff(failures))
         }
@@ -245,11 +261,11 @@ impl Ctx {
     }
   }
 
-  async fn step(&self, uuid: Uuid, live: &mut Live, notify: &Notify) -> Result<Next> {
+  async fn step(&self, uuid: Uuid, live: &mut Live, notify: &Arc<Notify>) -> Result<Next> {
     let desired = self.store.get(uuid).await?;
     let observed = self.store.observed(uuid).await?.unwrap_or_default();
     let container = self.docker.inspect(uuid).await?;
-    live.mem.attached = live.stdin.is_some();
+    live.mem.attached = live.stdin.is_some() && live.attached.load(Ordering::Relaxed);
     let now = Instant::now();
 
     let action = decide(desired.as_ref(), &observed, container, live.mem, now);
@@ -288,10 +304,7 @@ impl Ctx {
             false => "Crashed, restart on crash is off",
           };
           self.report(uuid, Some(why.into())).await;
-          self
-            .store
-            .update(uuid, |d| d.power = DesiredPower::Stopped)
-            .await?;
+          self.store.stop_self(uuid).await?;
         }
         Next::Now
       }
@@ -319,7 +332,7 @@ impl Ctx {
                 warn!("Install of server {uuid} failed: {err:?}");
                 format!("Install failed: {err:#}")
               }),
-              () = self.superseded(uuid, generation, notify) => {
+              () = self.superseded(uuid, notify, |d| d.server.install_generation == Some(generation)) => {
                 info!("Install of server {uuid} is no longer wanted, aborting");
                 self.docker.abort_install(uuid).await?;
                 return Ok(Next::Now);
@@ -340,11 +353,40 @@ impl Ctx {
         self.store.set_state(uuid, ServerState::Offline).await?;
         Next::Now
       }
-      Action::Start => self.start(&desired, live).await?,
+      Action::Start => {
+        // before the pull and the prepare, which can take minutes
+        self.store.set_state(uuid, ServerState::Starting).await?;
+        let wanted = |d: &Desired| {
+          d.power == DesiredPower::Running
+            && d.server.install_generation == desired.server.install_generation
+            && d.killed_at == desired.killed_at
+        };
+        let started = tokio::select! {
+          res = self.start(&desired, live, notify) => res,
+          () = self.superseded(uuid, notify, wanted) => {
+            // a container started meanwhile is stopped by the next step
+            info!("Start of server {uuid} is no longer wanted, aborting");
+            self.store.set_state(uuid, ServerState::Offline).await?;
+            return Ok(Next::Now);
+          }
+        };
+        if started.is_err() {
+          self.store.set_state(uuid, ServerState::Offline).await?;
+        }
+        started?
+      }
       Action::Adopt => {
         let (stdin, output) = self.docker.attach(uuid).await?;
         live.stdin = Some(stdin);
-        tokio::spawn(pump(self.store.clone(), uuid, output, Vec::new()));
+        live.attached = Arc::new(AtomicBool::new(true));
+        tokio::spawn(pump(
+          self.store.clone(),
+          uuid,
+          output,
+          Vec::new(),
+          live.attached.clone(),
+          notify.clone(),
+        ));
         if observed.state != ServerState::Running {
           self.store.set_state(uuid, ServerState::Running).await?;
         }
@@ -367,14 +409,14 @@ impl Ctx {
     })
   }
 
-  /// Resolves once the server is deleted or no longer waits for this install.
-  async fn superseded(&self, uuid: Uuid, generation: u64, notify: &Notify) {
+  /// Resolves once the server is deleted or its desired state is no longer `wanted`.
+  async fn superseded(&self, uuid: Uuid, notify: &Notify, wanted: impl Fn(&Desired) -> bool) {
     loop {
       notify.notified().await;
       match self.store.get(uuid).await {
-        Ok(Some(d)) if d.server.install_generation == Some(generation) => (),
+        Ok(Some(d)) if wanted(&d) => (),
         Ok(_) => return,
-        Err(err) => warn!("Failed to check install of server {uuid}: {err:?}"),
+        Err(err) => warn!("Failed to check desired state of server {uuid}: {err:?}"),
       }
     }
   }
@@ -406,9 +448,18 @@ impl Ctx {
     self.docker.signal(uuid, signal).await
   }
 
-  async fn start(&self, desired: &Desired, live: &mut Live) -> Result<Next> {
+  async fn start(&self, desired: &Desired, live: &mut Live, notify: &Arc<Notify>) -> Result<Next> {
     let spec = &desired.server;
     let uuid = spec.uuid;
+    let image = match self.docker.pull(&spec.image).await {
+      Ok(image) => image,
+      Err(err) => {
+        warn!("Failed to pull image of server {uuid}: {err:?}");
+        return self
+          .give_up(uuid, format!("Failed to start: {err:#}"))
+          .await;
+      }
+    };
     // like Wings before every start: config files, permissions, disk check
     self.docker.ensure_volume(spec).await?;
     let helper = self.docker.ensure_agent(uuid).await?;
@@ -424,8 +475,7 @@ impl Ctx {
       return self.give_up(uuid, why).await;
     }
 
-    self.store.set_state(uuid, ServerState::Starting).await?;
-    let (stdin, output) = match self.docker.start(spec).await {
+    let (stdin, output) = match self.docker.start(spec, image).await {
       Ok(attached) => attached,
       Err(err) => {
         warn!("Failed to start server {uuid}: {err:?}");
@@ -436,12 +486,20 @@ impl Ctx {
     };
     self.report(uuid, None).await;
     live.stdin = Some(stdin);
+    live.attached = Arc::new(AtomicBool::new(true));
     live.mem.stop = None;
     let done: Vec<Matcher> = spec.startup_done.iter().map(|s| Matcher::new(s)).collect();
     if done.is_empty() {
       self.store.set_state(uuid, ServerState::Running).await?;
     }
-    tokio::spawn(pump(self.store.clone(), uuid, output, done));
+    tokio::spawn(pump(
+      self.store.clone(),
+      uuid,
+      output,
+      done,
+      live.attached.clone(),
+      notify.clone(),
+    ));
     info!("Started server {uuid}");
     Ok(Next::Idle)
   }
@@ -457,10 +515,7 @@ impl Ctx {
   /// Like a failed start on Wings: the server ends up offline and stays there.
   async fn give_up(&self, uuid: Uuid, why: String) -> Result<Next> {
     self.report(uuid, Some(why)).await;
-    self
-      .store
-      .update(uuid, |d| d.power = DesiredPower::Stopped)
-      .await?;
+    self.store.stop_self(uuid).await?;
     self.store.set_state(uuid, ServerState::Offline).await?;
     Ok(Next::Idle)
   }
@@ -514,8 +569,16 @@ fn line_done(done: &[Matcher], line: &str) -> bool {
 
 /// Reads the console until the container exits. Marks the server running on
 /// the first `startup_done` line. Always drains, a full attach stream would
-/// block the server's output.
-async fn pump(store: Store, uuid: Uuid, mut output: Output, done: Vec<Matcher>) {
+/// block the server's output. When the stream ends it clears `attached` and
+/// wakes the worker, which re-attaches if the container still runs.
+async fn pump(
+  store: Store,
+  uuid: Uuid,
+  mut output: Output,
+  done: Vec<Matcher>,
+  attached: Arc<AtomicBool>,
+  notify: Arc<Notify>,
+) {
   let mut waiting = !done.is_empty();
   let mut buf: Vec<u8> = Vec::new();
   while let Some(Ok(chunk)) = output.next().await {
@@ -530,14 +593,11 @@ async fn pump(store: Store, uuid: Uuid, mut output: Output, done: Vec<Matcher>) 
         continue;
       }
       waiting = false;
-      let starting = matches!(
-        store.observed(uuid).await,
-        Ok(Some(Observed {
-          state: ServerState::Starting,
-          ..
-        }))
-      );
-      if starting && let Err(err) = store.set_state(uuid, ServerState::Running).await {
+      // a stop requested meanwhile keeps its state
+      if let Err(err) = store
+        .set_state_if(uuid, ServerState::Starting, ServerState::Running)
+        .await
+      {
         warn!("Failed to mark server {uuid} running: {err:?}");
       }
       break;
@@ -547,6 +607,8 @@ async fn pump(store: Store, uuid: Uuid, mut output: Output, done: Vec<Matcher>) 
       buf.clear();
     }
   }
+  attached.store(false, Ordering::Relaxed);
+  notify.notify_one();
 }
 
 #[cfg(test)]
@@ -786,6 +848,7 @@ mod test {
         generation: 2,
         ok: true,
       }),
+      stopped_generation: None,
     };
     assert_eq!(decide(Some(&d), &done, None, m, now), Action::Start);
   }
@@ -939,10 +1002,13 @@ mod test {
       })
       .await;
 
-      // a wings restart loses the store, the panel's sync learns it still runs
+      // a wings restart loses the store, the panel's spec brings back its power
+      // and the install result comes from disk
       let fresh = memory();
       let installed = ServerSpec {
         install_generation: None,
+        power: DesiredPower::Running,
+        power_generation: 1,
         ..server.clone()
       };
       crate::servers::upsert(&fresh, Some(&docker), installed)
@@ -953,8 +1019,11 @@ mod test {
         DesiredPower::Running
       );
       assert_eq!(
-        fresh.observed(uuid).await.unwrap().unwrap().state,
-        ServerState::Running
+        fresh.observed(uuid).await.unwrap().unwrap().last_install,
+        Some(InstallResult {
+          generation: 1,
+          ok: true,
+        })
       );
 
       // the stop command ends the shell well before the 5 s timeout

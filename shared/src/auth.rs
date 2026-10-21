@@ -65,10 +65,24 @@ impl SignData {
     path: &str,
     body: &[u8],
   ) -> Result<Self> {
+    let now = Utc::now().timestamp_millis();
+    Self::validate_header_map_at(headers, token, method, path, body, now)
+  }
+
+  /// Like [`Self::validate_header_map`], with the timestamp checked against
+  /// `now_ms`: when the request arrived, so a slow body upload is no skew.
+  pub fn validate_header_map_at(
+    headers: &HeaderMap,
+    token: &str,
+    method: &str,
+    path: &str,
+    body: &[u8],
+    now_ms: i64,
+  ) -> Result<Self> {
     let timestamp: i64 = get_header_value(headers, TIMESTAMP_HEADER)?
       .parse()
       .status_context(StatusCode::UNAUTHORIZED, "Invalid wings timestamp")?;
-    let skew = Utc::now().timestamp_millis() - timestamp;
+    let skew = now_ms - timestamp;
     if skew.abs() > MAX_SKEW_MS {
       // a request in flight is never this old, the clocks differ
       bail!(
