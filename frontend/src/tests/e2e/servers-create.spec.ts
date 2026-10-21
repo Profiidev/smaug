@@ -113,10 +113,12 @@ test.describe('server create', () => {
         name: 'Survival',
         node: 'node-1',
         owner: 'user-admin',
+        restart_on_crash: true,
         skip_scripts: true,
         start_on_completion: true,
         startup: 'java -jar {{SERVER_JARFILE}}',
-        startup_overridden: false
+        startup_overridden: false,
+        stop_timeout: 60
       }
     ]);
   });
