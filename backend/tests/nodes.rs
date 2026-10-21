@@ -3,7 +3,7 @@ mod common;
 use std::time::Duration;
 
 use common::{JWT_COOKIE_NAME, TestServer, unique};
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use shared::auth::SignData;
@@ -85,7 +85,8 @@ async fn node_crud_flow() {
     json!({
       "id": uuid, "name": "alpha", "address": "127.0.0.1", "port": 1, "secure": false,
       "disk_limit_mb": 1024.0, "memory_limit_mb": 512.0, "cpu_limit": 2,
-      "connected": false
+      "connected": false,
+      "runtime": null
     })
   );
   let node = info(&server, beta).await;
@@ -105,7 +106,8 @@ async fn node_crud_flow() {
     json!({
       "id": uuid, "name": "alpha 2", "address": "localhost", "port": 2, "secure": true,
       "disk_limit_mb": null, "memory_limit_mb": 1.5, "cpu_limit": null,
-      "connected": false
+      "connected": false,
+      "runtime": null
     })
   );
 
@@ -361,6 +363,12 @@ async fn fake_wings(token: String) -> u16 {
         let mut ws = tokio_tungstenite::accept_hdr_async(stream, sign)
           .await
           .unwrap();
+        let hello = json!({ "type": "Hello", "runtime": "docker" }).to_string();
+        ws.send(tokio_tungstenite::tungstenite::Message::Binary(
+          hello.into_bytes().into(),
+        ))
+        .await
+        .unwrap();
         while let Some(Ok(_)) = ws.next().await {}
       });
     }
@@ -387,6 +395,10 @@ async fn node_connects_to_wings() {
   assert_eq!(info(&server, uuid).await["connected"], true);
   let list: Value = server.get("/nodes").await.json().await.unwrap();
   assert_eq!(list[0]["connected"], true);
+
+  // wings reports its runtime in the first message
+  next().await;
+  assert_eq!(info(&server, uuid).await["runtime"], "docker");
 
   // deleting disconnects
   server.delete("/nodes", json!({ "uuid": uuid })).await;

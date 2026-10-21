@@ -2,11 +2,13 @@ use axum::{Json, extract::Path};
 use centaurus::{bail, db::init::Connection, error::Result};
 use entity::sea_orm_active_enums::ServerInstallState;
 use http::StatusCode;
+use shared::msg::Power;
 use tracing::info;
 
 use super::{
   access::{Access, load},
   error::{FieldResult, fail_if, field_err},
+  spec,
   status::{Action, ensure_allowed},
   types::{InstallRequest, ServerUuid, SuspendRequest, TransferRequest},
   validation::{check_free, node_exists, parse_allocation},
@@ -14,20 +16,23 @@ use super::{
 use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
+  nodes::Wings,
   utils::{UpdateMessage, Updater},
 };
 
 pub(super) async fn reinstall_server(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Path(req): Path<ServerUuid>,
 ) -> Result<()> {
   let (mut server, _) = load(&db, auth.user_id, req.uuid, Access::Write).await?;
   ensure_allowed(&server, Action::Reinstall)?;
   server.install_state = ServerInstallState::Installing;
+  let node = server.node_id;
   db.server().save(server).await?;
-  // TODO(wings): stop the server and run the egg install script on the node
+  wings.install(node, req.uuid).await;
   info!("Reinstalling server with ID {}", req.uuid);
 
   updater
@@ -55,7 +60,6 @@ pub(super) async fn set_server_installed(
     ServerInstallState::NotInstalled
   };
   db.server().save(server).await?;
-  // TODO(wings): tell the node the install state changed (blocks or unblocks starts)
 
   updater
     .broadcast(UpdateMessage::Servers { uuid: path.uuid })
@@ -66,6 +70,7 @@ pub(super) async fn set_server_installed(
 pub(super) async fn set_server_suspended(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Path(path): Path<ServerUuid>,
   Json(req): Json<SuspendRequest>,
@@ -80,8 +85,12 @@ pub(super) async fn set_server_suspended(
     },
   )?;
   server.suspended = req.suspended;
+  let node = server.node_id;
   db.server().save(server).await?;
-  // TODO(wings): stop the server on suspend, lift the block on unsuspend
+  // unsuspend needs nothing on the node, the panel blocks starts while suspended
+  if req.suspended {
+    wings.power(node, path.uuid, Power::Kill).await;
+  }
 
   updater
     .broadcast(UpdateMessage::Servers { uuid: path.uuid })
@@ -92,6 +101,7 @@ pub(super) async fn set_server_suspended(
 pub(super) async fn transfer_server(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Path(path): Path<ServerUuid>,
   Json(req): Json<TransferRequest>,
@@ -117,9 +127,14 @@ pub(super) async fn transfer_server(
   )
   .await?;
 
+  let source = server.node_id;
   server.node_id = req.node;
+  let variables = db.server().variables(server.id).await?;
+  let wings_spec = spec::build(&server, std::slice::from_ref(&allocation), variables);
+  wings.put_server(req.node, &wings_spec).await;
   db.server().transfer(server, allocation).await?;
-  // TODO(wings): transfer the server's files to the new node, then remove them from the old one
+  // TODO(wings): stream the server's files from the source to the target node before deleting them
+  wings.delete_server(source, path.uuid).await;
   info!("Transferred server {} to node {}", path.uuid, req.node);
 
   updater

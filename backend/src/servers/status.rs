@@ -2,10 +2,14 @@ use centaurus::{bail, error::Result};
 use entity::{sea_orm_active_enums::ServerInstallState, server};
 use schemars::JsonSchema;
 use serde::Serialize;
+use shared::msg::ServerState;
 
 #[derive(Serialize, JsonSchema, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ServerStatus {
+  Running,
+  Starting,
+  Stopping,
   Offline,
   NotInstalled,
   Installing,
@@ -13,7 +17,8 @@ pub enum ServerStatus {
   Suspended,
 }
 
-pub(super) fn status(server: &server::Model) -> ServerStatus {
+/// `runtime` is what wings last reported, `None` while unknown.
+pub(super) fn status(server: &server::Model, runtime: Option<ServerState>) -> ServerStatus {
   if server.suspended {
     return ServerStatus::Suspended;
   }
@@ -21,8 +26,12 @@ pub(super) fn status(server: &server::Model) -> ServerStatus {
     ServerInstallState::NotInstalled => ServerStatus::NotInstalled,
     ServerInstallState::Installing => ServerStatus::Installing,
     ServerInstallState::InstallFailed => ServerStatus::InstallFailed,
-    // TODO(wings): runtime state (running/starting/stopping/offline, transferring) reported by wings
-    ServerInstallState::Installed => ServerStatus::Offline,
+    ServerInstallState::Installed => match runtime {
+      Some(ServerState::Starting) => ServerStatus::Starting,
+      Some(ServerState::Running) => ServerStatus::Running,
+      Some(ServerState::Stopping) => ServerStatus::Stopping,
+      _ => ServerStatus::Offline,
+    },
   }
 }
 
@@ -40,16 +49,20 @@ pub(super) enum Action {
 fn allowed(status: ServerStatus, action: Action) -> bool {
   use Action as A;
   match status {
-    ServerStatus::Offline | ServerStatus::InstallFailed | ServerStatus::NotInstalled => {
-      action != A::Unsuspend
-    }
+    ServerStatus::Running
+    | ServerStatus::Starting
+    | ServerStatus::Stopping
+    | ServerStatus::Offline
+    | ServerStatus::InstallFailed
+    | ServerStatus::NotInstalled => action != A::Unsuspend,
     ServerStatus::Installing => matches!(action, A::Install | A::Suspend),
     ServerStatus::Suspended => matches!(action, A::Install | A::Unsuspend | A::Delete),
   }
 }
 
 pub(super) fn ensure_allowed(server: &server::Model, action: Action) -> Result<()> {
-  if !allowed(status(server), action) {
+  // running, starting and stopping allow the same actions as offline
+  if !allowed(status(server, None), action) {
     bail!(CONFLICT, "Action is not available in the current state");
   }
   Ok(())
@@ -97,10 +110,30 @@ pub(super) mod test {
     ] {
       s.install_state = state;
       s.suspended = false;
-      assert_eq!(status(&s), expected);
+      assert_eq!(status(&s, None), expected);
       s.suspended = true;
-      assert_eq!(status(&s), ServerStatus::Suspended);
+      assert_eq!(
+        status(&s, Some(ServerState::Running)),
+        ServerStatus::Suspended
+      );
     }
+
+    s.suspended = false;
+    s.install_state = ServerInstallState::Installed;
+    for (state, expected) in [
+      (ServerState::Starting, ServerStatus::Starting),
+      (ServerState::Running, ServerStatus::Running),
+      (ServerState::Stopping, ServerStatus::Stopping),
+      (ServerState::Offline, ServerStatus::Offline),
+      (ServerState::Installing, ServerStatus::Offline),
+    ] {
+      assert_eq!(status(&s, Some(state)), expected);
+    }
+    s.install_state = ServerInstallState::NotInstalled;
+    assert_eq!(
+      status(&s, Some(ServerState::Running)),
+      ServerStatus::NotInstalled
+    );
   }
 
   #[test]
@@ -108,6 +141,15 @@ pub(super) mod test {
     use Action::*;
     let actions = [Reinstall, Install, Suspend, Unsuspend, Transfer, Delete];
     let rows = [
+      (ServerStatus::Running, [true, true, true, false, true, true]),
+      (
+        ServerStatus::Starting,
+        [true, true, true, false, true, true],
+      ),
+      (
+        ServerStatus::Stopping,
+        [true, true, true, false, true, true],
+      ),
       (ServerStatus::Offline, [true, true, true, false, true, true]),
       (
         ServerStatus::InstallFailed,

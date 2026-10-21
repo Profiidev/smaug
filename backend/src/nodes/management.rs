@@ -13,6 +13,7 @@ use rand::Rng;
 use schemars::JsonSchema;
 use sea_orm::{IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
+use shared::msg::Runtime;
 use tracing::info;
 use uuid::Uuid;
 
@@ -125,6 +126,8 @@ pub struct NodeInfo {
   pub memory_limit_mb: Option<f64>,
   pub cpu_limit: Option<i32>,
   pub connected: bool,
+  /// Reported by wings, `None` while disconnected.
+  pub runtime: Option<Runtime>,
 }
 
 impl NodeInfo {
@@ -139,6 +142,7 @@ impl NodeInfo {
       memory_limit_mb: node.memory_limit_mb,
       cpu_limit: node.cpu_limit,
       connected: wings.is_connected(node.id),
+      runtime: wings.runtime(node.id),
     }
   }
 }
