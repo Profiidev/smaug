@@ -446,6 +446,10 @@ export type NodeInfo = {
   memory_limit_mb?: number | null;
   name: string;
   port: number;
+  /**
+   * Reported by wings, `None` while disconnected.
+   */
+  runtime?: Runtime | null;
   secure: boolean;
 };
 
@@ -505,6 +509,10 @@ export type ResetUserPassword = {
   new_password: string;
   uuid: string;
 };
+
+export const Runtime = { DOCKER: 'docker', KUBERNETES: 'kubernetes' } as const;
+
+export type Runtime = (typeof Runtime)[keyof typeof Runtime];
 
 export const SsoType = { OIDC: 'Oidc', NONE: 'None' } as const;
 
@@ -576,6 +584,9 @@ export type ServerOptions = {
 };
 
 export const ServerStatus = {
+  RUNNING: 'running',
+  STARTING: 'starting',
+  STOPPING: 'stopping',
   OFFLINE: 'offline',
   NOT_INSTALLED: 'not_installed',
   INSTALLING: 'installing',

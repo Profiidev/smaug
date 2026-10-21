@@ -226,6 +226,7 @@ export const nodeInfo = {
   memory_limit_mb: null,
   name: 'Node One',
   port: 443,
+  runtime: 'docker',
   secure: true
 };
 

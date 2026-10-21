@@ -21,6 +21,7 @@ const node: NodeInfo = {
   id: 'n1',
   name: 'Alpha',
   port: 8443,
+  runtime: 'docker',
   secure: true
 };
 
@@ -41,13 +42,14 @@ const cellOf = (
 };
 
 describe('nodes table columns', () => {
-  it('shows name, status, address, secure, uuid and actions', () => {
+  it('shows name, status, runtime, address, secure, uuid and actions', () => {
     const keys = columns({ canEdit: true, deleteNode: vi.fn() }).map((c) =>
       'accessorKey' in c ? c.accessorKey : undefined
     );
     expect(keys).toEqual([
       'name',
       'connected',
+      'runtime',
       'address',
       'secure',
       'id',
@@ -65,6 +67,16 @@ describe('nodes table columns', () => {
     const cell = cellOf('connected', { ...node, connected });
     expect(cell.component).toBe(Status);
     expect(cell.props).toEqual({ connected });
+  });
+
+  it.each([
+    ['docker', 'Docker'],
+    ['kubernetes', 'Kubernetes'],
+    [null, '—']
+  ] as const)('renders runtime %s as %s', (runtime, text) => {
+    const cell = cellOf('runtime', { ...node, runtime });
+    expect(cell.component).toBe(MutedCell);
+    expect(cell.props).toEqual({ text });
   });
 
   it('renders the address with the port in mono', () => {
