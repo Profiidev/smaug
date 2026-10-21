@@ -60,6 +60,4 @@ COPY --from=wings-builder /app/app /usr/local/bin/smaug-wings
 
 EXPOSE 8000
 
-USER smaug
-
 ENTRYPOINT ["smaug-wings"]

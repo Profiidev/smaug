@@ -24,7 +24,7 @@ jobs:
 
     strategy:
       matrix:
-        item: [{ df_path: ./, image: "smaug" }, { df_path: ./wings, image: "smaug-wings" }]
+        item: [{ df_path: ./, image: "smaug" }, { df_path: ./wings, image: "smaug-wings" }, { df_path: ./agent, image: "smaug-agent" }]
         platform: ["linux/amd64", "linux/arm64"]
         include:
           - platform: linux/amd64
@@ -110,6 +110,7 @@ jobs:
         item: [
           { image: "smaug" },
           { image: "smaug-wings" },
+          { image: "smaug-agent" },
         ]
     if: github.event_name != 'pull_request'
     steps:
@@ -189,6 +190,7 @@ jobs:
         package:
           - ${{ github.event.repository.name }}/smaug
           - ${{ github.event.repository.name }}/smaug-wings
+          - ${{ github.event.repository.name }}/smaug-agent
 
     steps:
       - uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1

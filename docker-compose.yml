@@ -42,8 +42,8 @@ services:
       - ./wings:/app
       - ./shared:/shared
       - /var/run/docker.sock:/var/run/docker.sock
-      # bind mounts resolve on the host, so server data needs the same path in both
-      - /var/lib/smaug/volumes:/var/lib/smaug/volumes
+    environment:
+      - AGENT_IMAGE=smaug-agent:dev
     networks:
       - nginx
     tty: true
@@ -51,6 +51,25 @@ services:
       - '8123:8000'
     entrypoint: ['tini', '--']
     command: ['cargo', 'watch', '-x', 'run']
+
+  # does not run the agent, rebuilds the `smaug-agent:dev` image wings starts per server
+  agent:
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b03ecb064002e849d0f65dfa3690053241b0bfe4b893926f527d70655ff8bedc
+    restart: unless-stopped
+    volumes:
+      - ./agent:/app
+      - ./shared:/shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    tty: true
+    entrypoint: ['tini', '--']
+    command:
+      - sh
+      - -c
+      - >-
+        docker buildx version > /dev/null 2>&1 || (apt-get update && apt-get install -y --no-install-recommends docker-cli docker-buildx);
+        cargo watch -i target -s 'RUSTFLAGS="-C target-feature=+crt-static" cargo build --target x86_64-unknown-linux-gnu
+        && mkdir -p target/image && cp target/x86_64-unknown-linux-gnu/debug/smaug-agent target/image/
+        && docker build -q -f Dockerfile.dev -t smaug-agent:dev target/image'
 
   postgres:
     image: postgres:18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
