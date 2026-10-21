@@ -13,6 +13,7 @@ import {
   pageScrolls,
   recorder
 } from '$test_helpers/eggs-e2e';
+import { submitWith } from '$test_helpers/servers-e2e';
 import { eggInfo } from '../mocks/e2e/data';
 
 test.describe('egg create wizard', () => {
@@ -214,10 +215,14 @@ test.describe('egg create wizard', () => {
     await expect(
       page.getByText('Reserved name — choose another.').first()
     ).toBeVisible();
-    await page.getByLabel('Env Variable').nth(0).fill('DUP');
-    await page.getByLabel('Env Variable').nth(1).fill('DUP');
-    await next(page);
-    await expect(page.getByText('Duplicate env variable name.')).toBeVisible();
+    await submitWith(
+      page,
+      async () => {
+        await page.getByLabel('Env Variable').nth(0).fill('DUP');
+        await page.getByLabel('Env Variable').nth(1).fill('DUP');
+      },
+      page.getByText('Duplicate env variable name.')
+    );
     await expect(page.getByText('Startup variables (2)')).toBeVisible();
   });
 
