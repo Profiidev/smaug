@@ -47,6 +47,10 @@ export const combo = (scope: Page | Locator, label: string) =>
     .getByText(label, { exact: true })
     .locator('xpath=following-sibling::*[@role="combobox"]');
 
+/** The FormSelect trigger inside the group named `name` (grant rows, e.g. `User 1`). */
+export const rowCombo = (scope: Page | Locator, name: string) =>
+  scope.getByRole('group', { exact: true, name }).getByRole('combobox');
+
 /** Picks `option` in the single FormSelect labelled `label`. */
 export const pick = async (page: Page, label: string, option: string) => {
   await combo(page, label).click();

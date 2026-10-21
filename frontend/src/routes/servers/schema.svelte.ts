@@ -79,14 +79,15 @@ export const variableRow = z.object({
 
 export const GRANT_ACCESS = ['read', 'write'] as const;
 
-/** `target` is `user:<uuid>` or `group:<uuid>` (one FormSelect over both). */
-export const grantRow = z.object({
-  access: z
-    .array(z.enum(GRANT_ACCESS))
-    .min(1, 'Select an access level.')
-    .default(['read']),
-  target: z.array(z.string()).min(1, 'Select a user or group.').default([])
-});
+/** One user or group grant; `uuid` holds the FormSelect's single value. */
+const grantRow = (kind: 'user' | 'group') =>
+  z.object({
+    access: z
+      .array(z.enum(GRANT_ACCESS))
+      .min(1, 'Select an access level.')
+      .default(['read']),
+    uuid: z.array(z.string()).min(1, `Select a ${kind}.`).default([])
+  });
 
 const selectOne = (message: string) =>
   z.array(z.string()).min(1, message).max(1).default([]);
@@ -142,7 +143,8 @@ const resourcesObject = z.object({
 });
 
 const permissionsObject = z.object({
-  grants: z.array(grantRow).default([])
+  groupGrants: z.array(grantRow('group')).default([]),
+  userGrants: z.array(grantRow('user')).default([])
 });
 
 type Ctx = z.RefinementCtx;
@@ -212,17 +214,19 @@ const checkLimits = (data: z.infer<typeof resourcesObject>, ctx: Ctx) => {
 };
 
 const checkGrants = (data: z.infer<typeof permissionsObject>, ctx: Ctx) => {
-  const seen = new Set<string>();
-  for (const [i, g] of data.grants.entries()) {
-    const [target] = g.target;
-    if (target && seen.has(target)) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Already granted.',
-        path: ['grants', i, 'target']
-      });
+  for (const key of ['userGrants', 'groupGrants'] as const) {
+    const seen = new Set<string>();
+    for (const [i, g] of data[key].entries()) {
+      const [uuid] = g.uuid;
+      if (uuid && seen.has(uuid)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Already granted.',
+          path: [key, i, 'uuid']
+        });
+      }
+      seen.add(uuid);
     }
-    seen.add(target);
   }
 };
 
@@ -262,7 +266,8 @@ export const serverSettings = z
 
 export type ServerForm = FormValue<typeof serverSettings>;
 export type VariableRow = z.infer<typeof variableRow>;
-export type GrantRow = z.infer<typeof grantRow>;
+export type GrantRow = z.infer<ReturnType<typeof grantRow>>;
+type Grants = Pick<ServerForm, 'userGrants' | 'groupGrants'>;
 export type FieldsMode = 'create' | 'edit';
 
 /**
@@ -348,32 +353,21 @@ const environment = (rows: VariableRow[]) =>
     rows.filter((r) => r.editable).map((r) => [r.env, r.value])
   );
 
-const splitTarget = (target = '') => {
-  const sep = target.indexOf(':');
-  return { kind: target.slice(0, sep), uuid: target.slice(sep + 1) };
-};
+const toGrants = (rows: GrantRow[]) =>
+  rows.map((r) => ({ access: r.access[0], uuid: r.uuid[0] }));
 
-export const toGrantsBody = (rows: GrantRow[]): GrantsBody => {
-  const users: GrantsBody['users'] = [];
-  const groups: GrantsBody['groups'] = [];
-  for (const row of rows) {
-    const { kind, uuid } = splitTarget(row.target[0]);
-    const grant = { access: row.access[0], uuid };
-    (kind === 'group' ? groups : users).push(grant);
-  }
-  return { groups, users };
-};
+const fromGrants = (grants: GrantsInfo['users'] = []): GrantRow[] =>
+  grants.map((g) => ({ access: [g.access], uuid: [g.uuid] }));
 
-export const fromGrantsInfo = (grants?: GrantsInfo | null): GrantRow[] => [
-  ...(grants?.users ?? []).map((g) => ({
-    access: [g.access],
-    target: [`user:${g.uuid}`]
-  })),
-  ...(grants?.groups ?? []).map((g) => ({
-    access: [g.access],
-    target: [`group:${g.uuid}`]
-  }))
-];
+export const toGrantsBody = (f: Grants): GrantsBody => ({
+  groups: toGrants(f.groupGrants),
+  users: toGrants(f.userGrants)
+});
+
+export const fromGrantsInfo = (grants?: GrantsInfo | null): Grants => ({
+  groupGrants: fromGrants(grants?.groups),
+  userGrants: fromGrants(grants?.users)
+});
 
 const common = (f: ServerForm) => ({
   allocations: f.allocations.map(({ ip, port }) => ({ ip: ip.trim(), port })),
@@ -401,7 +395,7 @@ export const toUpdateBody = (
   f: ServerForm,
   withGrants: boolean
 ): UpdateServer =>
-  withGrants ? { ...common(f), grants: toGrantsBody(f.grants) } : common(f);
+  withGrants ? { ...common(f), grants: toGrantsBody(f) } : common(f);
 
 const fromLimit = (value: number, fallback: number) =>
   value > 0
@@ -414,6 +408,7 @@ export const fromServerInfo = (info: ServerInfo): ServerForm => {
   const memory = fromLimit(info.limits.memory, LIMIT_DEFAULTS.memory);
   const disk = fromLimit(info.limits.disk, LIMIT_DEFAULTS.disk);
   return {
+    ...fromGrantsInfo(info.grants),
     allocations: info.allocations.map(({ ip, port }) => ({ ip, port })),
     backupLimit: info.backup_limit,
     cpu: cpu.value,
@@ -421,7 +416,6 @@ export const fromServerInfo = (info: ServerInfo): ServerForm => {
     disk: disk.value,
     diskUnlimited: disk.unlimited,
     egg: [info.egg.uuid],
-    grants: fromGrantsInfo(info.grants),
     image: info.image,
     memory: memory.value,
     memoryUnlimited: memory.unlimited,
@@ -480,7 +474,7 @@ export const isFieldErrors = (
 
 const locate = (
   field: string,
-  form: Partial<Pick<ServerForm, 'variables' | 'grants'>>
+  form: Partial<Pick<ServerForm, 'variables' | 'userGrants' | 'groupGrants'>>
 ): [Section, string] | undefined => {
   if (Object.hasOwn(DIRECT, field)) {
     return DIRECT[field];
@@ -500,12 +494,10 @@ const locate = (
   const grant = /^grants\.(?<kind>users|groups)\.(?<index>\d+)/.exec(field);
   if (grant) {
     const { kind, index } = grant.groups!;
-    const prefix = kind === 'users' ? 'user:' : 'group:';
-    const rows = (form.grants ?? [])
-      .map((g, i) => ({ i, target: g.target[0] ?? '' }))
-      .filter((g) => g.target.startsWith(prefix));
-    const row = rows[Number(index)];
-    return row ? ['permissions', `grants.${row.i}.target`] : undefined;
+    const key = kind === 'users' ? 'userGrants' : 'groupGrants';
+    return form[key]?.[Number(index)]
+      ? ['permissions', `${key}.${index}.uuid`]
+      : undefined;
   }
   return undefined;
 };
@@ -513,11 +505,13 @@ const locate = (
 /**
  * Maps a 400/409 `FieldErrors` body onto form paths and sections.
  * Returns undefined when `body` is not a FieldErrors body.
- * `form` resolves `variables.<ENV>` and `grants.*.N` to row indexes.
+ * `form` resolves `variables.<ENV>` to a row index and drops `grants.*.N` without a row.
  */
 export const mapFieldErrors = (
   body: unknown,
-  form: Partial<Pick<ServerForm, 'variables' | 'grants'>> = {}
+  form: Partial<
+    Pick<ServerForm, 'variables' | 'userGrants' | 'groupGrants'>
+  > = {}
 ): MappedErrors | undefined => {
   if (!isFieldErrors(body)) {
     return undefined;

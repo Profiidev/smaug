@@ -106,7 +106,10 @@ describe('defaults', () => {
       memoryUnlimited: true
     });
     expect(variablesStage.parse({})).toEqual({ variables: [] });
-    expect(permissionsStage.parse({})).toEqual({ grants: [] });
+    expect(permissionsStage.parse({})).toEqual({
+      groupGrants: [],
+      userGrants: []
+    });
   });
 
   // Zod returns defaults unvalidated; superforms always submits every key.
@@ -362,38 +365,49 @@ describe('resourcesStage', () => {
 });
 
 describe('permissionsStage', () => {
-  const grant = (target: string[], access = ['read']) => ({ access, target });
+  const grant = (uuid: string[], access = ['read']) => ({ access, uuid });
 
-  it('accepts distinct grants', () => {
+  it('accepts distinct grants and the same uuid across lists', () => {
     expect(
       issues(permissionsStage, {
-        grants: [grant(['user:a']), grant(['group:a'], ['write'])]
+        groupGrants: [grant(['a'], ['write'])],
+        userGrants: [grant(['a']), grant(['b'])]
       })
     ).toEqual({});
   });
 
-  it('requires a target and an access level', () => {
-    expect(issues(permissionsStage, { grants: [grant([], [])] })).toEqual({
-      'grants.0.access': ['Select an access level.'],
-      'grants.0.target': ['Select a user or group.']
+  it('requires a target and an access level per list', () => {
+    expect(
+      issues(permissionsStage, {
+        groupGrants: [grant([], [])],
+        userGrants: [grant([], [])]
+      })
+    ).toEqual({
+      'groupGrants.0.access': ['Select an access level.'],
+      'groupGrants.0.uuid': ['Select a group.'],
+      'userGrants.0.access': ['Select an access level.'],
+      'userGrants.0.uuid': ['Select a user.']
     });
   });
 
   it('rejects an unknown access level', () => {
     expect(
-      issues(permissionsStage, { grants: [grant(['user:a'], ['admin'])] })[
-        'grants.0.access.0'
+      issues(permissionsStage, { userGrants: [grant(['a'], ['admin'])] })[
+        'userGrants.0.access.0'
       ]
     ).toBeDefined();
   });
 
-  it('flags duplicate targets', () => {
-    expect(
-      issues(permissionsStage, {
-        grants: [grant(['user:a']), grant(['user:a'], ['write'])]
-      })
-    ).toEqual({ 'grants.1.target': ['Already granted.'] });
-  });
+  it.each(['userGrants', 'groupGrants'])(
+    'flags duplicates within %s',
+    (key) => {
+      expect(
+        issues(permissionsStage, {
+          [key]: [grant(['a']), grant(['b']), grant(['a'], ['write'])]
+        })
+      ).toEqual({ [`${key}.2.uuid`]: ['Already granted.'] });
+    }
+  );
 });
 
 describe('serverSettings', () => {
@@ -420,11 +434,11 @@ describe('serverSettings', () => {
     f.variables[0].value = '';
     f.cpuUnlimited = false;
     f.cpu = -5;
-    f.grants.push(clone(f.grants[0]));
+    f.groupGrants.push(clone(f.groupGrants[0]));
     expect(Object.keys(issues(serverSettings, f)).toSorted()).toEqual([
       'allocations.2.port',
       'cpu',
-      'grants.2.target',
+      'groupGrants.1.uuid',
       'variables.0.value'
     ]);
   });
@@ -546,10 +560,7 @@ describe('converters', () => {
       disk: LIMIT_DEFAULTS.disk,
       diskUnlimited: true,
       egg: ['egg-paper'],
-      grants: [
-        { access: ['read'], target: ['user:user-1'] },
-        { access: ['write'], target: ['group:group-admins'] }
-      ],
+      groupGrants: [{ access: ['write'], uuid: ['group-admins'] }],
       image: 'ghcr.io/yolks:java_21',
       memory: 4096,
       memoryUnlimited: false,
@@ -560,6 +571,7 @@ describe('converters', () => {
       startOnCompletion: false,
       startup: 'java -jar custom.jar',
       startupOverridden: true,
+      userGrants: [{ access: ['read'], uuid: ['user-1'] }],
       variables: [
         {
           defaultValue: 'server.jar',
@@ -590,8 +602,9 @@ describe('converters', () => {
       owner: null
     });
     expect(f.owner).toEqual([]);
-    expect(f.grants).toEqual([]);
-    expect(fromGrantsInfo()).toEqual([]);
+    expect(f.userGrants).toEqual([]);
+    expect(f.groupGrants).toEqual([]);
+    expect(fromGrantsInfo()).toEqual({ groupGrants: [], userGrants: [] });
   });
 
   it('builds the create body (unlimited sends 0, only editable variables)', () => {
@@ -644,19 +657,28 @@ describe('converters', () => {
     expect(without.name).toBe('survival');
   });
 
-  it('round-trips grants and keeps uuids containing colons', () => {
-    const rows: GrantRow[] = [
-      { access: ['write'], target: ['user:a:b'] },
-      { access: ['read'], target: ['group:g'] }
-    ];
+  it('round-trips grants in order', () => {
+    const rows: { userGrants: GrantRow[]; groupGrants: GrantRow[] } = {
+      groupGrants: [{ access: ['read'], uuid: ['g'] }],
+      userGrants: [
+        { access: ['write'], uuid: ['b'] },
+        { access: ['read'], uuid: ['a'] }
+      ]
+    };
     expect(toGrantsBody(rows)).toEqual({
       groups: [{ access: 'read', uuid: 'g' }],
-      users: [{ access: 'write', uuid: 'a:b' }]
+      users: [
+        { access: 'write', uuid: 'b' },
+        { access: 'read', uuid: 'a' }
+      ]
     });
     expect(
       fromGrantsInfo({
         groups: [{ access: 'read', name: 'G', uuid: 'g' }],
-        users: [{ access: 'write', name: 'A', uuid: 'a:b' }]
+        users: [
+          { access: 'write', name: 'B', uuid: 'b' },
+          { access: 'read', name: 'A', uuid: 'a' }
+        ]
       })
     ).toEqual(rows);
   });
@@ -702,8 +724,9 @@ describe('mapFieldErrors', () => {
     ['limits.memory', 'resources', 'memory'],
     ['limits.disk', 'resources', 'disk'],
     ['backup_limit', 'resources', 'backupLimit'],
-    ['grants.users.0', 'permissions', 'grants.0.target'],
-    ['grants.groups.0', 'permissions', 'grants.1.target']
+    ['grants.users.0', 'permissions', 'userGrants.0.uuid'],
+    ['grants.users.0.access', 'permissions', 'userGrants.0.uuid'],
+    ['grants.groups.0', 'permissions', 'groupGrants.0.uuid']
   ])('maps %s to %s / %s', (field, section, path) => {
     expect(mapFieldErrors(body(field), form)).toEqual({
       first: section,
@@ -714,8 +737,9 @@ describe('mapFieldErrors', () => {
 
   it.each([
     'variables.UNKNOWN',
-    'grants.users.5',
+    'grants.users.1',
     'grants.groups.1',
+    'grants',
     'something',
     'allocations.x'
   ])('collects unmappable field %s as other', (field) => {

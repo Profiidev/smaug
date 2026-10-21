@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within
+} from '@testing-library/svelte';
 import Harness from '$test_helpers/ServerFieldsHarness.svelte';
 import GeneralFields from '$routes/servers/GeneralFields.svelte';
 import StartupFields from '$routes/servers/StartupFields.svelte';
@@ -631,67 +637,174 @@ describe('ResourcesFields', () => {
 });
 
 describe('PermissionsFields', () => {
-  const perms = (init = base(), disabled = false) =>
+  const perms = (init = base(), disabled = false, opts = options) =>
     mount(PermissionsFields, {
       disabled,
-      extra: { options },
+      extra: { options: opts },
       initialValue: init
     });
+  const section = (name: string) =>
+    screen.getByRole('region', { name: `${name} grants` });
+  const select = (group: string) =>
+    within(screen.getByRole('group', { name: group })).getByRole('combobox');
+  const optionNames = async (group: string) => {
+    await fireEvent.click(select(group));
+    const names = (await screen.findAllByRole('option')).map((o) =>
+      o.textContent?.trim()
+    );
+    await fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    await tick();
+    return names;
+  };
+  const empty = (): ServerForm => ({
+    ...base(),
+    groupGrants: [],
+    userGrants: []
+  });
 
-  it('renders a row per grant with its target and access', () => {
+  it('groups grants into a users and a groups section', () => {
     perms();
     expect(
-      screen.getAllByRole('combobox').map((b) => b.textContent?.trim())
-    ).toEqual(['Bob User', 'Read', 'Admins', 'Write']);
-  });
-
-  it('adds a read row and picks a user or group for it', async () => {
-    const { value } = perms({ ...base(), grants: [] });
-    expect(screen.getByText('No grants')).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole('button', { name: 'Add grant' }));
-    expect(value().grants).toEqual([{ access: ['read'], target: [] }]);
-    await pick('No User or group', 'Admins');
-    await pick('Read', 'Write');
-    expect(value().grants).toEqual([
-      { access: ['write'], target: ['group:group-admins'] }
-    ]);
-  });
-
-  it('lists users and groups in separate groups', async () => {
-    perms({ ...base(), grants: [{ access: ['read'], target: [] }] });
-    await fireEvent.click(
-      screen
+      within(section('User'))
         .getAllByRole('combobox')
-        .find((b) => b.textContent?.trim() === 'No User or group')!
-    );
-    expect(await screen.findByText('Users')).toBeInTheDocument();
-    expect(screen.getByText('Groups')).toBeInTheDocument();
+        .map((b) => b.textContent?.trim())
+    ).toEqual(['Bob User', 'Read']);
     expect(
-      screen.getByRole('option', { name: 'Ada Admin' })
-    ).toBeInTheDocument();
+      within(section('Group'))
+        .getAllByRole('combobox')
+        .map((b) => b.textContent?.trim())
+    ).toEqual(['Admins', 'Write']);
+    expect(select('User 1')).toHaveTextContent('Bob User');
+    expect(select('Access for user 1')).toHaveTextContent('Read');
+    expect(select('Group 1')).toHaveTextContent('Admins');
+    expect(select('Access for group 1')).toHaveTextContent('Write');
   });
 
-  it('removes the chosen row', async () => {
-    const { value } = perms();
-    await fireEvent.click(
-      screen.getAllByRole('button', { name: 'Remove grant' })[0]
-    );
-    expect(value().grants).toEqual([
-      { access: ['write'], target: ['group:group-admins'] }
+  it('shows the column labels once per section above the rows', () => {
+    const init = base();
+    init.userGrants.push({ access: ['read'], uuid: [] });
+    perms(init);
+    expect(
+      within(section('User')).getAllByText('User', { exact: true })
+    ).toHaveLength(1);
+    expect(
+      within(section('User')).getAllByText('Access', { exact: true })
+    ).toHaveLength(1);
+    expect(
+      within(section('Group')).getAllByText('Group', { exact: true })
+    ).toHaveLength(1);
+    expect(
+      within(section('Group')).getAllByText('Access', { exact: true })
+    ).toHaveLength(1);
+  });
+
+  it('shows an empty state per section without column labels', () => {
+    perms({ ...base(), userGrants: [] });
+    expect(within(section('User')).getByText('No users')).toBeInTheDocument();
+    expect(
+      within(section('User')).queryByText('Access', { exact: true })
+    ).toBeNull();
+    expect(within(section('Group')).queryByText('No groups')).toBeNull();
+    cleanup();
+    perms({ ...base(), groupGrants: [] });
+    expect(within(section('Group')).getByText('No groups')).toBeInTheDocument();
+    expect(within(section('User')).queryByText('No users')).toBeNull();
+  });
+
+  it('adds a user row and picks a user and access for it', async () => {
+    const { value } = perms(empty());
+    await fireEvent.click(screen.getByRole('button', { name: 'Add user' }));
+    expect(value().userGrants).toEqual([{ access: ['read'], uuid: [] }]);
+    expect(value().groupGrants).toEqual([]);
+    expect(select('User 1')).toHaveTextContent('No user');
+    await pick('No user', 'Ada Admin');
+    await pick('Read', 'Write');
+    expect(value().userGrants).toEqual([
+      { access: ['write'], uuid: ['user-admin'] }
     ]);
   });
 
-  it('does not submit duplicate grants', async () => {
+  it('adds a group row', async () => {
+    const { value } = perms(empty());
+    await fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
+    expect(value().groupGrants).toEqual([{ access: ['read'], uuid: [] }]);
+    expect(value().userGrants).toEqual([]);
+    await pick('No group', 'Admins');
+    expect(value().groupGrants).toEqual([
+      { access: ['read'], uuid: ['group-admins'] }
+    ]);
+  });
+
+  it('lists only users in user rows and only groups in group rows', async () => {
+    perms(empty());
+    await fireEvent.click(screen.getByRole('button', { name: 'Add user' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
+    expect(await optionNames('User 1')).toEqual(['Ada Admin', 'Bob User']);
+    expect(await optionNames('Group 1')).toEqual(['Admins']);
+  });
+
+  it('hides entries picked in other rows but keeps the own value', async () => {
+    const opts = {
+      ...options,
+      groups: [
+        { name: 'Admins', uuid: 'group-admins' },
+        { name: 'Staff', uuid: 'group-staff' },
+        { name: 'Mods', uuid: 'group-mods' }
+      ]
+    };
     const init = base();
-    init.grants.push({ access: ['write'], target: ['user:user-1'] });
+    init.groupGrants.push({ access: ['read'], uuid: ['group-staff'] });
+    init.groupGrants.push({ access: ['read'], uuid: [] });
+    perms(init, false, opts);
+    expect(await optionNames('Group 1')).toEqual(['Admins', 'Mods']);
+    expect(await optionNames('Group 2')).toEqual(['Staff', 'Mods']);
+    expect(await optionNames('Group 3')).toEqual(['Mods']);
+    // Users picked elsewhere do not affect groups, and vice versa.
+    expect(await optionNames('User 1')).toEqual(['Ada Admin', 'Bob User']);
+  });
+
+  it('removes the chosen row of its own section', async () => {
+    const init = base();
+    init.userGrants.push({ access: ['write'], uuid: ['user-admin'] });
+    const { value } = perms(init);
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Remove user 1' })
+    );
+    expect(value().userGrants).toEqual([
+      { access: ['write'], uuid: ['user-admin'] }
+    ]);
+    expect(value().groupGrants).toEqual(base().groupGrants);
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Remove group 1' })
+    );
+    expect(value().groupGrants).toEqual([]);
+    expect(screen.getByText('No groups')).toBeInTheDocument();
+  });
+
+  it.each(['userGrants', 'groupGrants'] as const)(
+    'does not submit duplicate %s',
+    async (key) => {
+      const init = base();
+      init[key].push({ access: ['write'], uuid: init[key][0].uuid });
+      await expectRejected(PermissionsFields, init, { options });
+    }
+  );
+
+  it('does not submit a row without a target', async () => {
+    const init = base();
+    init.userGrants.push({ access: ['read'], uuid: [] });
     await expectRejected(PermissionsFields, init, { options });
   });
 
   it('disables every control when disabled', () => {
     perms(base(), true);
-    expect(screen.getByRole('button', { name: 'Add grant' })).toBeDisabled();
-    for (const b of screen.getAllByRole('button', { name: 'Remove grant' })) {
-      expect(b).toBeDisabled();
+    for (const name of [
+      'Add user',
+      'Add group',
+      'Remove user 1',
+      'Remove group 1'
+    ]) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
     }
   });
 });

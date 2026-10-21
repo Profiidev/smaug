@@ -12,6 +12,7 @@ import {
   openTab,
   pick,
   recordUpdate,
+  rowCombo,
   save,
   survivalBody,
   tab
@@ -415,37 +416,49 @@ test.describe('server edit (admin)', () => {
     ]);
   });
 
-  test('edits access grants', async ({ network, page }) => {
+  test('edits access grants per section', async ({ network, page }) => {
     const update = recordUpdate();
     network.use(update.handler);
     await gotoReady(page, '/servers/srv-survival');
     await openTab(page, 'Permissions');
 
-    const targets = page
-      .getByText('User or group', { exact: true })
-      .locator('xpath=following-sibling::*[@role="combobox"]');
-    await expect(targets).toHaveCount(2);
-    await expect(targets.nth(0)).toHaveText('Bob User');
-    await expect(targets.nth(1)).toHaveText('Staff');
+    const users = page.getByRole('region', { name: 'User grants' });
+    const groups = page.getByRole('region', { name: 'Group grants' });
+    await expect(users.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(groups.getByRole('heading', { name: 'Groups' })).toBeVisible();
+    await expect(rowCombo(page, 'User 1')).toHaveText('Bob User');
+    await expect(rowCombo(page, 'Access for user 1')).toHaveText('Write');
+    await expect(rowCombo(page, 'Group 1')).toHaveText('Staff');
+    await expect(rowCombo(page, 'Access for group 1')).toHaveText('Read');
+    await expect(users.getByRole('combobox')).toHaveCount(2);
+    await expect(groups.getByRole('combobox')).toHaveCount(2);
 
-    // A new grant needs a target and may not repeat one.
-    await page.getByRole('button', { name: 'Add grant' }).click();
+    // A new group row needs a target; groups granted elsewhere are hidden.
+    await groups.getByRole('button', { name: 'Add group' }).click();
+    // Column labels appear once per section, not per row.
+    await expect(groups.getByText('Group', { exact: true })).toHaveCount(1);
+    await expect(groups.getByText('Access', { exact: true })).toHaveCount(1);
+    await expect(users.getByText('User', { exact: true })).toHaveCount(1);
+    await expect(users.getByText('Access', { exact: true })).toHaveCount(1);
     await save(page);
-    await expect(page.getByText('Select a user or group.')).toBeVisible();
-    await targets.nth(2).click();
-    await page.getByRole('option', { name: 'Staff' }).click();
-    await save(page);
-    await expect(page.getByText('Already granted.')).toBeVisible();
-
-    await targets.nth(2).click();
+    await expect(page.getByText('Select a group.')).toBeVisible();
+    await rowCombo(page, 'Group 2').click();
+    await expect(page.getByRole('option')).toHaveText(['Admins']);
     await page.getByRole('option', { name: 'Admins' }).click();
-    await page
-      .getByText('Access', { exact: true })
-      .locator('xpath=following-sibling::*[@role="combobox"]')
-      .nth(2)
-      .click();
-    await page.getByRole('option', { name: 'Write' }).click();
-    await page.getByRole('button', { name: 'Remove grant' }).first().click();
+    await choose(page, rowCombo(page, 'Access for group 2'), 'Write');
+
+    // Each row keeps its own value but not the others'; only groups are listed.
+    await rowCombo(page, 'Group 1').click();
+    await expect(page.getByRole('option')).toHaveText(['Staff']);
+    await page.keyboard.press('Escape');
+
+    // User rows list only users, minus the ones already granted.
+    await users.getByRole('button', { name: 'Add user' }).click();
+    await rowCombo(page, 'User 2').click();
+    await expect(page.getByRole('option')).toHaveText(['Ada Admin']);
+    await page.getByRole('option', { name: 'Ada Admin' }).click();
+    await page.getByRole('button', { name: 'Remove user 1' }).click();
+    await expect(rowCombo(page, 'User 1')).toHaveText('Ada Admin');
     await save(page);
 
     await expect(
@@ -459,15 +472,20 @@ test.describe('server edit (admin)', () => {
             { access: 'read', uuid: 'group-staff' },
             { access: 'write', uuid: 'group-admins' }
           ],
-          users: []
+          users: [{ access: 'read', uuid: 'user-admin' }]
         }
       }
     ]);
+    await expectNoHorizontalOverflow(page);
 
-    // Removing every grant shows the empty state.
-    await page.getByRole('button', { name: 'Remove grant' }).first().click();
-    await page.getByRole('button', { name: 'Remove grant' }).first().click();
-    await expect(page.getByText('No grants')).toBeVisible();
+    // Emptying a section shows its own empty state and hides its column labels.
+    await page.getByRole('button', { name: 'Remove user 1' }).click();
+    await expect(users.getByText('No users')).toBeVisible();
+    await expect(users.getByText('Access', { exact: true })).toHaveCount(0);
+    await expect(groups.getByText('No groups')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Remove group 1' }).click();
+    await page.getByRole('button', { name: 'Remove group 1' }).click();
+    await expect(groups.getByText('No groups')).toBeVisible();
   });
 
   test('maps grant field errors to the permissions tab', async ({
@@ -477,6 +495,7 @@ test.describe('server edit (admin)', () => {
     network.use(
       gen.handleUpdateServer(() =>
         fieldErrors(400, [
+          { field: 'grants.users.0', message: 'User is gone.' },
           { field: 'grants.groups.0', message: 'Group is gone.' }
         ])
       )
@@ -489,6 +508,11 @@ test.describe('server edit (admin)', () => {
       'aria-selected',
       'true'
     );
-    await expect(page.getByText('Group is gone.')).toBeVisible();
+    await expect(
+      page.getByRole('group', { exact: true, name: 'Group 1' })
+    ).toContainText('Group is gone.');
+    await expect(
+      page.getByRole('group', { exact: true, name: 'User 1' })
+    ).toContainText('User is gone.');
   });
 });

@@ -161,9 +161,9 @@ describe('server edit page access', () => {
     expect(
       comboboxes().find((b) => b.textContent?.trim() === 'eu-1')
     ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { hidden: true, name: 'Add grant' })
-    ).toBeEnabled();
+    for (const name of ['Add user', 'Add group']) {
+      expect(screen.getByRole('button', { hidden: true, name })).toBeEnabled();
+    }
     expect(screen.getByRole('button', { name: 'Transfer…' })).toBeEnabled();
   });
 
@@ -345,6 +345,35 @@ describe('server edit page save', () => {
       'data-state',
       'active'
     );
+  });
+
+  it('shows grant field errors on their row in Permissions', async () => {
+    vi.mocked(updateServer).mockResolvedValue(
+      result(400, {
+        errors: [
+          { field: 'grants.users.0', message: 'User is gone.' },
+          { field: 'grants.groups.0', message: 'Group is gone.' }
+        ]
+      })
+    );
+    await mount();
+    await openTab('General');
+    await save();
+    expect(await screen.findByText('User is gone.')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Permissions/ })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+    expect(
+      within(screen.getByRole('group', { name: 'User 1' })).getByText(
+        'User is gone.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', { name: 'Group 1' })).getByText(
+        'Group is gone.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('describes field errors it cannot place', async () => {
