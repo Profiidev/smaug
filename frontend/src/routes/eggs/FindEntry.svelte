@@ -82,14 +82,16 @@
       onValueChange={setMode}
     >
       {#each FIND_MODES as m (m)}
-        <ToggleGroup.Item value={m}>{MODE_LABELS[m]}</ToggleGroup.Item>
+        <ToggleGroup.Item class="cursor-pointer" value={m}
+          >{MODE_LABELS[m]}</ToggleGroup.Item
+        >
       {/each}
     </ToggleGroup.Root>
     <Button
       size="icon-sm"
       variant="destructive"
       type="button"
-      class="mt-6 ml-auto"
+      class="mt-6 ml-auto cursor-pointer"
       aria-label="Remove find entry"
       {disabled}
       onclick={onremove}
@@ -133,7 +135,7 @@
             size="icon-sm"
             variant="destructive"
             type="button"
-            class="mt-6"
+            class="mt-6 cursor-pointer"
             aria-label="Remove pair"
             {disabled}
             onclick={() => setMap(entry.map.filter((_, m) => m !== k))}
@@ -144,6 +146,7 @@
       {/each}
       <div>
         <Button
+          class="cursor-pointer"
           size="sm"
           variant="ghost"
           type="button"
@@ -188,7 +191,10 @@
               value={entry.value}
               onValueChange={setValue}
             >
-              <Select.Trigger {...props} class="w-full font-mono">
+              <Select.Trigger
+                {...props}
+                class="w-full cursor-pointer font-mono"
+              >
                 {entry.value || 'Choose a value'}
               </Select.Trigger>
               <Select.Content>

@@ -270,7 +270,7 @@ fn pairs(map: IndexMap<String, String>) -> serde_json::Result<Value> {
   serde_json::to_value(map.into_iter().collect::<Vec<_>>())
 }
 
-fn unpairs(v: Value) -> serde_json::Result<IndexMap<String, String>> {
+pub(crate) fn unpairs(v: Value) -> serde_json::Result<IndexMap<String, String>> {
   Ok(
     serde_json::from_value::<Vec<(String, String)>>(v)?
       .into_iter()
@@ -313,21 +313,23 @@ fn to_models(id: Uuid, egg: EggBody) -> Result<(egg::Model, Vec<egg_variable::Mo
   Ok((model, vars))
 }
 
+pub(crate) fn variable_from_model(v: egg_variable::Model) -> Result<EggVariable> {
+  Ok(EggVariable {
+    name: v.name,
+    description: v.description,
+    env_variable: v.env_variable,
+    default_value: v.default_value,
+    user_viewable: v.user_viewable,
+    user_editable: v.user_editable,
+    rules: serde_json::from_value(v.rules)?,
+    sort: v.sort,
+  })
+}
+
 fn from_models(egg: egg::Model, vars: Vec<egg_variable::Model>) -> Result<EggInfo> {
   let variables = vars
     .into_iter()
-    .map(|v| {
-      Ok(EggVariable {
-        name: v.name,
-        description: v.description,
-        env_variable: v.env_variable,
-        default_value: v.default_value,
-        user_viewable: v.user_viewable,
-        user_editable: v.user_editable,
-        rules: serde_json::from_value(v.rules)?,
-        sort: v.sort,
-      })
-    })
+    .map(variable_from_model)
     .collect::<Result<_>>()?;
   Ok(EggInfo {
     uuid: egg.id,
@@ -427,13 +429,19 @@ async fn edit_egg(
 ) -> Result<()> {
   let egg = validate(req.egg)?;
   db.egg().find_by_id(req.uuid).await?;
+  // validate guarantees at least one command
+  let startup = egg.startup_commands[0].clone();
   let (egg, vars) = to_models(req.uuid, egg)?;
-  db.egg().update_egg(egg, vars).await?;
+  let servers = db.egg().update_egg(egg, vars, &startup).await?;
   info!("Updated egg with ID {}", req.uuid);
 
   updater
     .broadcast(UpdateMessage::Eggs { uuid: req.uuid })
     .await;
+  for uuid in servers {
+    // TODO(wings): push the new startup command, variables and egg config to the server's node
+    updater.broadcast(UpdateMessage::Servers { uuid }).await;
+  }
   Ok(())
 }
 
@@ -443,6 +451,9 @@ async fn delete_egg(
   updater: Updater,
   Json(req): Json<EggUuid>,
 ) -> Result<()> {
+  if db.server().count_by_egg(req.uuid).await? > 0 {
+    bail!(CONFLICT, "Egg is in use by servers");
+  }
   if db.egg().delete_egg(req.uuid).await? == 0 {
     bail!(NOT_FOUND, "Egg not found");
   }

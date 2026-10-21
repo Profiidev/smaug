@@ -3,6 +3,8 @@ use entity::{egg, egg_variable};
 use http::StatusCode;
 use sea_orm::{QueryOrder, TransactionTrait, prelude::*};
 
+use crate::db::server::sync_egg;
+
 pub struct EggTable<'db> {
   db: &'db DatabaseConnection,
 }
@@ -47,12 +49,14 @@ impl<'db> EggTable<'db> {
     txn.commit().await
   }
 
-  /// Replaces every column and all variables in one transaction.
+  /// Replaces every column and all variables in one transaction and syncs
+  /// the egg's servers (see [`sync_egg`]); returns their ids.
   pub async fn update_egg(
     &self,
     egg: egg::Model,
     vars: Vec<egg_variable::Model>,
-  ) -> Result<(), DbErr> {
+    default_startup: &str,
+  ) -> Result<Vec<Uuid>, DbErr> {
     let txn = self.db.begin().await?;
     let id = egg.id;
     egg::ActiveModel::from(egg).reset_all().update(&txn).await?;
@@ -60,8 +64,10 @@ impl<'db> EggTable<'db> {
       .filter(egg_variable::Column::EggId.eq(id))
       .exec(&txn)
       .await?;
+    let servers = sync_egg(&txn, id, default_startup, &vars).await?;
     insert_vars(&txn, vars).await?;
-    txn.commit().await
+    txn.commit().await?;
+    Ok(servers)
   }
 
   /// Variables go with it via the FK cascade.

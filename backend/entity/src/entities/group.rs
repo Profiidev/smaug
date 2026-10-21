@@ -12,6 +12,8 @@ pub struct Model {
   pub name: String,
   #[sea_orm(has_many)]
   pub group_permissions: HasMany<super::group_permission::Entity>,
+  #[sea_orm(has_many, via = "server_group_access")]
+  pub servers: HasMany<super::server::Entity>,
   #[sea_orm(has_many, via = "group_user")]
   pub users: HasMany<super::user::Entity>,
 }

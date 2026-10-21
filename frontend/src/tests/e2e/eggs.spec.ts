@@ -135,7 +135,7 @@ const finishWizard = async (page: Page) => {
     // oxlint-disable-next-line no-await-in-loop
     await expect(ready).toBeVisible();
   }
-  await page.getByRole('button', { name: 'Create Egg' }).click();
+  await page.getByRole('button', { exact: true, name: 'Create' }).click();
 };
 
 test.describe('eggs list', () => {
@@ -155,7 +155,9 @@ test.describe('eggs list', () => {
         'Server templates that define how game servers are installed and run.'
       )
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Create egg' })).toBeVisible();
+    await expect(
+      page.getByRole('link', { exact: true, name: 'Create' })
+    ).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Import JSON' })
     ).toBeVisible();
@@ -178,12 +180,14 @@ test.describe('eggs list', () => {
     await gotoReady(page, '/eggs');
     await expect(page.getByText('No eggs yet')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Create egg' })).toHaveCount(1);
+    await expect(
+      page.getByRole('link', { exact: true, name: 'Create' })
+    ).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Import JSON' })).toHaveCount(
       1
     );
     await expectNoHorizontalOverflow(page);
-    await page.getByRole('link', { name: 'Create egg' }).click();
+    await page.getByRole('link', { exact: true, name: 'Create' }).click();
     await expect(page).toHaveURL(/\/eggs\/create$/);
   });
 
@@ -322,6 +326,27 @@ test.describe('eggs list', () => {
 test.describe('egg create wizard', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
+  test('keeps the header right above the wizard card', async ({ page }) => {
+    await gotoReady(page, '/eggs/create');
+    await expect(
+      page.getByRole('heading', { name: 'Create egg' })
+    ).toBeVisible();
+    const header = (await page
+      .getByRole('link', { name: 'Back to eggs' })
+      .boundingBox())!;
+    const card = (await page
+      .locator('[data-slot=card]')
+      .first()
+      .boundingBox())!;
+    // Directly above the card (gap-4), not pinned to the page top.
+    const gap = card.y - (header.y + header.height);
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(24);
+    // Left-aligned with the card; mobile shifts it past the sidebar trigger (ml-7).
+    expect(header.x - card.x).toBeGreaterThanOrEqual(0);
+    expect(header.x - card.x).toBeLessThanOrEqual(29);
+  });
+
   test('only the stage fields scroll, cards keep their height', async ({
     page
   }) => {
@@ -441,7 +466,7 @@ test.describe('egg create wizard', () => {
     await expect(
       page.getByRole('button', { name: 'Add config file' })
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Create Egg' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
     await expect(page.getByText('Egg created successfully.')).toBeVisible();
     await expect(page).toHaveURL(/\/eggs\/egg-new$/);
@@ -608,7 +633,7 @@ test.describe('egg create wizard', () => {
     await expect(card.getByLabel('File Path')).toBeHidden();
     await expect(card.getByText('3 find entries')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Create Egg' }).click();
+    await page.getByRole('button', { exact: true, name: 'Create' }).click();
     await expect(page).toHaveURL(/\/eggs\/egg-new$/);
     const config = create.bodies[0].config as Record<string, string>;
     expect(JSON.parse(config.files)['config.yml']).toEqual({
@@ -675,7 +700,10 @@ test.describe('egg detail', () => {
       page.getByRole('heading', { name: 'Egg: Paper' })
     ).toBeVisible();
     await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
+    await openTab(page, 'Variables');
+    await page.getByRole('button', { name: 'Toggle variable' }).click();
     await expect(page.getByLabel('Env Variable')).toHaveValue('SERVER_JARFILE');
+    await openTab(page, 'Config');
     await expect(page.getByLabel('File Path')).toHaveValue('server.properties');
     await expect(page.getByLabel('Stop Command')).toHaveValue('stop');
     await expectNoHorizontalOverflow(page);
@@ -693,6 +721,7 @@ test.describe('egg detail', () => {
     await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
     await page.getByLabel('Egg Name').fill('Paper 2');
     await openTab(page, 'Variables');
+    await page.getByRole('button', { name: 'Toggle variable' }).click();
     await page.getByLabel('Default Value').fill('paper.jar');
     await openTab(page, 'Runtime');
     await page.getByRole('button', { name: 'Add image' }).click();
@@ -770,7 +799,12 @@ test.describe('egg detail', () => {
     await gotoReady(page, '/eggs/egg-paper');
     await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
     await openTab(page, 'Variables');
+    const toggle = page.getByRole('button', { name: 'Toggle variable' });
+    await toggle.click();
     await page.getByLabel('Env Variable').fill('HOME');
+    // Collapse it again: the error must expand it so it is not hidden.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await openTab(page, 'General');
     await page.getByRole('button', { name: 'Save Changes' }).click();
     // The invalid field is on another tab: its trigger gets an error dot.
@@ -780,6 +814,7 @@ test.describe('egg detail', () => {
       page.getByRole('tab', { name: 'General' }).getByLabel('Has errors')
     ).toHaveCount(0);
     await variablesTab.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(
       page.getByText('Reserved name — choose another.')
     ).toBeVisible();
@@ -819,12 +854,33 @@ test.describe('egg detail', () => {
     ).toBeInViewport();
   });
 
+  test('variables load collapsed and toggle open', async ({ page }) => {
+    await gotoReady(page, '/eggs/egg-paper');
+    await openTab(page, 'Variables');
+    const toggle = page.getByRole('button', { name: 'Toggle variable' });
+    const header = page.locator('[data-slot="card-title"]', { has: toggle });
+    await expect(header).toContainText('SERVER_JARFILE');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByLabel('Env Variable')).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByLabel('Env Variable')).toBeVisible();
+    await toggle.click();
+    await expect(page.getByLabel('Env Variable')).toBeHidden();
+    await page.getByRole('button', { name: 'Add variable' }).click();
+    await expect(toggle.nth(1)).toHaveAttribute('aria-expanded', 'true');
+    await expect(header.nth(1)).toContainText('New variable');
+    await page.getByLabel('Env Variable').nth(1).fill('NEW_ENV');
+    await expect(header.nth(1)).toContainText('NEW_ENV');
+    await expectNoHorizontalOverflow(page);
+  });
+
   test('shows one section per tab', async ({ page }) => {
     await gotoReady(page, '/eggs/egg-paper');
     await expect(page.getByLabel('Egg Name')).toBeVisible();
-    await expect(page.getByLabel('Env Variable')).toBeHidden();
+    await expect(page.getByText('Startup variables (1)')).toBeHidden();
     await openTab(page, 'Variables');
-    await expect(page.getByLabel('Env Variable')).toBeVisible();
+    await expect(page.getByText('Startup variables (1)')).toBeVisible();
     await expect(page.getByLabel('Egg Name')).toBeHidden();
     await expectNoHorizontalOverflow(page);
   });
@@ -969,7 +1025,7 @@ test.describe('eggs without egg:edit', () => {
       page.getByRole('cell', { exact: true, name: 'Paper' })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Create egg' })
+      page.getByRole('link', { exact: true, name: 'Create' })
     ).toHaveAttribute('aria-disabled', 'true');
     await expect(
       page.getByRole('row', { name: /Paper/ }).getByRole('button').last()
@@ -987,6 +1043,7 @@ test.describe('eggs without egg:edit', () => {
       page.getByRole('button', { name: 'Save Changes' })
     ).toBeDisabled();
     await openTab(page, 'Variables');
+    await page.getByRole('button', { name: 'Toggle variable' }).click();
     await expect(page.getByLabel('Env Variable')).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Add variable' })

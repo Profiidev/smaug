@@ -170,6 +170,9 @@ async fn delete_node(
   updater: Updater,
   Json(data): Json<DeleteNode>,
 ) -> Result<()> {
+  if db.server().count_by_node(data.uuid).await? > 0 {
+    bail!(CONFLICT, "Node is in use by servers");
+  }
   if db.node().delete_node(data.uuid).await? == 0 {
     bail!(NOT_FOUND, "Node not found");
   }

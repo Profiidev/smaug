@@ -106,7 +106,7 @@ describe('eggs list page', () => {
   it('shows the empty state with create and import, and no table', async () => {
     render(ListPage, { props: { data: listData([]) } as never });
     expect(await screen.findByText('No eggs yet')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Create egg' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Create' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Import JSON' })).toHaveLength(
       1
     );

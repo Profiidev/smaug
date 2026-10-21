@@ -29,6 +29,19 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
   { path: '/eggs/create', ready: (p) => p.getByLabel('Egg Name') },
   { path: '/eggs/egg-paper', ready: (p) => p.getByLabel('Egg Name') },
 
+  {
+    path: '/servers',
+    ready: (p) => p.getByRole('heading', { name: 'Servers' })
+  },
+  {
+    path: '/servers/create',
+    ready: (p) => p.getByLabel('Name', { exact: true })
+  },
+  {
+    path: '/servers/srv-survival',
+    ready: (p) => p.getByRole('heading', { name: /Server:/ })
+  },
+
   { path: '/users', ready: (p) => p.getByRole('heading', { name: 'Users' }) },
   {
     path: '/users/create',

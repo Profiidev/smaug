@@ -40,6 +40,7 @@
       <span class="text-muted-foreground text-xs">{caption}</span>
     </div>
     <Button
+      class="cursor-pointer"
       size="sm"
       variant="outline"
       type="button"
@@ -69,7 +70,7 @@
     size="icon-sm"
     variant="destructive"
     type="button"
-    class="mt-0.5"
+    class="mt-0.5 cursor-pointer"
     aria-label={label}
     disabled={props.disabled}
     {onclick}

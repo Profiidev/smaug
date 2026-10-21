@@ -1,3 +1,4 @@
+import Container from '@lucide/svelte/icons/container';
 import { describe, expect, it } from 'vitest';
 import { items, noAuthPaths, noSidebarPaths } from '$lib/components/nav.svelte';
 import { Permission } from '$lib/permissions.svelte';
@@ -47,7 +48,7 @@ describe('nav items', () => {
     expect(overview?.requiredPermission).toBeUndefined();
   });
 
-  it('lists Nodes and Eggs under Servers, gated by their view permissions', () => {
+  it('lists Nodes, then Servers (public), then Eggs, gated by their view permissions', () => {
     const servers = items.find((g) => g.label === 'Servers');
     expect(
       servers?.items.map(({ href, label, requiredPermission }) => ({
@@ -61,8 +62,13 @@ describe('nav items', () => {
         label: 'Nodes',
         requiredPermission: Permission.NODE_VIEW
       },
+      { href: '/servers', label: 'Servers', requiredPermission: undefined },
       { href: '/eggs', label: 'Eggs', requiredPermission: Permission.EGG_VIEW }
     ]);
+  });
+
+  it('uses the Container icon for Servers', () => {
+    expect(allItems.find((i) => i.href === '/servers')?.icon).toBe(Container);
   });
 });
 

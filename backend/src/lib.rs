@@ -24,6 +24,7 @@ mod config;
 mod db;
 mod eggs;
 mod nodes;
+mod servers;
 mod settings;
 mod utils;
 
@@ -81,6 +82,7 @@ fn api_router(rate_limiter: &mut RateLimiter) -> ApiRouter {
     .nest("/group", group::router::<UpdateMessage>())
     .nest("/nodes", nodes::router())
     .nest("/eggs", eggs::router())
+    .nest("/servers", servers::router())
 }
 
 async fn state(mut router: ApiRouter, config: Config) -> ApiRouter {

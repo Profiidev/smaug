@@ -15,7 +15,14 @@ const cases = [
   { error: 'not_found', message: 'Node not found', path: '/nodes' },
   { error: 'other', message: 'Failed to load node', path: '/nodes' },
   { error: 'not_found', message: 'Egg not found', path: '/eggs' },
-  { error: 'other', message: 'Failed to load egg', path: '/eggs' }
+  { error: 'other', message: 'Failed to load egg', path: '/eggs' },
+  { error: 'not_found', message: 'Server not found', path: '/servers' },
+  { error: 'other', message: 'Failed to load server', path: '/servers' },
+  {
+    error: 'options',
+    message: 'Failed to load server options',
+    path: '/servers'
+  }
 ];
 
 test.describe('list error toasts', () => {

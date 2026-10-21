@@ -575,6 +575,7 @@ dependencies = [
  "jsonwebtoken",
  "migration",
  "rand 0.10.3",
+ "regex",
  "reqwest",
  "reqwest-middleware",
  "rsa",
@@ -1633,6 +1634,7 @@ dependencies = [
 name = "entity"
 version = "0.1.0"
 dependencies = [
+ "schemars 1.2.3",
  "sea-orm",
  "serde",
 ]

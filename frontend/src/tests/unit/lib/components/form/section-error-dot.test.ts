@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
 import { writable } from 'svelte/store';
-import SectionErrorDot from '$routes/eggs/SectionErrorDot.svelte';
+import SectionErrorDot from '$lib/components/form/SectionErrorDot.svelte';
 
 afterEach(cleanup);
 

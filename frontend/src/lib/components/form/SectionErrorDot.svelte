@@ -1,9 +1,11 @@
-<script lang="ts">
-  import type { SuperForm } from '@profidev/pleiades/components/form/types';
-  import type { EggForm } from './schema.svelte';
+<script lang="ts" generics="T extends FormRecord">
+  import type {
+    FormRecord,
+    SuperForm
+  } from '@profidev/pleiades/components/form/types';
 
   interface Props {
-    formData: SuperForm<EggForm>;
+    formData: SuperForm<T>;
     keys: string[];
   }
 

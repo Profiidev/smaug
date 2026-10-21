@@ -21,6 +21,8 @@ pub struct Model {
   pub user_avatar: HasOne<super::user_avatar::Entity>,
   #[sea_orm(has_many, via = "group_user")]
   pub groups: HasMany<super::group::Entity>,
+  #[sea_orm(has_many, via = "server_user_access")]
+  pub servers: HasMany<super::server::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

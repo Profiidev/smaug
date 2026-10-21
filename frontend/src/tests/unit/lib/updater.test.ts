@@ -37,6 +37,7 @@ describe('UpdateType enum', () => {
       'Eggs',
       'Group',
       'Nodes',
+      'Servers',
       'Settings',
       'User',
       'UserPermissions'
@@ -103,6 +104,13 @@ describe('updater message handling', () => {
   it('invalidates the egg list and detail on Eggs updates', () => {
     send({ type: UpdateType.Eggs, uuid: 'egg-1' });
     expect(invalidatedUrls()).toEqual(['/api/eggs', '/api/eggs/egg-1']);
+  });
+
+  it('invalidates only the server list and that server on Servers updates', () => {
+    send({ type: UpdateType.Servers, uuid: 's1' });
+    // Other servers' edit pages (/api/servers/s2) and options stay untouched.
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidatedUrls()).toEqual(['/api/servers', '/api/servers/s1']);
   });
 
   it('ignores unknown message types', () => {

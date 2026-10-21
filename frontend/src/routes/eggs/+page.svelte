@@ -10,7 +10,6 @@
   import { toast } from '@profidev/pleiades/components/util/general';
   import { goto, invalidate } from '$app/navigation';
   import * as Empty from '@profidev/pleiades/components/ui/empty';
-  import { Separator } from '@profidev/pleiades/components/ui/separator';
   import Egg from '@lucide/svelte/icons/egg';
   import ImportButton from './ImportButton.svelte';
   import { Permission } from '$lib/permissions.svelte';
@@ -185,7 +184,6 @@
       </div>
     {/if}
   </div>
-  <Separator />
   {#if eggs?.length === 0}
     <Empty.Root class="border border-dashed">
       <Empty.Header>
@@ -228,7 +226,7 @@
   <ImportButton {onimport} disabled={!canEdit} />
   <Button class="cursor-pointer" href="/eggs/create" disabled={!canEdit}>
     <Plus />
-    Create egg
+    Create
   </Button>
 {/snippet}
 

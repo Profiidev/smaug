@@ -66,40 +66,45 @@
   };
 </script>
 
-<div class="flex h-full max-h-screen min-h-0 flex-col gap-4 p-4">
-  <div class="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-2">
-    <div class="ml-7 flex items-center md:m-0">
-      <Button
-        size="icon"
-        variant="ghost"
-        href="/eggs"
-        aria-label="Back to eggs"
-      >
-        <ArrowLeft class="size-5" />
-      </Button>
-      <h3 class="ml-2 text-xl font-medium">Create egg</h3>
+<!-- Header and card stack as one centered group; the min-h-0 flex chain caps the card so only the stage fields scroll. -->
+<div class="flex h-full max-h-screen min-h-0 flex-col justify-center p-4">
+  <div class="mx-auto flex min-h-0 w-full max-w-4xl flex-col gap-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="ml-7 flex items-center md:m-0">
+        <Button
+          class="cursor-pointer"
+          size="icon"
+          variant="ghost"
+          href="/eggs"
+          aria-label="Back to eggs"
+        >
+          <ArrowLeft class="size-5" />
+        </Button>
+        <h3 class="ml-2 text-xl font-medium">Create egg</h3>
+      </div>
+      <div class="ml-auto">
+        <ImportButton {onimport} />
+      </div>
     </div>
-    <div class="ml-auto">
-      <ImportButton {onimport} />
+    {#if imported}
+      <Alert.Root>
+        <Info />
+        <Alert.Title>Imported from {imported.sourceVersion}</Alert.Title>
+        <Alert.Description>
+          Upgraded to PLCN_v3. Review every step before creating the egg.
+        </Alert.Description>
+      </Alert.Root>
+    {/if}
+    <!-- Undo MultistepForm's centering wrapper (h-full, p-4) so the card sits right under the header. -->
+    <div
+      class="flex min-h-0 flex-col [&>div]:h-auto [&>div]:min-h-0 [&>div]:flex-col [&>div]:items-stretch [&>div]:p-0"
+    >
+      <MultistepForm
+        {stages}
+        class="min-h-0 w-full [&>[data-slot=card-content]]:flex [&>[data-slot=card-content]]:min-h-0 [&>[data-slot=card-content]]:flex-col"
+        onsubmit={submit}
+        cancelHref="/eggs"
+      />
     </div>
-  </div>
-  {#if imported}
-    <Alert.Root class="mx-auto max-w-4xl">
-      <Info />
-      <Alert.Title>Imported from {imported.sourceVersion}</Alert.Title>
-      <Alert.Description>
-        Upgraded to PLCN_v3. Review every step before creating the egg.
-      </Alert.Description>
-    </Alert.Root>
-  {/if}
-  <!-- -m cancels MultistepForm's p-4; the wrapper gives it the remaining height so only the stage fields scroll. -->
-  <div class="-mx-4 -mt-4 min-h-0 grow">
-    <MultistepForm
-      {stages}
-      class="max-h-full min-h-0 w-full max-w-4xl [&>[data-slot=card-content]]:flex [&>[data-slot=card-content]]:min-h-0 [&>[data-slot=card-content]]:flex-col"
-      onsubmit={submit}
-      cancelHref="/eggs"
-      submitLabel="Create Egg"
-    />
   </div>
 </div>

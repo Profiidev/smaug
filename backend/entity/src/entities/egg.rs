@@ -24,6 +24,8 @@ pub struct Model {
   pub tags: Json,
   #[sea_orm(has_many)]
   pub egg_variables: HasMany<super::egg_variable::Entity>,
+  #[sea_orm(has_many)]
+  pub servers: HasMany<super::server::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

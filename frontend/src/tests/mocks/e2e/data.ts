@@ -24,15 +24,18 @@ export const adminUser = {
 };
 
 /**
- * `readonly` scenario: the admin minus `egg:edit` and `node:edit`, for
- * read-only egg and node pages.
+ * `readonly` scenario: the admin minus `egg:edit`, `node:edit` and
+ * `server:edit`, for read-only egg, node and server pages.
  */
 export const userOf = (cookies: Record<string, string>) =>
   cookies.mock_scenario === 'readonly'
     ? {
         ...adminUser,
         permissions: adminUser.permissions.filter(
-          (p) => p !== Permission.EGG_EDIT && p !== Permission.NODE_EDIT
+          (p) =>
+            p !== Permission.EGG_EDIT &&
+            p !== Permission.NODE_EDIT &&
+            p !== Permission.SERVER_EDIT
         )
       }
     : adminUser;
@@ -246,3 +249,216 @@ export const nodeList = {
 
 export const generalSettings = { site_url: 'https://smaug.example/' };
 export const userSettings = { from_env: [] as string[], settings: {} };
+
+// Servers. `serverOptions` drives the create wizard; `srv-missing` answers 404.
+const paperVariables = [
+  {
+    default_value: 'server.jar',
+    description: 'Jar to run',
+    env_variable: 'SERVER_JARFILE',
+    name: 'Server Jar File',
+    rules: ['required', 'string', 'max:20'],
+    sort: 1
+  },
+  {
+    default_value: '20',
+    description: 'Player slots',
+    env_variable: 'MAX_PLAYERS',
+    name: 'Max Players',
+    rules: ['required|integer|between:1,100'],
+    sort: 2
+  },
+  {
+    default_value: 'latest',
+    description: '',
+    env_variable: 'VERSION',
+    name: 'Version',
+    rules: ['nullable', 'in:latest,1.21'],
+    sort: 3
+  }
+];
+
+export const serverOptions = {
+  default: {
+    eggs: [
+      {
+        // oxlint-disable-next-line sort-keys -- order matters: first is the default
+        docker_images: {
+          'Java 21': 'ghcr.io/pelican-eggs/yolks:java_21',
+          'Java 17': 'ghcr.io/pelican-eggs/yolks:java_17'
+        },
+        name: 'Paper',
+        // oxlint-disable-next-line sort-keys -- order matters: first is the default
+        startup_commands: {
+          Default: 'java -jar {{SERVER_JARFILE}}',
+          'Aikar flags': 'java -XX:+UseG1GC -jar {{SERVER_JARFILE}}'
+        },
+        uuid: 'egg-paper',
+        variables: paperVariables
+      },
+      {
+        docker_images: { Wine: 'ghcr.io/pelican-eggs/yolks:wine' },
+        name: 'Valheim',
+        startup_commands: { Default: './valheim_server' },
+        uuid: 'egg-valheim',
+        variables: [
+          {
+            default_value: 'My World',
+            description: 'World name',
+            env_variable: 'WORLD_NAME',
+            name: 'World Name',
+            rules: ['required', 'regex:/^[A-Za-z ]+$/']
+          }
+        ]
+      },
+      {
+        docker_images: { Alpine: 'alpine:3' },
+        name: 'Bare',
+        startup_commands: { Default: './run' },
+        uuid: 'egg-bare',
+        variables: []
+      }
+    ],
+    groups: [
+      { name: 'Admins', uuid: 'group-admins' },
+      { name: 'Staff', uuid: 'group-staff' }
+    ],
+    nodes: [
+      { name: 'Node One', uuid: 'node-1' },
+      { name: 'Node Two', uuid: 'node-2' }
+    ],
+    users: [
+      { name: 'Ada Admin', uuid: 'user-admin' },
+      { name: 'Bob User', uuid: 'user-1' }
+    ]
+  },
+  empty: { eggs: [], groups: [], nodes: [], users: [] }
+};
+
+const paper = { name: 'Paper', uuid: 'egg-paper' },
+  valheim = { name: 'Valheim', uuid: 'egg-valheim' },
+  nodeOne = { name: 'Node One', uuid: 'node-1' },
+  nodeTwo = { name: 'Node Two', uuid: 'node-2' },
+  ada = { name: 'Ada Admin', uuid: 'user-admin' };
+
+export const serverList = {
+  default: {
+    servers: [
+      {
+        egg: paper,
+        extra_allocations: [
+          { ip: '10.0.0.1', port: 25_566 },
+          { ip: '10.0.0.1', port: 25_567 }
+        ],
+        name: 'Survival SMP',
+        node: nodeOne,
+        owner: ada,
+        primary_allocation: { ip: '10.0.0.1', port: 25_565 },
+        status: 'offline',
+        uuid: 'srv-survival'
+      },
+      {
+        egg: paper,
+        extra_allocations: [],
+        name: 'Creative',
+        node: nodeTwo,
+        owner: null,
+        primary_allocation: { ip: '10.0.0.2', port: 25_570 },
+        status: 'installing',
+        uuid: 'srv-creative'
+      },
+      {
+        egg: valheim,
+        extra_allocations: [],
+        name: 'Viking World',
+        node: nodeOne,
+        owner: ada,
+        primary_allocation: { ip: '2001:db8::1', port: 2456 },
+        status: 'install_failed',
+        uuid: 'srv-viking'
+      },
+      {
+        egg: paper,
+        extra_allocations: [],
+        name: 'Fresh Server',
+        node: nodeTwo,
+        owner: ada,
+        primary_allocation: { ip: '10.0.0.2', port: 25_580 },
+        status: 'not_installed',
+        uuid: 'srv-fresh'
+      },
+      {
+        egg: valheim,
+        extra_allocations: [],
+        name: 'Banned Realm',
+        node: nodeOne,
+        owner: ada,
+        primary_allocation: { ip: '10.0.0.1', port: 2457 },
+        status: 'suspended',
+        uuid: 'srv-banned'
+      }
+    ]
+  },
+  empty: { servers: [] as unknown[] }
+};
+
+const installState = {
+  install_failed: 'install_failed',
+  installing: 'installing',
+  not_installed: 'not_installed'
+} as Record<string, string>;
+
+/**
+ * `GET /servers/{uuid}` payload for a listed server as seen with `access`
+ * (`admin` also gets grants). Unknown uuids fall back to the first server.
+ */
+export const serverInfoOf = (
+  uuid: string,
+  access: 'read' | 'write' | 'admin' = 'admin'
+) => {
+  const item =
+    serverList.default.servers.find((s) => s.uuid === uuid) ??
+    serverList.default.servers[0];
+  const egg = serverOptions.default.eggs.find((e) => e.uuid === item.egg.uuid)!;
+  return {
+    access,
+    allocations: [item.primary_allocation, ...item.extra_allocations],
+    backup_limit: 2,
+    created_at: '2026-01-01T00:00:00Z',
+    egg: item.egg,
+    grants:
+      access === 'admin'
+        ? {
+            groups: [{ access: 'read', name: 'Staff', uuid: 'group-staff' }],
+            users: [{ access: 'write', name: 'Bob User', uuid: 'user-1' }]
+          }
+        : null,
+    image: Object.values(egg.docker_images)[0],
+    install_state: installState[item.status] ?? 'installed',
+    limits: { cpu: 2000, disk: 0, memory: 4096 },
+    name: item.name,
+    node: item.node,
+    owner: item.owner,
+    start_on_completion: true,
+    startup: Object.values(egg.startup_commands)[0],
+    startup_overridden: false,
+    status: item.status,
+    suspended: item.status === 'suspended',
+    uuid: item.uuid,
+    variables: egg.variables
+      .filter((_, i) => access === 'admin' || i < 2)
+      .map((v) => ({
+        default_value: v.default_value,
+        description: v.description,
+        editable: access === 'admin' || v.env_variable !== 'SERVER_JARFILE',
+        env_variable: v.env_variable,
+        name: v.name,
+        rules: v.rules,
+        value: v.default_value
+      }))
+  };
+};
+
+/** `readonly` scenario only reads servers; everyone else is admin. */
+export const serverAccessOf = (cookies: Record<string, string>) =>
+  cookies.mock_scenario === 'readonly' ? 'read' : 'admin';

@@ -13,7 +13,8 @@ export default defineConfig({
       name: '@hey-api/typescript'
     },
     {
-      name: '@hey-api/sdk'
+      name: '@hey-api/sdk',
+      transformer: true
     },
     {
       bigInt: false,

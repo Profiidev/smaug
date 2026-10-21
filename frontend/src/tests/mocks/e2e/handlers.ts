@@ -96,6 +96,22 @@ export const handlers = [
   gen.handleUpdateNode(ok),
   gen.handleDeleteNode(ok),
 
+  // Servers. `srv-missing` answers 404 so the detail redirect can be exercised.
+  gen.handleListServers(({ cookies }) => j(data.serverList[scn(cookies)])),
+  gen.handleServerOptions(({ cookies }) => j(data.serverOptions[scn(cookies)])),
+  gen.handleServerInfo(({ cookies, params }) =>
+    params.uuid === 'srv-missing'
+      ? (new HttpResponse(null, { status: 404 }) as never)
+      : j(data.serverInfoOf(params.uuid, data.serverAccessOf(cookies)))
+  ),
+  gen.handleCreateServer(() => j({ uuid: 'srv-new' })),
+  gen.handleUpdateServer(ok),
+  gen.handleDeleteServer(ok),
+  gen.handleReinstallServer(ok),
+  gen.handleSetServerInstalled(ok),
+  gen.handleSetServerSuspended(ok),
+  gen.handleTransferServer(ok),
+
   // Mutations return a generic success so submit flows resolve.
   gen.handleCreateGroup(() => j({ uuid: 'group-new' })),
   gen.handleCreateUser(() => j({ uuid: 'user-new' })),

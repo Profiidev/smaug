@@ -38,9 +38,15 @@ afterEach(cleanup);
 
 const tick = async () => new Promise((r) => setTimeout(r, 0));
 
+const expandVariable = async (i = 0) =>
+  fireEvent.click(
+    screen.getAllByRole('button', { name: 'Toggle variable' })[i]
+  );
+
 describe('VariablesFields (nested fieldProxy binding)', () => {
-  it('renders each variable from the form value', () => {
+  it('renders each variable from the form value', async () => {
     mount(VariablesFields);
+    await expandVariable();
     expect(screen.getByText('Startup variables (1)')).toBeInTheDocument();
     expect(screen.getByLabelText('Env Variable')).toHaveValue('SERVER_JARFILE');
     expect(screen.getByLabelText('Description')).toHaveValue('Jar to run');
@@ -48,6 +54,7 @@ describe('VariablesFields (nested fieldProxy binding)', () => {
 
   it('adds a variable with default rules and binds its nested inputs', async () => {
     const { value } = mount(VariablesFields);
+    await expandVariable();
     await fireEvent.click(screen.getByRole('button', { name: 'Add variable' }));
     expect(screen.getByText('Startup variables (2)')).toBeInTheDocument();
 
@@ -95,8 +102,9 @@ describe('VariablesFields (nested fieldProxy binding)', () => {
     expect(value().variables.map((v) => v.envVariable)).toEqual(['OTHER']);
   });
 
-  it('disables every control when disabled', () => {
+  it('disables every control when disabled', async () => {
     mount(VariablesFields, base(), true);
+    await expandVariable();
     expect(screen.getByRole('button', { name: 'Add variable' })).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Remove variable' })
@@ -393,6 +401,59 @@ describe('VariablesFields cards', () => {
   });
 });
 
+describe('VariablesFields collapsible cards', () => {
+  const toggles = () =>
+    screen.getAllByRole('button', { name: 'Toggle variable' });
+
+  it('collapses loaded variables and expands newly added ones', async () => {
+    mount(VariablesFields);
+    expect(toggles()[0]).toHaveAttribute('aria-expanded', 'false');
+    expect(toggles()[0].className).toContain('cursor-pointer');
+    expect(screen.queryByLabelText('Env Variable')).not.toBeVisible();
+    await fireEvent.click(screen.getByRole('button', { name: 'Add variable' }));
+    expect(toggles()[0]).toHaveAttribute('aria-expanded', 'false');
+    expect(toggles()[1]).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByLabelText('Env Variable')[1]).toBeVisible();
+  });
+
+  it('toggles a variable open and closed', async () => {
+    mount(VariablesFields);
+    await expandVariable();
+    expect(toggles()[0]).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Env Variable')).toBeVisible();
+    await expandVariable();
+    expect(toggles()[0]).toHaveAttribute('aria-expanded', 'false');
+    await vi.waitFor(() =>
+      expect(screen.queryByLabelText('Env Variable')).not.toBeVisible()
+    );
+  });
+
+  it('shows the name and env variable in the header', async () => {
+    mount(VariablesFields);
+    const header = toggles()[0].parentElement!;
+    expect(header).toHaveTextContent(base().variables[0].name);
+    expect(header).toHaveTextContent('SERVER_JARFILE');
+    await fireEvent.click(screen.getByRole('button', { name: 'Add variable' }));
+    const added = toggles()[1].parentElement!;
+    expect(added).toHaveTextContent('New variable');
+    await fireEvent.input(screen.getAllByLabelText('Env Variable')[1], {
+      target: { value: 'MY_ENV' }
+    });
+    expect(added).toHaveTextContent('MY_ENV');
+  });
+
+  // Error auto-expand needs SvelteKit's page store for superforms errors; e2e covers it.
+  it('keeps the open state aligned after removing a variable', async () => {
+    mount(VariablesFields);
+    await fireEvent.click(screen.getByRole('button', { name: 'Add variable' }));
+    await fireEvent.click(
+      screen.getAllByRole('button', { name: 'Remove variable' })[0]
+    );
+    expect(toggles()).toHaveLength(1);
+    expect(toggles()[0]).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
 describe('item switches', () => {
   it.each(KNOWN_FEATURES.map((f) => [f.label, f.formKey] as const))(
     'feature %s binds its flag',
@@ -473,6 +534,7 @@ describe('GeneralFields / InstallScriptFields', () => {
 describe('FormTags / FormSelect (nested)', () => {
   it('adds a validation rule to a nested variable', async () => {
     const { value } = mount(VariablesFields);
+    await expandVariable();
     const input = screen.getByPlaceholderText(/required, string, max:20/);
     await fireEvent.input(input, { target: { value: 'max:20' } });
     await fireEvent.keyDown(input, { key: 'Enter' });
