@@ -32,6 +32,13 @@ impl<'db> ServerTable<'db> {
     query.all(self.db).await
   }
 
+  pub async fn list_by_node(&self, node: Uuid) -> Result<Vec<server::Model>, DbErr> {
+    server::Entity::find()
+      .filter(server::Column::NodeId.eq(node))
+      .all(self.db)
+      .await
+  }
+
   pub async fn find_by_id(&self, id: Uuid) -> centaurus::error::Result<server::Model> {
     server::Entity::find_by_id(id)
       .one(self.db)

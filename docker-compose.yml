@@ -42,6 +42,7 @@ services:
     volumes:
       - ./wings:/app
       - ./shared:/shared
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - nginx
     tty: true

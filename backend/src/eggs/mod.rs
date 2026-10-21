@@ -22,6 +22,8 @@ use uuid::Uuid;
 use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
+  nodes::Wings,
+  servers::spec,
   utils::{EggEditPerm, EggViewPerm, UpdateMessage, Updater, client},
 };
 
@@ -424,6 +426,7 @@ async fn create_egg(
 async fn edit_egg(
   _auth: JwtAuth<EggEditPerm>,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Json(req): Json<EditEggRequest>,
 ) -> Result<()> {
@@ -439,7 +442,8 @@ async fn edit_egg(
     .broadcast(UpdateMessage::Eggs { uuid: req.uuid })
     .await;
   for uuid in servers {
-    // TODO(wings): push the new startup command, variables and egg config to the server's node
+    let server = db.server().find_by_id(uuid).await?;
+    spec::push(&db, &wings, &server).await;
     updater.broadcast(UpdateMessage::Servers { uuid }).await;
   }
   Ok(())

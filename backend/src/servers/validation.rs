@@ -41,6 +41,9 @@ pub(super) fn parse_allocation(
 }
 
 /// Checks the request-only rules and returns the normalized allocations.
+/// One hour; longer would block a stop (and a node shutdown) for ages.
+const MAX_STOP_TIMEOUT: i32 = 3600;
+
 pub(super) fn validate_spec(spec: &ServerSpec, errors: &mut Vec<FieldError>) -> Vec<(String, i32)> {
   let name = spec.name.trim();
   if name.is_empty() {
@@ -68,6 +71,12 @@ pub(super) fn validate_spec(spec: &ServerSpec, errors: &mut Vec<FieldError>) -> 
   }
   if spec.backup_limit < 0 {
     errors.push(field_err("backup_limit", "Backup limit must be 0 or more."));
+  }
+  if !(1..=MAX_STOP_TIMEOUT).contains(&spec.stop_timeout) {
+    errors.push(field_err(
+      "stop_timeout",
+      format!("Stop timeout must be between 1 and {MAX_STOP_TIMEOUT} seconds."),
+    ));
   }
 
   if spec.allocations.is_empty() {
@@ -314,6 +323,8 @@ pub(super) fn apply_spec(server: &mut server::Model, spec: ServerSpec) {
   server.memory_mb = spec.limits.memory;
   server.disk_mb = spec.limits.disk;
   server.backup_limit = spec.backup_limit;
+  server.stop_timeout = spec.stop_timeout;
+  server.restart_on_crash = spec.restart_on_crash;
 }
 #[cfg(test)]
 mod test {
@@ -332,7 +343,9 @@ mod test {
       "startup_overridden": false,
       "image": "img",
       "limits": { "cpu": 0, "memory": 0, "disk": 0 },
-      "backup_limit": 0
+      "backup_limit": 0,
+      "stop_timeout": 60,
+      "restart_on_crash": true
     }))
     .unwrap()
   }
@@ -380,6 +393,9 @@ mod test {
     assert_eq!(spec_errors(|s| s.limits.memory = -1), ["limits.memory"]);
     assert_eq!(spec_errors(|s| s.limits.disk = -1), ["limits.disk"]);
     assert_eq!(spec_errors(|s| s.backup_limit = -1), ["backup_limit"]);
+    assert_eq!(spec_errors(|s| s.stop_timeout = 0), ["stop_timeout"]);
+    assert_eq!(spec_errors(|s| s.stop_timeout = 3601), ["stop_timeout"]);
+    assert!(spec_errors(|s| s.stop_timeout = 3600).is_empty());
     assert_eq!(spec_errors(|s| s.allocations.clear()), ["allocations"]);
     // everything at once
     assert_eq!(

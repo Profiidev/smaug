@@ -10,6 +10,7 @@ use figment::{
   providers::{Env, Serialized},
 };
 use serde::{Deserialize, Serialize};
+use shared::msg::Runtime;
 use tracing::instrument;
 
 #[derive(Deserialize, Serialize, Clone, Config)]
@@ -28,6 +29,8 @@ pub struct Config {
   pub auth: AuthConfig,
 
   pub token: String,
+  pub runtime: Runtime,
+  pub k8s_namespace: String,
 }
 
 impl Default for Config {
@@ -42,6 +45,8 @@ impl Default for Config {
         site_url: "http://localhost:8080".parse().unwrap(),
       },
       token: "test-token".to_string(),
+      runtime: Runtime::Docker,
+      k8s_namespace: "smaug-servers".to_string(),
       auth: AuthConfig::default(),
     }
   }

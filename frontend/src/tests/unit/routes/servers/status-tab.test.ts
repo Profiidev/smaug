@@ -58,10 +58,14 @@ const STATES: Record<
   Status,
   Pick<ServerInfo, 'install_state' | 'suspended'>
 > = {
+  crashed: { install_state: 'installed', suspended: false },
   install_failed: { install_state: 'install_failed', suspended: false },
   installing: { install_state: 'installing', suspended: false },
   not_installed: { install_state: 'not_installed', suspended: false },
   offline: { install_state: 'installed', suspended: false },
+  running: { install_state: 'installed', suspended: false },
+  starting: { install_state: 'installed', suspended: false },
+  stopping: { install_state: 'installed', suspended: false },
   suspended: { install_state: 'installed', suspended: true }
 };
 

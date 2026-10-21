@@ -71,10 +71,12 @@ export const serverInfo: ServerInfo = {
   name: 'survival',
   node: { name: 'eu-1', uuid: 'node-1' },
   owner: { name: 'Ada Admin', uuid: 'user-admin' },
+  restart_on_crash: false,
   start_on_completion: false,
   startup: 'java -jar custom.jar',
   startup_overridden: true,
   status: 'offline',
+  stop_timeout: 30,
   suspended: false,
   uuid: 'srv-1',
   variables: [

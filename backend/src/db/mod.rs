@@ -331,12 +331,15 @@ mod test {
       startup_overridden: false,
       image: "img".into(),
       install_state: entity::sea_orm_active_enums::ServerInstallState::InstallFailed,
+      install_generation: 0,
       suspended: false,
       start_on_completion: true,
       cpu_limit: 0,
       memory_mb: 5_000_000_000,
       disk_mb: 0,
       backup_limit: 0,
+      stop_timeout: 60,
+      restart_on_crash: true,
       // postgres keeps microseconds
       created_at: chrono::SubsecRound::trunc_subsecs(chrono::Utc::now(), 6).fixed_offset(),
     }

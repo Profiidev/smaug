@@ -8,12 +8,14 @@ use centaurus::{
 use chrono::Utc;
 use entity::{sea_orm_active_enums::ServerInstallState, server};
 use http::StatusCode;
+use shared::msg::Power;
 use tracing::info;
 use uuid::Uuid;
 
 use super::{
   access::{Access, has_perm, load},
   error::{FieldResult, fail_if, field_err},
+  spec,
   status::{Action, ensure_allowed, status},
   types::{
     Allocation, CreateServer, CreateServerResponse, GrantInfo, GrantsInfo, Limits,
@@ -29,6 +31,7 @@ use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
   eggs::{unpairs, variable_from_model},
+  nodes::Wings,
   utils::{ServerEditPerm, ServerViewPerm, UpdateMessage, Updater},
 };
 
@@ -73,6 +76,7 @@ fn named(names: &HashMap<Uuid, String>, uuid: Uuid) -> Named {
 pub(super) async fn list_servers(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
 ) -> Result<Json<ListServersResponse>> {
   let user = auth.user_id;
   let all =
@@ -115,7 +119,7 @@ pub(super) async fn list_servers(
       let mut allocs = allocations.remove(&s.id).unwrap_or_default().into_iter();
       ServerListItem {
         uuid: s.id,
-        status: status(&s),
+        status: status(&s, wings.state(s.node_id, s.id)),
         node: named(&nodes, s.node_id),
         egg: named(&eggs, s.egg_id),
         owner: s.owner_id.map(|o| named(&users, o)),
@@ -188,6 +192,7 @@ pub(super) async fn server_options(
 pub(super) async fn server_info(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   Path(req): Path<ServerUuid>,
 ) -> Result<Json<ServerInfo>> {
   let (server, access) = load(&db, auth.user_id, req.uuid, Access::Read).await?;
@@ -258,7 +263,7 @@ pub(super) async fn server_info(
 
   Ok(Json(ServerInfo {
     uuid: server.id,
-    status: status(&server),
+    status: status(&server, wings.state(server.node_id, server.id)),
     access,
     owner: server.owner_id.map(|o| named(&users, o)),
     node: named(&nodes, server.node_id),
@@ -279,6 +284,8 @@ pub(super) async fn server_info(
     suspended: server.suspended,
     start_on_completion: server.start_on_completion,
     backup_limit: server.backup_limit,
+    stop_timeout: server.stop_timeout,
+    restart_on_crash: server.restart_on_crash,
     created_at: server.created_at,
   }))
 }
@@ -286,6 +293,7 @@ pub(super) async fn server_info(
 pub(super) async fn create_server(
   _auth: JwtAuth<ServerEditPerm>,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Json(req): Json<CreateServer>,
 ) -> FieldResult<Json<CreateServerResponse>> {
@@ -320,18 +328,28 @@ pub(super) async fn create_server(
     } else {
       ServerInstallState::Installing
     },
+    install_generation: if req.skip_scripts { 0 } else { 1 },
     suspended: false,
     start_on_completion: req.start_on_completion,
     cpu_limit: 0,
     memory_mb: 0,
     disk_mb: 0,
     backup_limit: 0,
+    stop_timeout: 0,
+    restart_on_crash: false,
     created_at: Utc::now().fixed_offset(),
   };
   apply_spec(&mut server, req.spec);
   // ponytail: a concurrent create can still take a pair after check_free, the unique index then fails with 500
-  db.server().create(server, allocations, variables).await?;
-  // TODO(wings): send the server spec to its node and run the install script unless skip_scripts
+  db.server()
+    .create(server.clone(), allocations, variables)
+    .await?;
+  // a pending install is part of the spec; without one no InstallFinished
+  // comes, so start right away
+  spec::push(&db, &wings, &server).await;
+  if req.skip_scripts && req.start_on_completion {
+    wings.power(req.node, id, Power::Start).await;
+  }
   info!("Created server with ID {}", id);
 
   updater.broadcast(UpdateMessage::Servers { uuid: id }).await;
@@ -341,6 +359,7 @@ pub(super) async fn create_server(
 pub(super) async fn update_server(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Path(path): Path<ServerUuid>,
   Json(req): Json<UpdateServer>,
@@ -394,9 +413,9 @@ pub(super) async fn update_server(
 
   apply_spec(&mut server, req.spec);
   db.server()
-    .update(server, allocations, variables, grants)
+    .update(server.clone(), allocations, variables, grants)
     .await?;
-  // TODO(wings): push the updated spec (startup, image, limits, allocations, variables) to the node
+  spec::push(&db, &wings, &server).await;
   info!("Updated server with ID {}", path.uuid);
 
   updater
@@ -408,13 +427,14 @@ pub(super) async fn update_server(
 pub(super) async fn delete_server(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Path(req): Path<ServerUuid>,
 ) -> Result<()> {
   let (server, _) = load(&db, auth.user_id, req.uuid, Access::Admin).await?;
   ensure_allowed(&server, Action::Delete)?;
   db.server().delete(server.id).await?;
-  // TODO(wings): stop the server and remove its files on the node
+  wings.delete_server(server.node_id, server.id).await;
   info!("Deleted server with ID {}", req.uuid);
 
   updater

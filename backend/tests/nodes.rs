@@ -3,7 +3,7 @@ mod common;
 use std::time::Duration;
 
 use common::{JWT_COOKIE_NAME, TestServer, unique};
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use shared::auth::SignData;
@@ -85,7 +85,8 @@ async fn node_crud_flow() {
     json!({
       "id": uuid, "name": "alpha", "address": "127.0.0.1", "port": 1, "secure": false,
       "disk_limit_mb": 1024.0, "memory_limit_mb": 512.0, "cpu_limit": 2,
-      "connected": false
+      "connected": false,
+      "runtime": null
     })
   );
   let node = info(&server, beta).await;
@@ -105,7 +106,8 @@ async fn node_crud_flow() {
     json!({
       "id": uuid, "name": "alpha 2", "address": "localhost", "port": 2, "secure": true,
       "disk_limit_mb": null, "memory_limit_mb": 1.5, "cpu_limit": null,
-      "connected": false
+      "connected": false,
+      "runtime": null
     })
   );
 
@@ -339,6 +341,12 @@ async fn node_changes_are_broadcast() {
 // the handshake callback's error type is fixed by tungstenite
 #[allow(clippy::result_large_err)]
 async fn fake_wings(token: String) -> u16 {
+  fake_wings_with(token, vec![]).await
+}
+
+/// Like `fake_wings`, sending `events` after the hello on every connection.
+#[allow(clippy::result_large_err)]
+async fn fake_wings_with(token: String, events: Vec<Value>) -> u16 {
   // Ephemeral ports are usually above 32767, which also covers ports that do not fit in i16.
   let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
   let port = listener.local_addr().unwrap().port();
@@ -346,6 +354,7 @@ async fn fake_wings(token: String) -> u16 {
   spawn(async move {
     while let Ok((stream, _)) = listener.accept().await {
       let token = token.clone();
+      let events = events.clone();
       spawn(async move {
         let sign =
           |req: &tokio_tungstenite::tungstenite::handshake::server::Request,
@@ -361,6 +370,12 @@ async fn fake_wings(token: String) -> u16 {
         let mut ws = tokio_tungstenite::accept_hdr_async(stream, sign)
           .await
           .unwrap();
+        let hello = json!({ "type": "Hello", "runtime": "docker" });
+        for event in std::iter::once(hello).chain(events) {
+          ws.send(Message::Binary(event.to_string().into_bytes().into()))
+            .await
+            .unwrap();
+        }
         while let Some(Ok(_)) = ws.next().await {}
       });
     }
@@ -387,6 +402,10 @@ async fn node_connects_to_wings() {
   assert_eq!(info(&server, uuid).await["connected"], true);
   let list: Value = server.get("/nodes").await.json().await.unwrap();
   assert_eq!(list[0]["connected"], true);
+
+  // wings reports its runtime in the first message
+  next().await;
+  assert_eq!(info(&server, uuid).await["runtime"], "docker");
 
   // deleting disconnects
   server.delete("/nodes", json!({ "uuid": uuid })).await;
@@ -437,4 +456,60 @@ async fn insecure_nodes_rejected_when_disallowed() {
     .await;
   assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
   assert_eq!(info(&server, uuid).await["secure"], true);
+}
+
+/// Polls until `check` holds for the server info, the panel applies wings
+/// events asynchronously.
+async fn wait_for_server(server: &TestServer, uuid: Uuid, check: impl Fn(&Value) -> bool) -> Value {
+  timeout(Duration::from_secs(10), async {
+    loop {
+      let info: Value = server
+        .get(&format!("/servers/{uuid}"))
+        .await
+        .json()
+        .await
+        .unwrap();
+      if check(&info) {
+        return info;
+      }
+      tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+  })
+  .await
+  .expect("server never reached the expected state")
+}
+
+#[tokio::test]
+async fn wings_events_update_servers() {
+  let (server, _) = TestServer::start_with_admin().await;
+  let (node, token) = create_with_token(&server, node_body("alpha")).await;
+  let egg = common::create_egg(&server, common::server_egg_body()).await;
+  let mut body = common::server_body(node, egg, 25565);
+  body["skip_scripts"] = json!(false);
+  let resp = server.post("/servers", body).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  let uuid = common::uuid_of(&resp.json().await.unwrap());
+
+  // an old generation is ignored, the current one finishes the install
+  let port = fake_wings_with(
+    token,
+    vec![
+      json!({ "type": "InstallFinished", "uuid": uuid, "generation": 0, "ok": false }),
+      json!({ "type": "InstallFinished", "uuid": uuid, "generation": 1, "ok": true }),
+      json!({ "type": "State", "uuid": uuid, "state": "crashed" }),
+    ],
+  )
+  .await;
+  let mut update = node_body("alpha");
+  update["address"] = json!(format!("http://127.0.0.1:{port}"));
+  assert_eq!(
+    server
+      .post(&format!("/nodes/{node}"), update)
+      .await
+      .status(),
+    StatusCode::OK
+  );
+
+  let info = wait_for_server(&server, uuid, |i| i["status"] == "crashed").await;
+  assert_eq!(info["install_state"], "installed");
 }

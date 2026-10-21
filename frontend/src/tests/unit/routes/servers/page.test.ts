@@ -435,10 +435,12 @@ describe('server create page', () => {
         name: 'survival',
         node: 'node-1',
         owner: 'user-admin',
+        restart_on_crash: true,
         skip_scripts: false,
         start_on_completion: true,
         startup: 'java -jar {{SERVER_JARFILE}}',
-        startup_overridden: false
+        startup_overridden: false,
+        stop_timeout: 60
       }
     });
   });

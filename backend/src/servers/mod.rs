@@ -15,6 +15,7 @@ mod actions;
 mod error;
 mod management;
 mod rules;
+pub mod spec;
 mod status;
 mod types;
 mod validation;

@@ -8,8 +8,13 @@ import {
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
 import MutedCell from '$lib/components/table/MutedCell.svelte';
 import Status from '$lib/components/table/Status.svelte';
-import type { NodeInfo } from '$lib/client';
+import type { NodeInfo, Runtime } from '$lib/client';
 import NameCell from '../servers/NameCell.svelte';
+
+const RUNTIME_LABELS: Record<Runtime, string> = {
+  docker: 'Docker',
+  kubernetes: 'Kubernetes'
+};
 
 export const columns = ({
   canEdit,
@@ -30,6 +35,15 @@ export const columns = ({
     ...createColumnHeader<NodeInfo>('connected', 'Status'),
     cell: ({ row }) =>
       renderComponent(Status, { connected: row.original.connected })
+  },
+  {
+    ...createColumnHeader<NodeInfo>('runtime', 'Runtime'),
+    cell: ({ row }) => {
+      const { runtime } = row.original;
+      return renderComponent(MutedCell, {
+        text: runtime ? RUNTIME_LABELS[runtime] : '—'
+      });
+    }
   },
   {
     ...createColumnHeader<NodeInfo>('address', 'Address'),

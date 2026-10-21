@@ -2,12 +2,14 @@ use aide::axum::ApiRouter;
 use axum::Extension;
 use centaurus::db::init::Connection;
 
-use crate::{nodes::state::Wings, utils::Updater};
+use crate::utils::Updater;
 
 mod auth;
 mod connection;
 mod management;
 mod state;
+
+pub use state::Wings;
 
 pub fn router() -> ApiRouter {
   management::router()

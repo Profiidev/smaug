@@ -121,8 +121,10 @@ export const survivalBody = {
   limits: { cpu: 2000, disk: 0, memory: 4096 },
   name: 'Survival SMP',
   owner: 'user-admin',
+  restart_on_crash: true,
   startup: 'java -jar {{SERVER_JARFILE}}',
-  startup_overridden: false
+  startup_overridden: false,
+  stop_timeout: 60
 };
 
 export const action = (page: Page, name: string) =>

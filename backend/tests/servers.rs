@@ -177,6 +177,8 @@ async fn server_crud_flow() {
   body["environment"] = json!({ "FIRST": "hello", "MAX_PLAYERS": "50" });
   body["limits"] = json!({ "cpu": 1500, "memory": 4096, "disk": 10240 });
   body["backup_limit"] = json!(3);
+  body["stop_timeout"] = json!(30);
+  body["restart_on_crash"] = json!(false);
   body["skip_scripts"] = json!(false);
   body["start_on_completion"] = json!(false);
   let uuid = c.create(body).await;
@@ -208,6 +210,7 @@ async fn server_crud_flow() {
       "startup": "java -jar a.jar", "startup_overridden": false, "image": "ghcr.io/java:21",
       "install_state": "installing", "suspended": false, "start_on_completion": false,
       "limits": { "cpu": 1500, "memory": 4096, "disk": 10240 }, "backup_limit": 3,
+      "stop_timeout": 30, "restart_on_crash": false,
       "variables": [
         { "name": "First", "description": "first var", "env_variable": "FIRST", "default_value": "1", "value": "hello", "rules": ["required", "string"], "editable": true },
         { "name": "Max players", "description": "", "env_variable": "MAX_PLAYERS", "default_value": "20", "value": "50", "rules": ["required", "integer", "between:1,100"], "editable": true },
@@ -229,6 +232,8 @@ async fn server_crud_flow() {
   update["environment"] = json!({ "LOCKED": "changed", "HIDDEN": "" });
   update["limits"] = json!({ "cpu": 0, "memory": 1, "disk": 2 });
   update["backup_limit"] = json!(0);
+  update["stop_timeout"] = json!(3600);
+  update["restart_on_crash"] = json!(true);
   assert_eq!(c.put(uuid, update).await.status(), StatusCode::OK);
   let info = c.info(uuid).await;
   assert_eq!(info["name"], "creative");
@@ -247,6 +252,10 @@ async fn server_crud_flow() {
   );
   assert_eq!(info["limits"], json!({ "cpu": 0, "memory": 1, "disk": 2 }));
   assert_eq!(info["backup_limit"], 0);
+  assert_eq!(
+    (&info["stop_timeout"], &info["restart_on_crash"]),
+    (&json!(3600), &json!(true))
+  );
   assert_eq!(
     values(&info),
     [
@@ -324,7 +333,8 @@ async fn missing_servers_are_not_found() {
   let body = update_body(&json!({
     "name": "x", "owner": null, "egg": { "uuid": c.egg }, "allocations": [{ "ip": "10.0.0.1", "port": 2000 }],
     "startup": "x", "startup_overridden": false, "image": "x", "variables": [],
-    "limits": { "cpu": 0, "memory": 0, "disk": 0 }, "backup_limit": 0
+    "limits": { "cpu": 0, "memory": 0, "disk": 0 }, "backup_limit": 0,
+    "stop_timeout": 60, "restart_on_crash": true
   }));
   assert_eq!(c.put(missing, body).await.status(), StatusCode::NOT_FOUND);
   assert_eq!(
@@ -449,6 +459,14 @@ async fn create_validation_errors() {
     (
       Box::new(|b| b["backup_limit"] = json!(-1)),
       &["backup_limit"],
+    ),
+    (
+      Box::new(|b| b["stop_timeout"] = json!(0)),
+      &["stop_timeout"],
+    ),
+    (
+      Box::new(|b| b["stop_timeout"] = json!(3601)),
+      &["stop_timeout"],
     ),
     (Box::new(move |b| b["owner"] = json!(missing)), &["owner"]),
     (Box::new(move |b| b["node"] = json!(missing)), &["node"]),

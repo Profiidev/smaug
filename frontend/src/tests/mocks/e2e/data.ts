@@ -226,6 +226,7 @@ export const nodeInfo = {
   memory_limit_mb: null,
   name: 'Node One',
   port: 443,
+  runtime: 'docker',
   secure: true
 };
 
@@ -439,10 +440,12 @@ export const serverInfoOf = (
     name: item.name,
     node: item.node,
     owner: item.owner,
+    restart_on_crash: true,
     start_on_completion: true,
     startup: Object.values(egg.startup_commands)[0],
     startup_overridden: false,
     status: item.status,
+    stop_timeout: 60,
     suspended: item.status === 'suspended',
     uuid: item.uuid,
     variables: egg.variables

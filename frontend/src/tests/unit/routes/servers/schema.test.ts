@@ -91,10 +91,12 @@ describe('defaults', () => {
     expect(g.allocations).toHaveLength(1);
     expect(startupStage.parse({ image: 'img', startup: 'run' })).toEqual({
       image: 'img',
+      restartOnCrash: true,
       runInstall: true,
       startOnCompletion: true,
       startup: 'run',
-      startupOverridden: false
+      startupOverridden: false,
+      stopTimeout: 60
     });
     expect(resourcesStage.parse({})).toEqual({
       backupLimit: 0,
@@ -364,6 +366,27 @@ describe('resourcesStage', () => {
   });
 });
 
+describe('startupStage stop timeout', () => {
+  const valid = { image: 'img', startup: 'run' };
+
+  it.each([1, 60, 3600])('accepts %j seconds', (stopTimeout) => {
+    expect(issues(startupStage, { ...valid, stopTimeout }).stopTimeout).toBe(
+      undefined
+    );
+  });
+
+  it.each([
+    [0, 'Stop timeout must be at least 1 second.'],
+    [3601, 'Stop timeout must be at most 3600 seconds.'],
+    [1.5, 'Stop timeout must be a whole number.'],
+    [null, 'Stop timeout is required.']
+  ])('rejects %j', (stopTimeout, message) => {
+    expect(issues(startupStage, { ...valid, stopTimeout }).stopTimeout).toEqual(
+      [message]
+    );
+  });
+});
+
 describe('permissionsStage', () => {
   const grant = (uuid: string[], access = ['read']) => ({ access, uuid });
 
@@ -567,10 +590,12 @@ describe('converters', () => {
       name: 'survival',
       node: ['node-1'],
       owner: ['user-admin'],
+      restartOnCrash: false,
       runInstall: true,
       startOnCompletion: false,
       startup: 'java -jar custom.jar',
       startupOverridden: true,
+      stopTimeout: 30,
       userGrants: [{ access: ['read'], uuid: ['user-1'] }],
       variables: [
         {
@@ -627,10 +652,12 @@ describe('converters', () => {
       name: 'survival',
       node: 'node-1',
       owner: 'user-admin',
+      restart_on_crash: false,
       skip_scripts: true,
       start_on_completion: false,
       startup: 'run',
-      startup_overridden: true
+      startup_overridden: true,
+      stop_timeout: 30
     });
   });
 
@@ -719,6 +746,7 @@ describe('mapFieldErrors', () => {
     ['allocations.2.port', 'general', 'allocations.2.port'],
     ['startup', 'startup', 'startup'],
     ['image', 'startup', 'image'],
+    ['stop_timeout', 'startup', 'stopTimeout'],
     ['variables.MAX_PLAYERS', 'variables', 'variables.1.value'],
     ['limits.cpu', 'resources', 'cpu'],
     ['limits.memory', 'resources', 'memory'],

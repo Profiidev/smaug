@@ -3,6 +3,7 @@ export type ServerStatus =
   | 'running'
   | 'starting'
   | 'stopping'
+  | 'crashed'
   | 'offline'
   | 'installing'
   | 'install_failed'
@@ -12,6 +13,7 @@ export type ServerStatus =
 
 /** Badge label and dot colour (CSS) per status; dots are the only custom colour. */
 export const STATUS: Record<ServerStatus, { label: string; color: string }> = {
+  crashed: { color: 'oklch(0.65 0.22 25)', label: 'Crashed' },
   install_failed: { color: 'oklch(0.65 0.22 25)', label: 'Install failed' },
   installing: { color: 'oklch(0.70 0.14 250)', label: 'Installing' },
   not_installed: { color: 'oklch(0.60 0 0)', label: 'Not installed' },
@@ -25,6 +27,8 @@ export const STATUS: Record<ServerStatus, { label: string; color: string }> = {
 
 /** One-line explanation shown on the Status tab. */
 export const STATUS_DESCRIPTIONS: Record<ServerStatus, string> = {
+  crashed:
+    'The server exited without being stopped. With restart on crash it starts again on its own.',
   install_failed:
     "The egg's install script failed. Reinstall to run it again, or mark the server as installed if the files are in place.",
   installing: "The egg's install script is running.",
@@ -52,6 +56,7 @@ const IDLE = new Set<ServerStatus>([
   'running',
   'starting',
   'stopping',
+  'crashed',
   'offline',
   'install_failed',
   'not_installed'
