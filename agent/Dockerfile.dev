@@ -1,0 +1,4 @@
+# Image the dev `agent` compose service rebuilds on every change
+FROM scratch
+COPY smaug-agent /usr/local/bin/smaug-agent
+ENTRYPOINT ["smaug-agent"]
