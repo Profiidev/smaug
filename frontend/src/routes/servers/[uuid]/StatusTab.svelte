@@ -54,8 +54,7 @@
     transfer: admin && allowed.transfer && nodes.length > 1
   });
 
-  const refresh = () =>
-    invalidate((url) => url.pathname.startsWith('/api/servers'));
+  const refresh = () => invalidate(`/api/servers/${server.uuid}`);
 
   const formatAllocation = ({ ip, port }: Allocation) =>
     ip.includes(':') ? `[${ip}]:${port}` : `${ip}:${port}`;

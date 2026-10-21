@@ -112,9 +112,7 @@ describe('TransferDialog', () => {
       body: { ip: '10.0.1.5', node: 'node-2', port: 25_570 },
       path: { uuid: 'srv-1' }
     });
-    const pred = vi.mocked(invalidate).mock.calls[0][0] as (u: URL) => boolean;
-    expect(pred(new URL('http://x/api/servers/srv-1'))).toBe(true);
-    expect(pred(new URL('http://x/api/nodes'))).toBe(false);
+    expect(vi.mocked(invalidate).mock.calls).toEqual([['/api/servers/srv-1']]);
     await vi.waitFor(() =>
       expect(screen.queryByText('Transfer survival')).not.toBeInTheDocument()
     );

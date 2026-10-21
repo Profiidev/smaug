@@ -58,6 +58,7 @@
   let form: BaseForm<typeof serverSettings> | undefined = $state();
   let saving = $state(false);
   let saveFailed = $state(false);
+  let dirty = $state(false);
   let fieldErrors: Record<string, string> | undefined = $state.raw();
   let deleteOpen = $state(false);
   let isLoading = $state(false);
@@ -87,7 +88,8 @@
         return;
       }
       server = res.data;
-      saved = fromServerInfo(res.data);
+      // A reload (websocket update, status action) must not wipe unsaved edits.
+      if (!dirty || !saved) saved = fromServerInfo(res.data);
     });
   });
 
@@ -115,6 +117,10 @@
 
     if (!res.response?.ok) {
       const status = res.response?.status;
+      if (status === 403) {
+        saveFailed = false;
+        return { error: "You don't have permission to change these fields." };
+      }
       const mapped =
         status === 400 || status === 409
           ? mapFieldErrors(res.error, values)
@@ -325,6 +331,7 @@
             isLoading={saving}
             isError={saveFailed}
             {readonly}
+            bind:dirty
           />
         </div>
       {/snippet}

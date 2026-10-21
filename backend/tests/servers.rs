@@ -9,8 +9,10 @@ use common::{
   JWT_COOKIE_NAME, MEMBER_PASSWORD, TestServer, create_egg, create_group, create_node, create_user,
   egg_body, server_body, server_egg_body, update_body, uuid_of,
 };
+use entity::{sea_orm_active_enums::ServerInstallState, server};
 use futures_util::StreamExt;
 use reqwest::{Response, StatusCode};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
 use serde_json::{Value, json};
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
@@ -28,10 +30,22 @@ struct Ctx {
   node: Uuid,
   node2: Uuid,
   egg: Uuid,
+  /// Set by `ctx_with_db` for states the API can not reach.
+  db_url: Option<String>,
 }
 
 async fn ctx() -> Ctx {
-  let (server, admin) = TestServer::start_with_admin().await;
+  ctx_on(TestServer::start().await, None).await
+}
+
+/// Ctx on a sqlite file the test can open next to the server.
+async fn ctx_with_db() -> Ctx {
+  let (server, url) = TestServer::start_with_db_file().await;
+  ctx_on(server, Some(url)).await
+}
+
+async fn ctx_on(server: TestServer, db_url: Option<String>) -> Ctx {
+  let (server, admin) = TestServer::with_admin(server).await;
   let node = create_node(&server, "node-1").await;
   let node2 = create_node(&server, "node-2").await;
   let egg = create_egg(&server, server_egg_body()).await;
@@ -41,6 +55,7 @@ async fn ctx() -> Ctx {
     node,
     node2,
     egg,
+    db_url,
   }
 }
 
@@ -515,6 +530,8 @@ async fn update_validation_errors() {
       json!({ "MAX_PLAYERS": "0" }),
       "variables.MAX_PLAYERS",
     ),
+    // admins get the unknown key named, non-admins a plain 403
+    ("environment", json!({ "NOPE": "x" }), "variables.NOPE"),
     (
       "grants",
       json!({ "users": [{ "uuid": Uuid::now_v7(), "access": "read" }] }),
@@ -684,6 +701,7 @@ enum State {
   Offline,
   Installing,
   NotInstalled,
+  InstallFailed,
   Suspended,
 }
 
@@ -705,12 +723,27 @@ impl Ctx {
           .await,
         StatusCode::OK
       ),
+      // only the node reports failed installs, so set it in the database
+      State::InstallFailed => {
+        let db = Database::connect(self.db_url.as_deref().expect("ctx_with_db"))
+          .await
+          .unwrap();
+        let mut model: server::ActiveModel = server::Entity::find_by_id(uuid)
+          .one(&db)
+          .await
+          .unwrap()
+          .unwrap()
+          .into();
+        model.install_state = Set(ServerInstallState::InstallFailed);
+        model.update(&db).await.unwrap();
+      }
       _ => {}
     }
     let expected = match state {
       State::Offline => "offline",
       State::Installing => "installing",
       State::NotInstalled => "not_installed",
+      State::InstallFailed => "install_failed",
       State::Suspended => "suspended",
     };
     assert_eq!(self.info(uuid).await["status"], expected);
@@ -720,28 +753,29 @@ impl Ctx {
 
 #[tokio::test]
 async fn action_matrix() {
-  let c = ctx().await;
+  let c = ctx_with_db().await;
   const OK: StatusCode = StatusCode::OK;
   const NO: StatusCode = StatusCode::CONFLICT;
-  // (action, body, offline, installing, not_installed, suspended, status after success)
+  // (action, body, offline, installing, not_installed, install_failed, suspended)
   let reinstall = json!({});
   let installed = json!({ "installed": true });
   let not_installed = json!({ "installed": false });
   let suspend = json!({ "suspended": true });
   let unsuspend = json!({ "suspended": false });
-  let rows: Vec<(&str, &Value, [StatusCode; 4])> = vec![
-    ("reinstall", &reinstall, [OK, NO, OK, NO]),
-    ("install", &installed, [NO, OK, OK, NO]),
-    ("install", &not_installed, [OK, NO, NO, OK]),
-    ("suspend", &suspend, [OK, OK, OK, NO]),
-    ("suspend", &unsuspend, [NO, NO, NO, OK]),
-    ("transfer", &Value::Null, [OK, NO, OK, NO]),
-    ("delete", &Value::Null, [OK, NO, OK, OK]),
+  let rows: Vec<(&str, &Value, [StatusCode; 5])> = vec![
+    ("reinstall", &reinstall, [OK, NO, OK, OK, NO]),
+    ("install", &installed, [NO, OK, OK, OK, NO]),
+    ("install", &not_installed, [OK, NO, NO, NO, OK]),
+    ("suspend", &suspend, [OK, OK, OK, OK, NO]),
+    ("suspend", &unsuspend, [NO, NO, NO, NO, OK]),
+    ("transfer", &Value::Null, [OK, NO, OK, OK, NO]),
+    ("delete", &Value::Null, [OK, NO, OK, OK, OK]),
   ];
   let states = [
     State::Offline,
     State::Installing,
     State::NotInstalled,
+    State::InstallFailed,
     State::Suspended,
   ];
   for (action, body, expected) in rows {
@@ -1103,6 +1137,10 @@ async fn write_user_field_restrictions() {
     ("grants", json!({ "users": [], "groups": [] })),
     ("environment", json!({ "LOCKED": "mine" })),
     ("environment", json!({ "HIDDEN": "mine" })),
+    // the right hidden value is refused too, so a 403 can not confirm guesses
+    ("environment", json!({ "HIDDEN": "secret" })),
+    // unknown keys look like hidden ones, no hint which variables exist
+    ("environment", json!({ "NOPE": "x" })),
   ];
   for (field, value) in forbidden {
     let mut body = update_body(&info);
@@ -1161,6 +1199,34 @@ async fn write_user_field_restrictions() {
       .all(|v| v["editable"] == false)
   );
   assert_eq!(info["variables"].as_array().unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn write_user_can_update_server_without_owner() {
+  let c = ctx().await;
+  let (owner, _) = create_user(&c.server, "owner").await;
+  let (writer, email) = create_user(&c.server, "writer").await;
+  let mut body = c.body();
+  body["owner"] = json!(owner);
+  let uuid = c.create(body).await;
+  let mut update = update_body(&c.info(uuid).await);
+  update["grants"] = json!({ "users": [{ "uuid": writer, "access": "write" }] });
+  assert_eq!(c.put(uuid, update).await.status(), StatusCode::OK);
+  assert_eq!(
+    c.server
+      .delete("/user/management", json!({ "uuid": owner }))
+      .await
+      .status(),
+    StatusCode::OK
+  );
+
+  c.as_user(&email).await;
+  let info = c.info(uuid).await;
+  assert_eq!(info["owner"], Value::Null);
+  let mut update = update_body(&info);
+  update["name"] = json!("orphan");
+  assert_eq!(c.put(uuid, update).await.status(), StatusCode::OK);
+  assert_eq!(c.info(uuid).await["name"], "orphan");
 }
 
 // ---- options ----

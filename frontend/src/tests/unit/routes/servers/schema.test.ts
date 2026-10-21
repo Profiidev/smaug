@@ -349,6 +349,19 @@ describe('serverSettings', () => {
     expect(issues(serverSettings, base())).toEqual({});
   });
 
+  // The backend sets owner NULL when the owning user is deleted.
+  it('accepts a server without an owner (edit only)', () => {
+    const f = fromServerInfo({ ...clone(serverInfo), owner: null });
+    expect(f.owner).toEqual([]);
+    expect(issues(serverSettings, f)).toEqual({});
+    expect(toUpdateBody(f, false).owner).toBeNull();
+  });
+
+  it('rejects more than one owner', () => {
+    const f = { ...base(), owner: ['a', 'b'] };
+    expect(Object.keys(issues(serverSettings, f))).toEqual(['owner']);
+  });
+
   it('runs every section refinement', () => {
     const f = base();
     f.allocations.push(clone(f.allocations[0]));

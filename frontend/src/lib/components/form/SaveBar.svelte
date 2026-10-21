@@ -16,12 +16,24 @@
     isLoading: boolean;
     isError: boolean;
     readonly: boolean;
+    /** Out: whether the form has unsaved changes. */
+    dirty?: boolean;
   }
 
-  let { formData, saved, isLoading, isError, readonly }: Props = $props();
+  let {
+    formData,
+    saved,
+    isLoading,
+    isError,
+    readonly,
+    dirty = $bindable(false)
+  }: Props = $props();
 
   let tainted = $derived(formData.tainted);
-  let dirty = $derived(formData.isTainted($tainted));
+
+  $effect.pre(() => {
+    dirty = formData.isTainted($tainted);
+  });
 
   $effect(() => {
     if (!saved) return;

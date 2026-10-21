@@ -352,7 +352,39 @@ describe('server edit page save', () => {
     );
   });
 
-  it.each([403, 500])('turns the save bar into Retry on %i', async (status) => {
+  it('explains a 403 as missing permission, without Retry', async () => {
+    vi.mocked(updateServer).mockResolvedValue(result(403, 'nope'));
+    await mount();
+    await openTab('General');
+    await save();
+    await vi.waitFor(() =>
+      expect(sonner.error).toHaveBeenCalledWith(
+        "You don't have permission to change these fields."
+      )
+    );
+    expect(
+      screen.getByRole('button', { name: 'Save Changes' })
+    ).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  // Owner is NULL once the owning user is deleted; the form must still save.
+  it.each(['admin', 'write'] as const)(
+    'saves a server without an owner as %s',
+    async (access) => {
+      vi.mocked(updateServer).mockResolvedValue(result(200));
+      await mount({ ...asAccess(access), owner: null });
+      await openTab('General');
+      await save();
+      await vi.waitFor(() => expect(updateServer).toHaveBeenCalled());
+      const [[{ body }]] = vi.mocked(updateServer).mock.calls;
+      expect(body.owner).toBeNull();
+      expect(toast.success).toHaveBeenCalled();
+    }
+  );
+
+  it('turns the save bar into Retry on 500', async () => {
+    const status = 500;
     vi.mocked(updateServer).mockResolvedValue(result(status, 'nope'));
     await mount();
     await openTab('General');
@@ -405,6 +437,45 @@ describe('server edit page save', () => {
       startup: './run.sh',
       startup_overridden: false
     });
+  });
+});
+
+describe('server edit page reload', () => {
+  const reload = async (
+    rerender: (p: never) => unknown,
+    server: ServerInfo
+  ) => {
+    await rerender({ data: pageData(server) } as never);
+    await tick(50);
+  };
+
+  it('keeps unsaved edits but shows the new status', async () => {
+    const { rerender } = render(EditPage, {
+      props: { data: pageData(info()) } as never
+    });
+    await screen.findByRole('tab', { name: 'General' });
+    await tick();
+    await openTab('General');
+    await fireEvent.input(screen.getByLabelText('Name'), {
+      target: { value: 'renamed' }
+    });
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+    await reload(rerender, info({ name: 'other', status: 'suspended' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('renamed');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    expect(screen.getAllByText('Suspended').length).toBeGreaterThan(0);
+  });
+
+  it('takes the reloaded values while the form is clean', async () => {
+    const { rerender } = render(EditPage, {
+      props: { data: pageData(info()) } as never
+    });
+    await screen.findByRole('tab', { name: 'General' });
+    await tick();
+    await openTab('General');
+    await reload(rerender, info({ name: 'other' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('other');
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   });
 });
 

@@ -63,7 +63,7 @@
     }
 
     toast.success(`Server ${server.name} transferred to ${node?.name}`);
-    invalidate((url) => url.pathname.startsWith('/api/servers'));
+    invalidate(`/api/servers/${server.uuid}`);
   };
 </script>
 

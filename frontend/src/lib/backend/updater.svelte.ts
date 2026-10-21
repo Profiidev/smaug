@@ -68,7 +68,8 @@ const handleMessage = (msg: UpdateMessage, user: string) => {
       break;
     }
     case UpdateType.Servers: {
-      const _ = invalidate((url) => url.pathname.startsWith('/api/servers'));
+      invalidate('/api/servers').catch(() => {});
+      invalidate(`/api/servers/${msg.uuid}`).catch(() => {});
       break;
     }
     default: {

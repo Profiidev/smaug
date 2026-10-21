@@ -106,14 +106,11 @@ describe('updater message handling', () => {
     expect(invalidatedUrls()).toEqual(['/api/eggs', '/api/eggs/egg-1']);
   });
 
-  it('invalidates every server endpoint via a path predicate on Servers updates', () => {
+  it('invalidates only the server list and that server on Servers updates', () => {
     send({ type: UpdateType.Servers, uuid: 's1' });
-    expect(invalidate).toHaveBeenCalledOnce();
-    const [[predicate]] = vi.mocked(invalidate).mock.calls;
-    const matches = predicate as (u: URL) => boolean;
-    expect(matches(new URL('http://x/api/servers'))).toBe(true);
-    expect(matches(new URL('http://x/api/servers/s1/status'))).toBe(true);
-    expect(matches(new URL('http://x/api/nodes'))).toBe(false);
+    // Other servers' edit pages (/api/servers/s2) and options stay untouched.
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidatedUrls()).toEqual(['/api/servers', '/api/servers/s1']);
   });
 
   it('ignores unknown message types', () => {

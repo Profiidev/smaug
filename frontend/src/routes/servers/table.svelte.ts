@@ -8,6 +8,7 @@ import type { Allocation, ServerListItem } from '$lib/client';
 import MutedCell from '$lib/components/table/MutedCell.svelte';
 import NameCell from './NameCell.svelte';
 import StatusBadge from './StatusBadge.svelte';
+import { availableActions } from './status';
 
 /** List item plus flat strings the table sorts and searches on. */
 export type ServerRow = ServerListItem & {
@@ -76,9 +77,11 @@ export const columns = ({
     accessorKey: 'actions',
     cell: ({ row }) =>
       renderComponent(Actions, {
-        delete_disabled: !canEdit,
+        delete_disabled:
+          !canEdit || !availableActions(row.original.status).delete,
+        // Owners and write grantees edit too; the edit page enforces access.
         edit: `/servers/${row.original.uuid}`,
-        edit_disabled: !canEdit,
+        edit_disabled: false,
         remove: () => deleteServer(row.original)
       }),
     enableHiding: false,

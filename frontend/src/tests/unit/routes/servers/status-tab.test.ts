@@ -237,9 +237,8 @@ describe('StatusTab action availability', () => {
 
 describe('StatusTab actions', () => {
   const expectRefreshed = () => {
-    const pred = vi.mocked(invalidate).mock.calls[0][0] as (u: URL) => boolean;
-    expect(pred(new URL('http://x/api/servers/srv-1'))).toBe(true);
-    expect(pred(new URL('http://x/api/eggs'))).toBe(false);
+    // Only this server's info: the list and options would reset nothing useful.
+    expect(vi.mocked(invalidate).mock.calls).toEqual([['/api/servers/srv-1']]);
   };
 
   const confirm = async (open: string, title: string, action: string) => {

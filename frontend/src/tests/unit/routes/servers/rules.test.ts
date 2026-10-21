@@ -167,7 +167,72 @@ describe('validateVariable', () => {
       expect(v('x', ['regex:^a$'])).toBeUndefined();
       expect(v('x', ['regex:/'])).toBeUndefined();
       expect(v('x', ['regex:/(/'])).toBeUndefined();
-      expect(v('x', ['regex:/a/x'])).toBeUndefined();
+      expect(v('x', ['regex:/a/q'])).toBeUndefined();
     });
+  });
+
+  // Shared with the backend's validator: both must agree on every row.
+  describe('backend parity', () => {
+    const REQUIRED = 'The Max players field is required.';
+    const INTEGER = 'The Max players field must be an integer.';
+    const NUMERIC = 'The Max players field must be a number.';
+    const FORMAT = 'The Max players field format is invalid.';
+    it.each([
+      ['   ', ['required'], REQUIRED],
+      ['\t\n', ['required|integer'], REQUIRED],
+      ['   ', ['integer', 'min:5'], undefined],
+      ['+5', ['integer'], INTEGER],
+      ['+5', ['numeric'], NUMERIC],
+      ['1e3', ['integer'], INTEGER],
+      ['1e3', ['numeric'], NUMERIC],
+      ['.5', ['numeric'], NUMERIC],
+      ['99999999999999999999', ['integer'], undefined],
+      [
+        '99999999999999999999',
+        ['integer', 'max:100'],
+        'The Max players field must not be greater than 100.'
+      ],
+      ['12', ['required|integer'], undefined],
+      ['abc', ['required|integer'], INTEGER],
+      ['abc', [' required | | integer '], INTEGER],
+      ['abc', ['regex:#^[a-z]+$#'], undefined],
+      ['ABC', ['regex:#^[a-z]+$#'], FORMAT],
+      ['ABC', ['regex:#^[a-z]+$#i'], undefined],
+      ['a/b', ['regex:~^a/b$~'], undefined],
+      ['a|b', ['regex:/^a|b$/'], undefined],
+      ['x', ['regex:a^x$a'], undefined],
+      // Size rules skip values that are not numeric-shaped; the type rule reports them.
+      ['1e3', ['max:5', 'integer'], INTEGER],
+      ['1e3', ['min:5000|numeric'], NUMERIC],
+      ['abc', ['between:1,2', 'integer'], INTEGER],
+      ['5.', ['numeric'], NUMERIC],
+      [
+        '7',
+        ['max:5', 'integer'],
+        'The Max players field must not be greater than 5.'
+      ],
+      // Delimiters: not alphanumeric, whitespace or backslash.
+      ['x', ['regex: x y '], undefined],
+      ['x', ['regex:\\^a$\\'], undefined],
+      ['ab', ['regex:!^a!'], undefined],
+      ['ba', ['regex:!^a!'], FORMAT],
+      // Flags: only i, m, s, x; anything else ignores the rule.
+      ['ABC', ['regex:/^b$/g'], undefined],
+      ['ABC', ['regex:/^b$/u'], undefined],
+      ['a\nb', ['regex:/^b$/m'], undefined],
+      ['a\nb', ['regex:/a.b/s'], undefined],
+      ['a\nb', ['regex:/a.b/'], FORMAT],
+      ['ab', ['regex:/^ a b # comment\n$/x'], undefined],
+      ['a b', ['regex:/^a[ ]b$/x'], undefined],
+      ['ab', [String.raw`regex:/^a\ b$/x`], FORMAT],
+      // Elements starting with regex: keep their pipes; others split.
+      ['b', ['regex:/^(a|b)$/'], undefined],
+      ['c', ['regex:/^(a|b)$/', 'required|string'], FORMAT]
+    ] as [string, string[], string | undefined][])(
+      '%j with %j',
+      (value, rules, expected) => {
+        expect(v(value, rules)).toBe(expected);
+      }
+    );
   });
 });

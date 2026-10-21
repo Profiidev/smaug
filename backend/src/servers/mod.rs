@@ -23,12 +23,12 @@ use chrono::Utc;
 use entity::{
   egg_variable,
   sea_orm_active_enums::{ServerAccessLevel, ServerInstallState},
-  server, server_group_access, server_user_access,
+  server, server_group_access, server_user_access, user,
 };
 use http::StatusCode;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
-use sea_orm::DbErr;
+use sea_orm::{DbErr, EntityTrait};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
@@ -600,11 +600,13 @@ fn changes_admin_fields(
       )
     })
     .collect();
+  // hidden and unknown keys count regardless of value, so the 403 can not be
+  // used to probe hidden values or variable names
   let locked_var_changed = spec.environment.iter().any(|(key, value)| {
     egg_vars
       .iter()
       .find(|v| &v.env_variable == key)
-      .is_some_and(|v| !(v.user_viewable && v.user_editable) && vars.get(key) != Some(value))
+      .is_none_or(|v| !v.user_viewable || (!v.user_editable && vars.get(key) != Some(value)))
   });
   req.grants.is_some()
     || spec.owner != server.owner_id
@@ -621,26 +623,31 @@ fn changes_admin_fields(
     || locked_var_changed
 }
 
-async fn check_owner(db: &Connection, owner: Option<Uuid>, errors: &mut Vec<FieldError>) {
+async fn check_owner(
+  db: &Connection,
+  owner: Option<Uuid>,
+  errors: &mut Vec<FieldError>,
+) -> Result<()> {
   if let Some(owner) = owner
-    && db.user().get_user_by_id(owner).await.is_err()
+    && user::Entity::find_by_id(owner).one(&**db).await?.is_none()
   {
     errors.push(field_err("owner", "User not found."));
   }
+  Ok(())
 }
 
 async fn egg_vars(
   db: &Connection,
   egg: Uuid,
   errors: &mut Vec<FieldError>,
-) -> Option<Vec<egg_variable::Model>> {
+) -> Result<Option<Vec<egg_variable::Model>>> {
   match db.egg().find_by_id(egg).await {
-    Ok((_, vars)) => Some(vars),
+    Ok((_, vars)) => Ok(Some(vars)),
     Err(e) if e.status == StatusCode::NOT_FOUND => {
       errors.push(field_err("egg", "Egg not found."));
-      None
+      Ok(None)
     }
-    Err(_) => None,
+    Err(e) => Err(e),
   }
 }
 
@@ -998,12 +1005,12 @@ async fn create_server(
 ) -> FieldResult<Json<CreateServerResponse>> {
   let mut errors = Vec::new();
   let allocations = validate_spec(&req.spec, &mut errors);
-  check_owner(&db, req.spec.owner, &mut errors).await;
+  check_owner(&db, req.spec.owner, &mut errors).await?;
   if !node_exists(&db, req.node).await? {
     errors.push(field_err("node", "Node not found."));
   }
   let variables = egg_vars(&db, req.spec.egg, &mut errors)
-    .await
+    .await?
     .map(|vars| build_variables(&vars, &req.spec.environment, None, &mut errors))
     .unwrap_or_default();
   fail_if(StatusCode::BAD_REQUEST, errors)?;
@@ -1076,10 +1083,10 @@ async fn update_server(
 
   let mut errors = Vec::new();
   let allocations = validate_spec(&req.spec, &mut errors);
-  check_owner(&db, req.spec.owner, &mut errors).await;
+  check_owner(&db, req.spec.owner, &mut errors).await?;
   let egg_changed = req.spec.egg != server.egg_id;
   let variables = egg_vars(&db, req.spec.egg, &mut errors)
-    .await
+    .await?
     .map(|vars| {
       build_variables(
         &vars,
@@ -1572,7 +1579,7 @@ mod test {
       r.spec.name = "new".into();
       r.spec.startup = "other".into();
       r.spec.startup_overridden = true;
-      r.spec.environment = map(&[("EDIT", "changed"), ("LOCKED", "l"), ("UNKNOWN", "x")]);
+      r.spec.environment = map(&[("EDIT", "changed"), ("LOCKED", "l")]);
       // same pair written differently
       r.spec.allocations[0].ip = " 10.0.0.5".into();
     }));
@@ -1595,9 +1602,30 @@ mod test {
       &|r| r.grants = Some(GrantsBody::default()),
       &|r| r.spec.environment = map(&[("LOCKED", "changed")]),
       &|r| r.spec.environment = map(&[("HIDDEN_EDIT", "changed")]),
+      // hidden and unknown keys count even with the current value, no oracle
+      &|r| r.spec.environment = map(&[("HIDDEN_EDIT", "h")]),
+      &|r| r.spec.environment = map(&[("UNKNOWN", "x")]),
     ] {
       assert!(changes(f));
     }
+  }
+
+  #[tokio::test]
+  async fn lookup_db_errors_propagate() {
+    // no migrations: every query fails with a db error, not a not-found
+    let db = Connection(sea_orm::Database::connect("sqlite::memory:").await.unwrap());
+    let mut errors = Vec::new();
+    assert!(
+      check_owner(&db, Some(Uuid::now_v7()), &mut errors)
+        .await
+        .is_err()
+    );
+    assert!(check_owner(&db, Option::None, &mut errors).await.is_ok());
+    let err = egg_vars(&db, Uuid::now_v7(), &mut errors)
+      .await
+      .unwrap_err();
+    assert_eq!(err.status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(errors.is_empty());
   }
 
   #[test]

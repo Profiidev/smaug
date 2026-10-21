@@ -183,16 +183,16 @@ test.describe('servers list', () => {
     );
     await gotoReady(page, '/servers');
 
-    await row(page, 'Creative').getByRole('button').last().click();
+    await row(page, 'Viking World').getByRole('button').last().click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Delete server Creative?')).toBeVisible();
+    await expect(dialog.getByText('Delete server Viking World?')).toBeVisible();
     await dialog.getByRole('button', { name: 'Delete' }).click();
 
     await expect(
-      page.getByText('Server Creative deleted successfully')
+      page.getByText('Server Viking World deleted successfully')
     ).toBeVisible();
     await expect(dialog).toBeHidden();
-    expect(deleted).toEqual(['srv-creative']);
+    expect(deleted).toEqual(['srv-viking']);
   });
 
   test('shows an error when delete fails', async ({ network, page }) => {
@@ -203,7 +203,7 @@ test.describe('servers list', () => {
     );
     await gotoReady(page, '/servers');
 
-    await row(page, 'Creative').getByRole('button').last().click();
+    await row(page, 'Viking World').getByRole('button').last().click();
     await page
       .getByRole('dialog')
       .getByRole('button', { name: 'Delete' })
@@ -211,6 +211,18 @@ test.describe('servers list', () => {
 
     await expect(page.getByText('Failed to delete server')).toBeVisible();
     await expect(page).toHaveURL(/\/servers$/);
+  });
+
+  test('disables delete while the status forbids it', async ({ page }) => {
+    await gotoReady(page, '/servers');
+
+    // Installing
+    await expect(
+      row(page, 'Creative').getByRole('button').last()
+    ).toBeDisabled();
+    await expect(
+      row(page, 'Banned Realm').getByRole('button').last()
+    ).toBeEnabled();
   });
 
   test('edit action links to the server', async ({ page }) => {
@@ -826,16 +838,17 @@ test.describe('server create', () => {
 test.describe('servers without server:edit', () => {
   test.beforeEach(async ({ context }) => setupSession(context, 'readonly'));
 
-  test('list disables create, edit and delete', async ({ page }) => {
+  test('list disables create and delete but not edit', async ({ page }) => {
     await gotoReady(page, '/servers');
 
     await expect(row(page, 'Survival SMP')).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Create server' })
     ).toHaveAttribute('aria-disabled', 'true');
-    await expect(
-      row(page, 'Survival SMP').getByRole('link').last()
-    ).toHaveAttribute('aria-disabled', 'true');
+    // Owners and write grantees edit without server:edit; the page enforces access.
+    const edit = row(page, 'Survival SMP').getByRole('link').last();
+    await expect(edit).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(edit).toHaveAttribute('href', '/servers/srv-survival');
     await expect(
       row(page, 'Survival SMP').getByRole('button').last()
     ).toBeDisabled();
@@ -933,7 +946,7 @@ test.describe('server edit (admin)', () => {
       page.getByText('10.0.0.1:25566, 10.0.0.1:25567')
     ).toBeVisible();
     await expect(page.getByText('srv-survival', { exact: true })).toBeVisible();
-    // created_at arrives as a string; the SDK transformer makes it a Date.
+    // The SDK transformer turns the created_at string into a Date.
     await expect(page.getByText(/^Created \d/)).toBeVisible();
     await expect(
       page.getByText('You have view-only access', { exact: true })
@@ -1829,5 +1842,94 @@ test.describe('server edit with read access', () => {
     await expect(page.getByLabel('Max Players')).toBeDisabled();
     await expectNoHorizontalOverflow(page);
     expect(optionsCalled).toBe(false);
+  });
+});
+
+test.describe('server edit edge cases', () => {
+  test.beforeEach(async ({ context }) => setupSession(context));
+
+  /** Serves srv-survival with `access` and no owner (owner user deleted). */
+  const ownerless = (access: 'write' | 'admin') =>
+    gen.handleServerInfo(({ params }) =>
+      // `/servers/options` matches this route too; leave it to its handler.
+      params.uuid === 'options'
+        ? undefined
+        : (HttpResponse.json({
+            ...serverInfoOf(params.uuid, access),
+            owner: null
+          }) as never)
+    );
+
+  for (const access of ['admin', 'write'] as const) {
+    test(`saves a server without an owner as ${access}`, async ({
+      network,
+      page
+    }) => {
+      const update = recordUpdate();
+      network.use(ownerless(access), update.handler);
+      await gotoReady(page, '/servers/srv-survival');
+      await openTab(page, 'General');
+      await page.getByLabel('Name', { exact: true }).fill('Orphan');
+      await save(page);
+
+      await expect(
+        page.getByText('Server Orphan updated successfully')
+      ).toBeVisible();
+      expect(update.bodies).toHaveLength(1);
+      expect(update.bodies[0]).toMatchObject({ name: 'Orphan', owner: null });
+    });
+  }
+
+  test('explains a 403 on save', async ({ network, page }) => {
+    const update = recordUpdate(
+      () => new HttpResponse(null, { status: 403 }) as never
+    );
+    network.use(update.handler);
+    await gotoReady(page, '/servers/srv-survival');
+    await openTab(page, 'General');
+    await page.getByLabel('Name', { exact: true }).fill('Nope');
+    await save(page);
+
+    await expect(
+      page.getByText("You don't have permission to change these fields.")
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Save Changes' })
+    ).toBeVisible();
+  });
+
+  test('keeps unsaved edits across a status action', async ({
+    network,
+    page
+  }) => {
+    let installed = true;
+    network.use(
+      gen.handleSetServerInstalled(async ({ request }) => {
+        ({ installed } = await request.json());
+        return ok();
+      }),
+      gen.handleServerInfo(({ params }) =>
+        params.uuid === 'options'
+          ? undefined
+          : (HttpResponse.json({
+              ...serverInfoOf(params.uuid),
+              install_state: installed ? 'installed' : 'not_installed'
+            }) as never)
+      )
+    );
+    await gotoReady(page, '/servers/srv-survival');
+    await openTab(page, 'General');
+    await page.getByLabel('Name', { exact: true }).fill('Draft name');
+    await openTab(page, 'Status');
+    await action(page, 'Mark as not installed').click();
+    // The refreshed server info is shown...
+    await expect(action(page, 'Mark as installed')).toBeVisible();
+
+    // ...without wiping the draft.
+    await openTab(page, 'General');
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue(
+      'Draft name'
+    );
+    await expect(page.getByText('Unsaved changes')).toBeVisible();
   });
 });

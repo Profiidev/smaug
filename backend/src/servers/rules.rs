@@ -1,13 +1,28 @@
 //! Subset of the Laravel validation rules eggs use for their variables:
 //! required, nullable, string, integer, numeric, boolean, min, max, between,
 //! in and regex. Unknown rules are ignored.
+//!
+//! Kept in sync with `frontend/src/routes/servers/rules.ts`.
 
 use regex::{Regex, RegexBuilder};
 
 /// Message for the first rule `value` breaks (`name` is the variable's display
 /// name), or `None` when it passes.
 pub fn check(name: &str, value: &str, rules: &[String]) -> Option<String> {
-  let has = |r: &str| rules.iter().any(|x| x == r);
+  // `a|b` elements are split, except regexes (they may contain `|`)
+  let rules: Vec<&str> = rules
+    .iter()
+    .flat_map(|r| {
+      if r.starts_with("regex:") {
+        vec![r.as_str()]
+      } else {
+        r.split('|').collect()
+      }
+    })
+    .map(str::trim)
+    .filter(|r| !r.is_empty())
+    .collect();
+  let has = |r: &str| rules.contains(&r);
   // empty values only have to pass `required`, like Laravel's null handling
   if value.trim().is_empty() {
     return has("required").then(|| format!("The {name} field is required."));
@@ -16,7 +31,9 @@ pub fn check(name: &str, value: &str, rules: &[String]) -> Option<String> {
   let numeric = has("integer") || has("numeric");
   // ponytail: non-numeric values skip size rules when a numeric rule is set, that rule reports instead
   let size = if numeric {
-    value.parse::<f64>().ok()
+    is_number(value)
+      .then(|| value.parse::<f64>().ok())
+      .flatten()
   } else {
     Some(value.chars().count() as f64)
   };
@@ -25,11 +42,9 @@ pub fn check(name: &str, value: &str, rules: &[String]) -> Option<String> {
 
   for rule in rules {
     let (rule, arg) = rule.split_once(':').unwrap_or((rule, ""));
-    let msg = match rule {
-      "integer" if value.parse::<i64>().is_err() => format!("The {name} field must be an integer."),
-      "numeric" if !value.parse::<f64>().is_ok_and(f64::is_finite) => {
-        format!("The {name} field must be a number.")
-      }
+    let msg = match rule.trim() {
+      "integer" if !is_integer(value) => format!("The {name} field must be an integer."),
+      "numeric" if !is_number(value) => format!("The {name} field must be a number."),
       "boolean" if !["true", "false", "1", "0"].contains(&value) => {
         format!("The {name} field must be true or false.")
       }
@@ -71,6 +86,20 @@ pub fn check(name: &str, value: &str, rules: &[String]) -> Option<String> {
     return Some(msg);
   }
   None
+}
+
+/// `^-?\d+$`
+fn is_integer(value: &str) -> bool {
+  let digits = value.strip_prefix('-').unwrap_or(value);
+  !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// `^-?\d+(\.\d+)?$`
+fn is_number(value: &str) -> bool {
+  match value.split_once('.') {
+    Some((int, frac)) => is_integer(int) && is_integer(frac) && !frac.starts_with('-'),
+    None => is_integer(value),
+  }
 }
 
 /// PCRE style `/pattern/flags`; `None` (rule ignored) when the regex crate
@@ -141,15 +170,18 @@ mod test {
   #[test]
   fn types() {
     ok("anything", &["string"]);
-    ok("-12", &["integer"]);
-    ok("+7", &["integer"]);
-    for v in ["1.5", "abc", "1e3", "9999999999999999999999"] {
+    for v in ["-12", "0", "007", "9999999999999999999999"] {
+      ok(v, &["integer"]);
+    }
+    for v in ["1.5", "abc", "1e3", "+7", "-", " 5", "٣"] {
       bad(v, &["integer"], "The Port field must be an integer.");
     }
-    for v in ["1.5", "-2", "1e3", "42"] {
+    for v in ["1.5", "-2", "42", "-0.25"] {
       ok(v, &["numeric"]);
     }
-    for v in ["abc", "inf", "NaN", "1,5"] {
+    for v in [
+      "abc", "inf", "NaN", "1,5", "1e3", ".5", "5.", "+5", "1.-5", "1.2.3",
+    ] {
       bad(v, &["numeric"], "The Port field must be a number.");
     }
     for v in ["true", "false", "1", "0"] {
@@ -267,6 +299,56 @@ mod test {
     }
     assert!(parse_regex("/a/").is_some());
     assert!(parse_regex(" a ").is_none());
+  }
+
+  /// Cases shared with the frontend validator (`rules.ts`).
+  #[test]
+  fn frontend_parity() {
+    let int = "The Port field must be an integer.";
+    let num = "The Port field must be a number.";
+    let cases: &[(&str, &[&str], Option<&str>)] = &[
+      ("   ", &["required"], Some("The Port field is required.")),
+      ("   ", &["integer"], None),
+      ("+5", &["integer"], Some(int)),
+      ("+5", &["numeric"], Some(num)),
+      ("1e3", &["integer"], Some(int)),
+      ("1e3", &["numeric"], Some(num)),
+      // not numeric shaped: the size rule is skipped, the type rule reports
+      ("1e3", &["max:5", "integer"], Some(int)),
+      (".5", &["numeric"], Some(num)),
+      ("99999999999999999999", &["integer"], None),
+      (
+        "99999999999999999999",
+        &["integer", "max:65535"],
+        Some("The Port field must not be greater than 65535."),
+      ),
+      ("abc", &["required|integer"], Some(int)),
+      (
+        "",
+        &["required|integer"],
+        Some("The Port field is required."),
+      ),
+      ("5", &[" required | integer ||max:9 "], None),
+      (
+        "10",
+        &["required|integer|max:9"],
+        Some("The Port field must not be greater than 9."),
+      ),
+      ("a|b", &["regex:#^a|b$#"], None),
+      (
+        "c",
+        &["regex:#^(a|b)$#"],
+        Some("The Port field format is invalid."),
+      ),
+      ("ab", &["regex:#^ab$#|max:1"], None),
+    ];
+    for (value, rules, expected) in cases {
+      assert_eq!(
+        run(value, rules).as_deref(),
+        *expected,
+        "{value:?} {rules:?}"
+      );
+    }
   }
 
   #[test]

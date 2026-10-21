@@ -95,12 +95,26 @@ describe('servers table columns', () => {
     expect(cellOf(key).cell).toEqual({ component: MutedCell, props });
   });
 
-  it.each([true, false])('gates edit/delete on canEdit=%s', (canEdit) => {
+  // Owners and write grantees may edit without server:edit; the page enforces access.
+  it.each([true, false])('always enables edit (canEdit=%s)', (canEdit) => {
     const { props } = cellOf('actions', row, canEdit).cell;
     expect(props.edit).toBe('/servers/srv-1');
-    expect(props.edit_disabled).toBe(!canEdit);
-    expect(props.delete_disabled).toBe(!canEdit);
+    expect(props.edit_disabled).toBe(false);
   });
+
+  it.each([
+    [true, 'offline', false],
+    [true, 'suspended', false],
+    [true, 'installing', true],
+    [false, 'offline', true],
+    [false, 'installing', true]
+  ] as const)(
+    'delete with canEdit=%s and status %s is disabled=%s',
+    (canEdit, status, disabled) => {
+      const { props } = cellOf('actions', { ...row, status }, canEdit).cell;
+      expect(props.delete_disabled).toBe(disabled);
+    }
+  );
 
   it('calls deleteServer with the row', () => {
     const { cell, deleteServer } = cellOf('actions');

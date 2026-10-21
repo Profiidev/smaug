@@ -100,6 +100,19 @@ impl TestServer {
     TestServer::boot(Some(container)).await
   }
 
+  /// Boot against a sqlite file so the test can open the same database to set
+  /// up states the API can not reach; returns the database url.
+  // ponytail: the file stays in the temp dir, clean up if it ever matters
+  pub async fn start_with_db_file() -> (TestServer, String) {
+    prepare_env();
+    let path = std::env::temp_dir().join(format!("smaug-test-{}.sqlite", Uuid::now_v7()));
+    let url = format!("sqlite://{}?mode=rwc", path.display());
+    unsafe {
+      std::env::set_var("DB_URL", &url);
+    }
+    (TestServer::boot(None).await, url)
+  }
+
   async fn boot(pg: Option<ContainerAsync<Postgres>>) -> TestServer {
     let app = App::new().await;
     let port = app.port();

@@ -113,7 +113,8 @@ const generalObject = z.object({
     .max(191, 'Name must be 191 characters or fewer.')
     .default(''),
   node: selectOne('Node is required.'),
-  owner: selectOne('Owner is required.')
+  /** Optional on edit: the backend keeps servers whose owner was deleted (owner null). */
+  owner: z.array(z.string()).max(1).default([])
 });
 
 const startupObject = z.object({
@@ -217,7 +218,9 @@ const checkGrants = (data: z.infer<typeof permissionsObject>, ctx: Ctx) => {
 };
 
 // Per-section schemas: one per wizard stage's BaseForm.
-export const generalStage = generalObject.superRefine(checkAllocations);
+export const generalStage = generalObject
+  .extend({ owner: selectOne('Owner is required.') })
+  .superRefine(checkAllocations);
 export const startupStage = startupObject;
 export const variablesStage = variablesObject.superRefine(checkVariables);
 export const resourcesStage = resourcesObject.superRefine(checkLimits);
