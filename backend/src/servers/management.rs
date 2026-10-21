@@ -334,10 +334,11 @@ pub(super) async fn create_server(
     created_at: Utc::now().fixed_offset(),
   };
   apply_spec(&mut server, req.spec);
-  let wings_spec = spec::build(&server, &allocations, variables.clone());
   // ponytail: a concurrent create can still take a pair after check_free, the unique index then fails with 500
-  db.server().create(server, allocations, variables).await?;
-  wings.put_server(req.node, &wings_spec).await;
+  db.server()
+    .create(server.clone(), allocations, variables)
+    .await?;
+  spec::push(&db, &wings, &server).await;
   if !req.skip_scripts {
     wings.install(req.node, id).await;
   }
@@ -403,14 +404,10 @@ pub(super) async fn update_server(
   .await?;
 
   apply_spec(&mut server, req.spec);
-  let (node, wings_spec) = (
-    server.node_id,
-    spec::build(&server, &allocations, variables.clone()),
-  );
   db.server()
-    .update(server, allocations, variables, grants)
+    .update(server.clone(), allocations, variables, grants)
     .await?;
-  wings.put_server(node, &wings_spec).await;
+  spec::push(&db, &wings, &server).await;
   info!("Updated server with ID {}", path.uuid);
 
   updater

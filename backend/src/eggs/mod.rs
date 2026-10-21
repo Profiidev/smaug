@@ -443,9 +443,7 @@ async fn edit_egg(
     .await;
   for uuid in servers {
     let server = db.server().find_by_id(uuid).await?;
-    wings
-      .put_server(server.node_id, &spec::load(&db, &server).await?)
-      .await;
+    spec::push(&db, &wings, &server).await;
     updater.broadcast(UpdateMessage::Servers { uuid }).await;
   }
   Ok(())

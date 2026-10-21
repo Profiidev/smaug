@@ -129,10 +129,8 @@ pub(super) async fn transfer_server(
 
   let source = server.node_id;
   server.node_id = req.node;
-  let variables = db.server().variables(server.id).await?;
-  let wings_spec = spec::build(&server, std::slice::from_ref(&allocation), variables);
-  wings.put_server(req.node, &wings_spec).await;
-  db.server().transfer(server, allocation).await?;
+  db.server().transfer(server.clone(), allocation).await?;
+  spec::push(&db, &wings, &server).await;
   // TODO(wings): stream the server's files from the source to the target node before deleting them
   wings.delete_server(source, path.uuid).await;
   info!("Transferred server {} to node {}", path.uuid, req.node);

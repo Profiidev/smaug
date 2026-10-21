@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use uuid::Uuid;
 
 /// Panel -> wings messages over the websocket. State transfer uses REST, this
@@ -48,6 +49,77 @@ pub struct ServerSpec {
   pub limits: Limits,
   /// First entry is the primary allocation.
   pub allocations: Vec<Allocation>,
+  pub stop: StopAction,
+  /// The server counts as running once a console line contains one of these.
+  /// Empty means running as soon as the process started.
+  pub startup_done: Vec<String>,
+  /// Rewritten before every start.
+  pub config_files: Vec<ConfigFile>,
+  /// Gitignore-style patterns users may not read or write.
+  pub file_denylist: Vec<String>,
+  pub install: InstallSpec,
+}
+
+/// How to stop the server gracefully, before falling back to SIGTERM/SIGKILL.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StopAction {
+  /// Written to the console.
+  Command(String),
+  Signal(Signal),
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Signal {
+  Int,
+  Term,
+  Kill,
+}
+
+/// A file wings rewrites before start. Placeholders the panel knows are
+/// already substituted; `{{config.*}}` ones are left for wings.
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct ConfigFile {
+  /// Relative to the server root.
+  pub file: String,
+  pub parser: ConfigParser,
+  pub replace: Vec<ConfigReplace>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfigParser {
+  File,
+  Yaml,
+  Properties,
+  Ini,
+  Json,
+  Xml,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct ConfigReplace {
+  /// Key path (or line prefix for the `file` parser) to replace.
+  pub matcher: String,
+  /// Only replace when the current value equals this.
+  pub if_value: Option<String>,
+  /// Any JSON value, so the `json`/`yaml` parsers keep numbers and booleans.
+  #[schemars(schema_with = "any_json")]
+  pub replace_with: Value,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]
+pub struct InstallSpec {
+  pub image: String,
+  pub entrypoint: String,
+  /// `None` means nothing to run, the install succeeds right away.
+  pub script: Option<String>,
+}
+
+/// Arbitrary JSON; Kubernetes needs the marker to accept it in a CRD.
+fn any_json(_: &mut SchemaGenerator) -> Schema {
+  json_schema!({ "x-kubernetes-preserve-unknown-fields": true })
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq)]

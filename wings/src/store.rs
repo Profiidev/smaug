@@ -219,7 +219,7 @@ pub fn state(router: axum::Router, store: Store) -> axum::Router {
 pub(crate) mod test {
   use std::collections::BTreeMap;
 
-  use shared::msg::Limits;
+  use shared::msg::{InstallSpec, Limits, Signal, StopAction};
 
   use super::*;
 
@@ -242,6 +242,15 @@ pub(crate) mod test {
         disk_mb: 1024,
       },
       allocations: vec![],
+      stop: StopAction::Signal(Signal::Term),
+      startup_done: vec![],
+      config_files: vec![],
+      file_denylist: vec![],
+      install: InstallSpec {
+        image: "img".into(),
+        entrypoint: "bash".into(),
+        script: None,
+      },
     }
   }
 
