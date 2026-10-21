@@ -8,7 +8,17 @@ import type {
   TDataShape
 } from './client';
 import { client } from './client.gen';
-import { serverInfoResponseTransformer } from './transformers.gen';
+import {
+  copyFileResponseTransformer,
+  createBackupResponseTransformer,
+  createScheduleResponseTransformer,
+  listBackupsResponseTransformer,
+  listFilesResponseTransformer,
+  listSchedulesResponseTransformer,
+  scheduleInfoResponseTransformer,
+  serverInfoResponseTransformer,
+  updateScheduleResponseTransformer
+} from './transformers.gen';
 import type {
   AuthConfigData,
   AuthConfigErrors,
@@ -18,47 +28,89 @@ import type {
   AvatarByIdData,
   AvatarByIdErrors,
   AvatarByIdResponses,
+  CancelUploadData,
+  CancelUploadErrors,
+  CancelUploadResponses,
   ChangeUserEmailData,
   ChangeUserEmailErrors,
   ChangeUserEmailResponses,
   CompleteSetupData,
   CompleteSetupErrors,
+  CompleteUploadData,
+  CompleteUploadErrors,
+  CompleteUploadResponses,
   ConfirmEmailChangeData,
   ConfirmEmailChangeErrors,
   ConfirmEmailChangeResponses,
   ConvertOidcUserData,
   ConvertOidcUserErrors,
   ConvertOidcUserResponses,
+  CopyFileData,
+  CopyFileErrors,
+  CopyFileResponses,
+  CreateBackupData,
+  CreateBackupErrors,
+  CreateBackupResponses,
   CreateEggData,
   CreateEggErrors,
   CreateEggResponses,
+  CreateFileData,
+  CreateFileErrors,
+  CreateFileResponses,
+  CreateFolderData,
+  CreateFolderErrors,
+  CreateFolderResponses,
   CreateGroupData,
   CreateGroupErrors,
   CreateGroupResponses,
   CreateNodeData,
   CreateNodeErrors,
   CreateNodeResponses,
+  CreateScheduleData,
+  CreateScheduleErrors,
+  CreateScheduleResponses,
+  CreateScheduleTaskData,
+  CreateScheduleTaskErrors,
+  CreateScheduleTaskResponses,
   CreateServerData,
   CreateServerErrors,
   CreateServerResponses,
   CreateUserData,
   CreateUserErrors,
   CreateUserResponses,
+  DeleteBackupData,
+  DeleteBackupErrors,
+  DeleteBackupResponses,
   DeleteEggData,
   DeleteEggErrors,
   DeleteEggResponses,
+  DeleteFilesData,
+  DeleteFilesErrors,
+  DeleteFilesResponses,
   DeleteGroupData,
   DeleteGroupErrors,
   DeleteGroupResponses,
   DeleteNodeData,
   DeleteNodeErrors,
   DeleteNodeResponses,
+  DeleteScheduleData,
+  DeleteScheduleErrors,
+  DeleteScheduleResponses,
+  DeleteScheduleTaskData,
+  DeleteScheduleTaskErrors,
+  DeleteScheduleTaskResponses,
   DeleteServerData,
   DeleteServerErrors,
   DeleteServerResponses,
   DeleteUserData,
   DeleteUserErrors,
   DeleteUserResponses,
+  DownloadBackupData,
+  DownloadBackupErrors,
+  DownloadBackupResponses,
+  DownloadFileData,
+  DownloadFileErrors,
+  DownloadFileResponses,
   EditEggData,
   EditEggErrors,
   EditEggResponses,
@@ -74,6 +126,9 @@ import type {
   EggSourceData,
   EggSourceErrors,
   EggSourceResponses,
+  FileContentData,
+  FileContentErrors,
+  FileContentResponses,
   GetGeneralSettingsData,
   GetGeneralSettingsErrors,
   GetGeneralSettingsResponses,
@@ -100,9 +155,15 @@ import type {
   IsSetupResponses,
   KeyData,
   KeyResponses,
+  ListBackupsData,
+  ListBackupsErrors,
+  ListBackupsResponses,
   ListEggsData,
   ListEggsErrors,
   ListEggsResponses,
+  ListFilesData,
+  ListFilesErrors,
+  ListFilesResponses,
   ListGroupsData,
   ListGroupsErrors,
   ListGroupsResponses,
@@ -112,6 +173,9 @@ import type {
   ListNodesData,
   ListNodesErrors,
   ListNodesResponses,
+  ListSchedulesData,
+  ListSchedulesErrors,
+  ListSchedulesResponses,
   ListServersData,
   ListServersErrors,
   ListServersResponses,
@@ -121,6 +185,9 @@ import type {
   ListUsersSimpleData,
   ListUsersSimpleErrors,
   ListUsersSimpleResponses,
+  LockBackupData,
+  LockBackupErrors,
+  LockBackupResponses,
   LogoutData,
   LogoutErrors,
   MailActiveData,
@@ -135,6 +202,9 @@ import type {
   ReinstallServerData,
   ReinstallServerErrors,
   ReinstallServerResponses,
+  RenameFileData,
+  RenameFileErrors,
+  RenameFileResponses,
   ResetPasswordData,
   ResetPasswordErrors,
   ResetPasswordResponses,
@@ -144,21 +214,38 @@ import type {
   ResetUserPasswordData,
   ResetUserPasswordErrors,
   ResetUserPasswordResponses,
+  RestoreBackupData,
+  RestoreBackupErrors,
+  RestoreBackupResponses,
+  RunScheduleData,
+  RunScheduleErrors,
+  RunScheduleResponses,
   SaveMailSettingsData,
   SaveMailSettingsErrors,
   SaveMailSettingsResponses,
   SaveUserSettingsData,
   SaveUserSettingsErrors,
   SaveUserSettingsResponses,
+  ScheduleInfoData,
+  ScheduleInfoErrors,
+  ScheduleInfoResponses,
   SendResetLinkData,
   SendResetLinkErrors,
   SendResetLinkResponses,
+  ServerCommandData,
+  ServerCommandErrors,
+  ServerCommandResponses,
   ServerInfoData,
   ServerInfoErrors,
   ServerInfoResponses,
   ServerOptionsData,
   ServerOptionsErrors,
   ServerOptionsResponses,
+  ServerPowerData,
+  ServerPowerErrors,
+  ServerPowerResponses,
+  ServerWsData,
+  ServerWsErrors,
   SetServerInstalledData,
   SetServerInstalledErrors,
   SetServerInstalledResponses,
@@ -168,6 +255,9 @@ import type {
   StartEmailChangeData,
   StartEmailChangeErrors,
   StartEmailChangeResponses,
+  StartUploadData,
+  StartUploadErrors,
+  StartUploadResponses,
   TestMailData,
   TestMailErrors,
   TestMailResponses,
@@ -187,12 +277,24 @@ import type {
   UpdatePasswordData,
   UpdatePasswordErrors,
   UpdatePasswordResponses,
+  UpdateScheduleData,
+  UpdateScheduleErrors,
+  UpdateScheduleResponses,
+  UpdateScheduleTaskData,
+  UpdateScheduleTaskErrors,
+  UpdateScheduleTaskResponses,
   UpdateServerData,
   UpdateServerErrors,
   UpdateServerResponses,
+  UploadChunkData,
+  UploadChunkErrors,
+  UploadChunkResponses,
   UserInfoData,
   UserInfoErrors,
-  UserInfoResponses
+  UserInfoResponses,
+  WriteFileContentData,
+  WriteFileContentErrors,
+  WriteFileContentResponses
 } from './types.gen';
 
 export type Options<
@@ -1064,6 +1166,454 @@ export const transferServer = <ThrowOnError extends boolean = false>(
     ThrowOnError
   >({
     url: '/api/servers/{uuid}/transfer',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const serverPower = <ThrowOnError extends boolean = false>(
+  options: Options<ServerPowerData, ThrowOnError>
+): RequestResult<ServerPowerResponses, ServerPowerErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ServerPowerResponses,
+    ServerPowerErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/power',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const serverCommand = <ThrowOnError extends boolean = false>(
+  options: Options<ServerCommandData, ThrowOnError>
+): RequestResult<ServerCommandResponses, ServerCommandErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ServerCommandResponses,
+    ServerCommandErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/command',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+/**
+ * Websocket (JWT cookie, read access) sending `LiveFrame` text frames.
+ */
+export const serverWs = <ThrowOnError extends boolean = false>(
+  options: Options<ServerWsData, ThrowOnError>
+): RequestResult<unknown, ServerWsErrors, ThrowOnError> =>
+  (options.client ?? client).get<unknown, ServerWsErrors, ThrowOnError>({
+    url: '/api/servers/{uuid}/ws',
+    ...options
+  });
+
+export const listFiles = <ThrowOnError extends boolean = false>(
+  options: Options<ListFilesData, ThrowOnError>
+): RequestResult<ListFilesResponses, ListFilesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListFilesResponses,
+    ListFilesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listFilesResponseTransformer,
+    url: '/api/servers/{uuid}/files',
+    ...options
+  });
+
+export const fileContent = <ThrowOnError extends boolean = false>(
+  options: Options<FileContentData, ThrowOnError>
+): RequestResult<FileContentResponses, FileContentErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    FileContentResponses,
+    FileContentErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/files/content', ...options });
+
+export const writeFileContent = <ThrowOnError extends boolean = false>(
+  options: Options<WriteFileContentData, ThrowOnError>
+): RequestResult<
+  WriteFileContentResponses,
+  WriteFileContentErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    WriteFileContentResponses,
+    WriteFileContentErrors,
+    ThrowOnError
+  >({
+    bodySerializer: null,
+    url: '/api/servers/{uuid}/files/content',
+    ...options,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      ...options.headers
+    }
+  });
+
+export const createFolder = <ThrowOnError extends boolean = false>(
+  options: Options<CreateFolderData, ThrowOnError>
+): RequestResult<CreateFolderResponses, CreateFolderErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateFolderResponses,
+    CreateFolderErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/files/folder',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const createFile = <ThrowOnError extends boolean = false>(
+  options: Options<CreateFileData, ThrowOnError>
+): RequestResult<CreateFileResponses, CreateFileErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateFileResponses,
+    CreateFileErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/files/file',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const renameFile = <ThrowOnError extends boolean = false>(
+  options: Options<RenameFileData, ThrowOnError>
+): RequestResult<RenameFileResponses, RenameFileErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RenameFileResponses,
+    RenameFileErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/files/rename',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const copyFile = <ThrowOnError extends boolean = false>(
+  options: Options<CopyFileData, ThrowOnError>
+): RequestResult<CopyFileResponses, CopyFileErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CopyFileResponses,
+    CopyFileErrors,
+    ThrowOnError
+  >({
+    responseTransformer: copyFileResponseTransformer,
+    url: '/api/servers/{uuid}/files/copy',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const deleteFiles = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteFilesData, ThrowOnError>
+): RequestResult<DeleteFilesResponses, DeleteFilesErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    DeleteFilesResponses,
+    DeleteFilesErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/files/delete',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const downloadFile = <ThrowOnError extends boolean = false>(
+  options: Options<DownloadFileData, ThrowOnError>
+): RequestResult<DownloadFileResponses, DownloadFileErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    DownloadFileResponses,
+    DownloadFileErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/files/download', ...options });
+
+export const startUpload = <ThrowOnError extends boolean = false>(
+  options: Options<StartUploadData, ThrowOnError>
+): RequestResult<StartUploadResponses, StartUploadErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    StartUploadResponses,
+    StartUploadErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/files/upload',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const cancelUpload = <ThrowOnError extends boolean = false>(
+  options: Options<CancelUploadData, ThrowOnError>
+): RequestResult<CancelUploadResponses, CancelUploadErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    CancelUploadResponses,
+    CancelUploadErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/files/upload/{stream}', ...options });
+
+export const completeUpload = <ThrowOnError extends boolean = false>(
+  options: Options<CompleteUploadData, ThrowOnError>
+): RequestResult<CompleteUploadResponses, CompleteUploadErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CompleteUploadResponses,
+    CompleteUploadErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/files/upload/{stream}/complete',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const uploadChunk = <ThrowOnError extends boolean = false>(
+  options: Options<UploadChunkData, ThrowOnError>
+): RequestResult<UploadChunkResponses, UploadChunkErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    UploadChunkResponses,
+    UploadChunkErrors,
+    ThrowOnError
+  >({
+    bodySerializer: null,
+    url: '/api/servers/{uuid}/files/upload/{stream}/{index}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      ...options.headers
+    }
+  });
+
+export const listBackups = <ThrowOnError extends boolean = false>(
+  options: Options<ListBackupsData, ThrowOnError>
+): RequestResult<ListBackupsResponses, ListBackupsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListBackupsResponses,
+    ListBackupsErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listBackupsResponseTransformer,
+    url: '/api/servers/{uuid}/backups',
+    ...options
+  });
+
+export const createBackup = <ThrowOnError extends boolean = false>(
+  options: Options<CreateBackupData, ThrowOnError>
+): RequestResult<CreateBackupResponses, CreateBackupErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateBackupResponses,
+    CreateBackupErrors,
+    ThrowOnError
+  >({
+    responseTransformer: createBackupResponseTransformer,
+    url: '/api/servers/{uuid}/backups',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const deleteBackup = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteBackupData, ThrowOnError>
+): RequestResult<DeleteBackupResponses, DeleteBackupErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteBackupResponses,
+    DeleteBackupErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/backups/{backup}', ...options });
+
+export const lockBackup = <ThrowOnError extends boolean = false>(
+  options: Options<LockBackupData, ThrowOnError>
+): RequestResult<LockBackupResponses, LockBackupErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    LockBackupResponses,
+    LockBackupErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/backups/{backup}/lock',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const restoreBackup = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreBackupData, ThrowOnError>
+): RequestResult<RestoreBackupResponses, RestoreBackupErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RestoreBackupResponses,
+    RestoreBackupErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/backups/{backup}/restore',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const downloadBackup = <ThrowOnError extends boolean = false>(
+  options: Options<DownloadBackupData, ThrowOnError>
+): RequestResult<DownloadBackupResponses, DownloadBackupErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    DownloadBackupResponses,
+    DownloadBackupErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/backups/{backup}/download', ...options });
+
+export const listSchedules = <ThrowOnError extends boolean = false>(
+  options: Options<ListSchedulesData, ThrowOnError>
+): RequestResult<ListSchedulesResponses, ListSchedulesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListSchedulesResponses,
+    ListSchedulesErrors,
+    ThrowOnError
+  >({
+    responseTransformer: listSchedulesResponseTransformer,
+    url: '/api/servers/{uuid}/schedules',
+    ...options
+  });
+
+export const createSchedule = <ThrowOnError extends boolean = false>(
+  options: Options<CreateScheduleData, ThrowOnError>
+): RequestResult<CreateScheduleResponses, CreateScheduleErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateScheduleResponses,
+    CreateScheduleErrors,
+    ThrowOnError
+  >({
+    responseTransformer: createScheduleResponseTransformer,
+    url: '/api/servers/{uuid}/schedules',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const deleteSchedule = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteScheduleData, ThrowOnError>
+): RequestResult<DeleteScheduleResponses, DeleteScheduleErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteScheduleResponses,
+    DeleteScheduleErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/schedules/{schedule}', ...options });
+
+export const scheduleInfo = <ThrowOnError extends boolean = false>(
+  options: Options<ScheduleInfoData, ThrowOnError>
+): RequestResult<ScheduleInfoResponses, ScheduleInfoErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ScheduleInfoResponses,
+    ScheduleInfoErrors,
+    ThrowOnError
+  >({
+    responseTransformer: scheduleInfoResponseTransformer,
+    url: '/api/servers/{uuid}/schedules/{schedule}',
+    ...options
+  });
+
+export const updateSchedule = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateScheduleData, ThrowOnError>
+): RequestResult<UpdateScheduleResponses, UpdateScheduleErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateScheduleResponses,
+    UpdateScheduleErrors,
+    ThrowOnError
+  >({
+    responseTransformer: updateScheduleResponseTransformer,
+    url: '/api/servers/{uuid}/schedules/{schedule}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const runSchedule = <ThrowOnError extends boolean = false>(
+  options: Options<RunScheduleData, ThrowOnError>
+): RequestResult<RunScheduleResponses, RunScheduleErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RunScheduleResponses,
+    RunScheduleErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/schedules/{schedule}/run', ...options });
+
+export const createScheduleTask = <ThrowOnError extends boolean = false>(
+  options: Options<CreateScheduleTaskData, ThrowOnError>
+): RequestResult<
+  CreateScheduleTaskResponses,
+  CreateScheduleTaskErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateScheduleTaskResponses,
+    CreateScheduleTaskErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/schedules/{schedule}/tasks',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const deleteScheduleTask = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteScheduleTaskData, ThrowOnError>
+): RequestResult<
+  DeleteScheduleTaskResponses,
+  DeleteScheduleTaskErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteScheduleTaskResponses,
+    DeleteScheduleTaskErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/schedules/{schedule}/tasks/{task}',
+    ...options
+  });
+
+export const updateScheduleTask = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateScheduleTaskData, ThrowOnError>
+): RequestResult<
+  UpdateScheduleTaskResponses,
+  UpdateScheduleTaskErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateScheduleTaskResponses,
+    UpdateScheduleTaskErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/schedules/{schedule}/tasks/{task}',
     ...options,
     headers: {
       'Content-Type': 'application/json',

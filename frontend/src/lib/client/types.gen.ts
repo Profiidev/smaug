@@ -42,9 +42,83 @@ export type AvatarUpdate = {
   avatar: string;
 };
 
+export type BackupInfo = {
+  created_at: Date;
+  /**
+   * Why it failed.
+   */
+  error?: string | null;
+  id: string;
+  /**
+   * Extra gitignore patterns, one per line.
+   */
+  ignored: string;
+  locked: boolean;
+  name: string;
+  /**
+   * Set once completed.
+   */
+  sha256?: string | null;
+  size_bytes: number;
+  status: BackupStatus;
+};
+
+/**
+ * `used` counts every backup that is not failed, creating ones included.
+ */
+export type BackupList = {
+  backups: Array<BackupInfo>;
+  limit: number;
+  used: number;
+};
+
+export type BackupPath = {
+  backup: string;
+  uuid: string;
+};
+
+export const BackupStatus = {
+  CREATING: 'creating',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  RESTORING: 'restoring'
+} as const;
+
+export type BackupStatus = (typeof BackupStatus)[keyof typeof BackupStatus];
+
 export type ChangeUserEmail = {
   new_email: string;
   uuid: string;
+};
+
+export type ChunkPath = {
+  /**
+   * From 0, the chunk starts at `index * chunk_size`.
+   */
+  index: number;
+  stream: string;
+  uuid: string;
+};
+
+export type CommandRequest = {
+  line: string;
+};
+
+export type CompleteStream = {
+  sha256: string;
+};
+
+export type CreateBackupRequest = {
+  /**
+   * gitignore patterns, one per line, on top of the server's
+   * `.smaugignore`, `.pteroignore` and `.pelicanignore`.
+   */
+  ignored?: string | null;
+  locked?: boolean | null;
+  /**
+   * Defaults to `Backup at YYYY-MM-DD HH:MM` (UTC).
+   */
+  name?: string | null;
 };
 
 export type CreateEggResponse = {
@@ -70,6 +144,13 @@ export type CreateNodeRes = {
    */
   token: string;
   uuid: string;
+};
+
+export type CreateScheduleRequest = {
+  cron: CronFields;
+  enabled?: boolean;
+  name: string;
+  only_when_online?: boolean;
 };
 
 export type CreateServer = {
@@ -118,6 +199,13 @@ export type CreateServerResponse = {
   uuid: string;
 };
 
+export type CreateTaskRequest = {
+  action: ScheduleAction;
+  continue_on_failure?: boolean;
+  offset_seconds?: number;
+  payload?: string;
+};
+
 export type CreateUser = {
   email: string;
   name: string;
@@ -128,12 +216,30 @@ export type CreateUserResponse = {
   uuid: string;
 };
 
+/**
+ * The five cron fields, UTC.
+ */
+export type CronFields = {
+  day_of_month: string;
+  day_of_week: string;
+  hour: string;
+  minute: string;
+  month: string;
+};
+
 export type DeleteGroupRequest = {
   uuid: string;
 };
 
 export type DeleteNode = {
   uuid: string;
+};
+
+/**
+ * Directories are deleted recursively.
+ */
+export type DeleteRequest = {
+  paths: Array<string>;
 };
 
 export type DeleteUserRequest = {
@@ -325,6 +431,29 @@ export type FieldErrors = {
   errors: Array<FieldError>;
 };
 
+export type FileEntry = {
+  kind: FileKind;
+  /**
+   * Guessed from the name, `None` for directories.
+   */
+  mime?: string | null;
+  /**
+   * Unix permission bits.
+   */
+  mode: number;
+  modified: Date;
+  name: string;
+  size: number;
+};
+
+export const FileKind = {
+  FILE: 'file',
+  DIR: 'dir',
+  SYMLINK: 'symlink'
+} as const;
+
+export type FileKind = (typeof FileKind)[keyof typeof FileKind];
+
 export type GeneralSettings = {
   site_url: string;
 };
@@ -387,6 +516,7 @@ export type InstallRequest = {
 export type IsSetupResponse = {
   db_backend: string;
   is_setup: boolean;
+  storage_backend: string;
 };
 
 export type KeyRes = {
@@ -415,6 +545,73 @@ export type ListServersResponse = {
   servers: Array<ServerListItem>;
 };
 
+/**
+ * One text JSON frame on `GET /servers/{uuid}/ws`, tagged by `type`.
+ */
+export type LiveFrame =
+  | {
+      lines: Array<LogLine>;
+      type: 'logs';
+    }
+  | {
+      status: ServerStatus;
+      type: 'state';
+    }
+  | (LiveStats & {
+      type: 'stats';
+    })
+  | {
+      error?: string | null;
+      ok: boolean;
+      op: string;
+      type: 'op_finished';
+    }
+  | {
+      bytes: number;
+      id: string;
+      status: BackupStatus;
+      type: 'backup';
+    }
+  | {
+      id: string;
+      status: ScheduleRunState;
+      task_index?: number | null;
+      type: 'schedule';
+    };
+
+/**
+ * Limits are 0 when unlimited.
+ */
+export type LiveStats = {
+  cpu_limit_millicores: number;
+  cpu_millicores: number;
+  disk_bytes: number;
+  disk_limit_bytes: number;
+  memory_bytes: number;
+  memory_limit_bytes: number;
+  net_rx_bps: number;
+  net_tx_bps: number;
+  uptime_ms: number;
+};
+
+export type LockBackupRequest = {
+  locked: boolean;
+};
+
+export type LogLine = {
+  at: Date;
+  line: string;
+  stream: LogStream;
+};
+
+export const LogStream = {
+  CONSOLE: 'console',
+  INSTALL: 'install',
+  DAEMON: 'daemon'
+} as const;
+
+export type LogStream = (typeof LogStream)[keyof typeof LogStream];
+
 export type LoginReq = {
   email: string;
   password: string;
@@ -438,6 +635,11 @@ export type MailSettings = {
 export type MailSettingsResponse = {
   from_env: Array<string>;
   settings: MailSettings;
+};
+
+export type Move = {
+  from: string;
+  to: string;
 };
 
 export type Named = {
@@ -485,6 +687,13 @@ export type OidcUrlQuery = {
   redirect_to?: string | null;
 };
 
+/**
+ * `202` body of a slow request, see [`Event::OpFinished`].
+ */
+export type OpStarted = {
+  op: string;
+};
+
 export type OptionEgg = {
   /**
    * label -> image, order preserved
@@ -508,6 +717,19 @@ export type PasswordUpdate = {
   old_password: string;
 };
 
+/**
+ * Paths are relative to the server root, `/` is the root.
+ */
+export type PathQuery = {
+  path: string;
+};
+
+export type PathRequest = {
+  path: string;
+};
+
+export type PowerAction = 'start' | 'stop' | 'restart' | 'kill';
+
 export type ResetPasswordPayload = {
   new_password: string;
   token: string;
@@ -522,6 +744,13 @@ export type ResetUserPassword = {
   uuid: string;
 };
 
+export type RestoreBackupRequest = {
+  /**
+   * Deletes all current files first.
+   */
+  truncate?: boolean;
+};
+
 export const Runtime = { DOCKER: 'docker', KUBERNETES: 'kubernetes' } as const;
 
 export type Runtime = (typeof Runtime)[keyof typeof Runtime];
@@ -529,6 +758,54 @@ export type Runtime = (typeof Runtime)[keyof typeof Runtime];
 export const SsoType = { OIDC: 'Oidc', NONE: 'None' } as const;
 
 export type SsoType = (typeof SsoType)[keyof typeof SsoType];
+
+export const ScheduleAction = {
+  COMMAND: 'command',
+  POWER: 'power',
+  BACKUP: 'backup'
+} as const;
+
+export type ScheduleAction =
+  (typeof ScheduleAction)[keyof typeof ScheduleAction];
+
+export type ScheduleInfo = {
+  created_at: Date;
+  cron: CronFields;
+  enabled: boolean;
+  id: string;
+  last_run_at?: Date | null;
+  name: string;
+  /**
+   * `None` while disabled.
+   */
+  next_run_at?: Date | null;
+  only_when_online: boolean;
+  /**
+   * Index into `tasks` while running.
+   */
+  running_task?: number | null;
+  status: ScheduleStatus;
+  tasks: Array<TaskInfo>;
+};
+
+export type SchedulePath = {
+  schedule: string;
+  uuid: string;
+};
+
+export const ScheduleRunState = { RUNNING: 'running', IDLE: 'idle' } as const;
+
+export type ScheduleRunState =
+  (typeof ScheduleRunState)[keyof typeof ScheduleRunState];
+
+export const ScheduleStatus = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  RUNNING: 'running'
+} as const;
+
+export type ScheduleStatus =
+  (typeof ScheduleStatus)[keyof typeof ScheduleStatus];
 
 export const ServerAccessLevel = { READ: 'read', WRITE: 'write' } as const;
 
@@ -602,6 +879,10 @@ export type ServerOptions = {
   users: Array<Named>;
 };
 
+export type ServerPowerRequest = {
+  action: PowerAction;
+};
+
 export const ServerStatus = {
   RUNNING: 'running',
   STARTING: 'starting',
@@ -641,6 +922,28 @@ export type SuspendRequest = {
   suspended: boolean;
 };
 
+export type TaskInfo = {
+  action: ScheduleAction;
+  continue_on_failure: boolean;
+  id: string;
+  /**
+   * Wait after the previous task finished.
+   */
+  offset_seconds: number;
+  /**
+   * Command line, power action (`start|stop|restart|kill`) or backup ignore
+   * patterns (one per line).
+   */
+  payload: string;
+  position: number;
+};
+
+export type TaskPath = {
+  schedule: string;
+  task: string;
+  uuid: string;
+};
+
 export type TokenRegenerateRes = {
   token: string;
 };
@@ -658,6 +961,16 @@ export type UpdateNode = {
   memory_limit_mb?: number | null;
   name: string;
   secure: boolean;
+};
+
+/**
+ * Only the given fields change.
+ */
+export type UpdateScheduleRequest = {
+  cron?: CronFields | null;
+  enabled?: boolean | null;
+  name?: string | null;
+  only_when_online?: boolean | null;
 };
 
 export type UpdateServer = {
@@ -698,6 +1011,38 @@ export type UpdateServer = {
    * Seconds per stop step before wings escalates to SIGTERM, then SIGKILL.
    */
   stop_timeout: number;
+};
+
+/**
+ * Only the given fields change.
+ */
+export type UpdateTaskRequest = {
+  action?: ScheduleAction | null;
+  continue_on_failure?: boolean | null;
+  offset_seconds?: number | null;
+  payload?: string | null;
+};
+
+export type UploadPath = {
+  stream: string;
+  uuid: string;
+};
+
+export type UploadRequest = {
+  /**
+   * Where the file ends up, replaced if it exists.
+   */
+  path: string;
+  size: number;
+};
+
+/**
+ * Every chunk but the last is exactly `chunk_size` bytes, chunks may be sent
+ * in parallel and in any order.
+ */
+export type UploadStarted = {
+  chunk_size: number;
+  upload: string;
 };
 
 export type UserAvatarResetRequest = {
@@ -2780,3 +3125,1142 @@ export type TransferServerResponses = {
    */
   200: unknown;
 };
+
+export type ServerPowerData = {
+  body: ServerPowerRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/power';
+};
+
+export type ServerPowerErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ServerPowerError = ServerPowerErrors[keyof ServerPowerErrors];
+
+export type ServerPowerResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ServerCommandData = {
+  body: CommandRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/command';
+};
+
+export type ServerCommandErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ServerCommandError = ServerCommandErrors[keyof ServerCommandErrors];
+
+export type ServerCommandResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ServerWsData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/ws';
+};
+
+export type ServerWsErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ListFilesData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query: {
+    path: string;
+  };
+  url: '/api/servers/{uuid}/files';
+};
+
+export type ListFilesErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ListFilesResponses = {
+  200: Array<FileEntry>;
+};
+
+export type ListFilesResponse = ListFilesResponses[keyof ListFilesResponses];
+
+export type FileContentData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query: {
+    path: string;
+  };
+  url: '/api/servers/{uuid}/files/content';
+};
+
+export type FileContentErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type FileContentResponses = {
+  /**
+   * byte stream
+   */
+  200: Blob | File;
+};
+
+export type FileContentResponse =
+  FileContentResponses[keyof FileContentResponses];
+
+export type WriteFileContentData = {
+  body: unknown;
+  path: {
+    uuid: string;
+  };
+  query: {
+    path: string;
+  };
+  url: '/api/servers/{uuid}/files/content';
+};
+
+export type WriteFileContentErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type WriteFileContentResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type CreateFolderData = {
+  body: PathRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/folder';
+};
+
+export type CreateFolderErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateFolderError = CreateFolderErrors[keyof CreateFolderErrors];
+
+export type CreateFolderResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type CreateFileData = {
+  body: PathRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/file';
+};
+
+export type CreateFileErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateFileError = CreateFileErrors[keyof CreateFileErrors];
+
+export type CreateFileResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type RenameFileData = {
+  body: Move;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/rename';
+};
+
+export type RenameFileErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type RenameFileError = RenameFileErrors[keyof RenameFileErrors];
+
+export type RenameFileResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type CopyFileData = {
+  body: PathRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/copy';
+};
+
+export type CopyFileErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CopyFileError = CopyFileErrors[keyof CopyFileErrors];
+
+export type CopyFileResponses = {
+  200: FileEntry;
+};
+
+export type CopyFileResponse = CopyFileResponses[keyof CopyFileResponses];
+
+export type DeleteFilesData = {
+  /**
+   * Directories are deleted recursively.
+   */
+  body: DeleteRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/delete';
+};
+
+export type DeleteFilesErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DeleteFilesError = DeleteFilesErrors[keyof DeleteFilesErrors];
+
+export type DeleteFilesResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type DownloadFileData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query: {
+    path: string;
+  };
+  url: '/api/servers/{uuid}/files/download';
+};
+
+export type DownloadFileErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DownloadFileResponses = {
+  /**
+   * byte stream
+   */
+  200: Blob | File;
+};
+
+export type DownloadFileResponse =
+  DownloadFileResponses[keyof DownloadFileResponses];
+
+export type StartUploadData = {
+  body: UploadRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/upload';
+};
+
+export type StartUploadErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type StartUploadError = StartUploadErrors[keyof StartUploadErrors];
+
+export type StartUploadResponses = {
+  /**
+   * Every chunk but the last is exactly `chunk_size` bytes, chunks may be sent
+   * in parallel and in any order.
+   */
+  200: UploadStarted;
+};
+
+export type StartUploadResponse =
+  StartUploadResponses[keyof StartUploadResponses];
+
+export type CancelUploadData = {
+  body?: never;
+  path: {
+    stream: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/upload/{stream}';
+};
+
+export type CancelUploadErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CancelUploadResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type CompleteUploadData = {
+  body: CompleteStream;
+  path: {
+    stream: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/upload/{stream}/complete';
+};
+
+export type CompleteUploadErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CompleteUploadError =
+  CompleteUploadErrors[keyof CompleteUploadErrors];
+
+export type CompleteUploadResponses = {
+  /**
+   * `202` body of a slow request, see [`Event::OpFinished`].
+   */
+  200: OpStarted;
+};
+
+export type CompleteUploadResponse =
+  CompleteUploadResponses[keyof CompleteUploadResponses];
+
+export type UploadChunkData = {
+  body: unknown;
+  path: {
+    /**
+     * From 0, the chunk starts at `index * chunk_size`.
+     */
+    index: number;
+    stream: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/files/upload/{stream}/{index}';
+};
+
+export type UploadChunkErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type UploadChunkResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ListBackupsData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/backups';
+};
+
+export type ListBackupsErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ListBackupsResponses = {
+  /**
+   * `used` counts every backup that is not failed, creating ones included.
+   */
+  200: BackupList;
+};
+
+export type ListBackupsResponse =
+  ListBackupsResponses[keyof ListBackupsResponses];
+
+export type CreateBackupData = {
+  body: CreateBackupRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/backups';
+};
+
+export type CreateBackupErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateBackupError = CreateBackupErrors[keyof CreateBackupErrors];
+
+export type CreateBackupResponses = {
+  200: BackupInfo;
+};
+
+export type CreateBackupResponse =
+  CreateBackupResponses[keyof CreateBackupResponses];
+
+export type DeleteBackupData = {
+  body?: never;
+  path: {
+    backup: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/backups/{backup}';
+};
+
+export type DeleteBackupErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DeleteBackupResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type LockBackupData = {
+  body: LockBackupRequest;
+  path: {
+    backup: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/backups/{backup}/lock';
+};
+
+export type LockBackupErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type LockBackupError = LockBackupErrors[keyof LockBackupErrors];
+
+export type LockBackupResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type RestoreBackupData = {
+  body: RestoreBackupRequest;
+  path: {
+    backup: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/backups/{backup}/restore';
+};
+
+export type RestoreBackupErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type RestoreBackupError = RestoreBackupErrors[keyof RestoreBackupErrors];
+
+export type RestoreBackupResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type DownloadBackupData = {
+  body?: never;
+  path: {
+    backup: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/backups/{backup}/download';
+};
+
+export type DownloadBackupErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DownloadBackupResponses = {
+  /**
+   * byte stream
+   */
+  200: Blob | File;
+};
+
+export type DownloadBackupResponse =
+  DownloadBackupResponses[keyof DownloadBackupResponses];
+
+export type ListSchedulesData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules';
+};
+
+export type ListSchedulesErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ListSchedulesResponses = {
+  200: Array<ScheduleInfo>;
+};
+
+export type ListSchedulesResponse =
+  ListSchedulesResponses[keyof ListSchedulesResponses];
+
+export type CreateScheduleData = {
+  body: CreateScheduleRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules';
+};
+
+export type CreateScheduleErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateScheduleError =
+  CreateScheduleErrors[keyof CreateScheduleErrors];
+
+export type CreateScheduleResponses = {
+  200: ScheduleInfo;
+};
+
+export type CreateScheduleResponse =
+  CreateScheduleResponses[keyof CreateScheduleResponses];
+
+export type DeleteScheduleData = {
+  body?: never;
+  path: {
+    schedule: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}';
+};
+
+export type DeleteScheduleErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DeleteScheduleResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ScheduleInfoData = {
+  body?: never;
+  path: {
+    schedule: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}';
+};
+
+export type ScheduleInfoErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ScheduleInfoError = ScheduleInfoErrors[keyof ScheduleInfoErrors];
+
+export type ScheduleInfoResponses = {
+  200: ScheduleInfo;
+};
+
+export type ScheduleInfoResponse =
+  ScheduleInfoResponses[keyof ScheduleInfoResponses];
+
+export type UpdateScheduleData = {
+  /**
+   * Only the given fields change.
+   */
+  body: UpdateScheduleRequest;
+  path: {
+    schedule: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}';
+};
+
+export type UpdateScheduleErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type UpdateScheduleError =
+  UpdateScheduleErrors[keyof UpdateScheduleErrors];
+
+export type UpdateScheduleResponses = {
+  200: ScheduleInfo;
+};
+
+export type UpdateScheduleResponse =
+  UpdateScheduleResponses[keyof UpdateScheduleResponses];
+
+export type RunScheduleData = {
+  body?: never;
+  path: {
+    schedule: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}/run';
+};
+
+export type RunScheduleErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type RunScheduleResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type CreateScheduleTaskData = {
+  body: CreateTaskRequest;
+  path: {
+    schedule: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}/tasks';
+};
+
+export type CreateScheduleTaskErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateScheduleTaskError =
+  CreateScheduleTaskErrors[keyof CreateScheduleTaskErrors];
+
+export type CreateScheduleTaskResponses = {
+  200: TaskInfo;
+};
+
+export type CreateScheduleTaskResponse =
+  CreateScheduleTaskResponses[keyof CreateScheduleTaskResponses];
+
+export type DeleteScheduleTaskData = {
+  body?: never;
+  path: {
+    schedule: string;
+    task: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}/tasks/{task}';
+};
+
+export type DeleteScheduleTaskErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DeleteScheduleTaskResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type UpdateScheduleTaskData = {
+  /**
+   * Only the given fields change.
+   */
+  body: UpdateTaskRequest;
+  path: {
+    schedule: string;
+    task: string;
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/schedules/{schedule}/tasks/{task}';
+};
+
+export type UpdateScheduleTaskErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type UpdateScheduleTaskError =
+  UpdateScheduleTaskErrors[keyof UpdateScheduleTaskErrors];
+
+export type UpdateScheduleTaskResponses = {
+  200: TaskInfo;
+};
+
+export type UpdateScheduleTaskResponse =
+  UpdateScheduleTaskResponses[keyof UpdateScheduleTaskResponses];
