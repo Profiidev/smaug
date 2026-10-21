@@ -234,7 +234,7 @@ describe('GeneralFields', () => {
       .find((b) => b.textContent?.trim() === 'eu-1');
     expect(node).toBeDisabled();
     expect(
-      screen.getByText('Use Transfer on the Status tab.')
+      screen.getByText('Use Transfer on the Actions tab.')
     ).toBeInTheDocument();
     expect(screen.getByText(/A reinstall is recommended/)).toBeInTheDocument();
   });

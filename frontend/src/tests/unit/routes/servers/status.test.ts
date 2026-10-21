@@ -3,9 +3,9 @@ import { cleanup, render, screen } from '@testing-library/svelte';
 import StatusBadge from '$routes/servers/StatusBadge.svelte';
 import {
   STATUS,
-  STATUS_DESCRIPTIONS,
   type ServerStatus,
-  availableActions
+  availableActions,
+  powerActions
 } from '$routes/servers/status';
 
 afterEach(cleanup);
@@ -57,17 +57,6 @@ describe('StatusBadge', () => {
   });
 });
 
-describe('STATUS_DESCRIPTIONS', () => {
-  it('describes every status', () => {
-    expect(Object.keys(STATUS_DESCRIPTIONS).toSorted()).toEqual(
-      statuses.toSorted()
-    );
-    for (const text of Object.values(STATUS_DESCRIPTIONS)) {
-      expect(text).not.toBe('');
-    }
-  });
-});
-
 describe('availableActions', () => {
   const all = {
     delete: true,
@@ -116,5 +105,37 @@ describe('availableActions', () => {
 
   it('allows nothing while transferring', () => {
     expect(availableActions('transferring')).toEqual(none);
+  });
+});
+
+describe('powerActions', () => {
+  it.each([
+    ['running', ['restart', 'stop', 'kill']],
+    ['starting', ['stop', 'kill']],
+    ['stopping', ['kill']],
+    ['offline', ['start']],
+    ['crashed', ['start']]
+  ] as const)('allows %s: %j', (status, actions) => {
+    expect(powerActions(status)).toEqual(actions);
+  });
+
+  it.each([
+    'unknown',
+    'installing',
+    'install_failed',
+    'not_installed',
+    'suspended',
+    'transferring'
+  ] as const)('allows nothing while %s', (status) => {
+    expect(powerActions(status)).toEqual([]);
+  });
+
+  it('never offers start alongside stop or kill', () => {
+    for (const status of statuses) {
+      const actions = powerActions(status);
+      if (actions.includes('start')) {
+        expect(actions).toEqual(['start']);
+      }
+    }
   });
 });

@@ -85,7 +85,7 @@ describe('servers list page', () => {
     expect(await screen.findByText('2 servers')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'survival' })).toHaveAttribute(
       'href',
-      '/servers/srv-1/status'
+      '/servers/srv-1/console'
     );
     // Container matches the nav; Server is the nodes list's icon.
     const row = screen.getByRole('link', { name: 'survival' }).closest('tr')!;
@@ -421,7 +421,7 @@ describe('server create page', () => {
     await fillWizard();
     await submitWizard();
     await vi.waitFor(() =>
-      expect(goto).toHaveBeenCalledWith('/servers/srv-9/status')
+      expect(goto).toHaveBeenCalledWith('/servers/srv-9/console')
     );
     expect(toast.success).toHaveBeenCalledWith('Server created successfully.');
     expect(createServer).toHaveBeenCalledWith({

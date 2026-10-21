@@ -165,30 +165,39 @@ describe('server edit load and tabs', () => {
 
 describe('servertab param matcher', () => {
   it.each([
-    'status',
+    'console',
+    'files',
+    'backups',
+    'schedules',
     'general',
     'startup',
     'variables',
     'resources',
-    'permissions'
+    'permissions',
+    'actions'
   ])('accepts %s', (tab) => {
     expect(match(tab)).toBe(true);
   });
 
-  it.each(['settings', 'bogus', '', 'Status', 'status/', 'transfer'])(
-    'rejects %j',
-    (tab) => {
-      expect(match(tab)).toBe(false);
-    }
-  );
+  it.each([
+    'settings',
+    'bogus',
+    '',
+    'Console',
+    'console/',
+    'status',
+    'transfer'
+  ])('rejects %j', (tab) => {
+    expect(match(tab)).toBe(false);
+  });
 });
 
 describe('server [uuid] without a tab', () => {
-  it('redirects to the status tab', async () => {
+  it('redirects to the console tab', async () => {
     const redirect = await catchRedirect(() =>
       (rootLoad as (e: unknown) => unknown)({ params: { uuid: 'srv-1' } })
     );
     expect(redirect.status).toBe(307);
-    expect(redirect.location).toBe('/servers/srv-1/status');
+    expect(redirect.location).toBe('/servers/srv-1/console');
   });
 });

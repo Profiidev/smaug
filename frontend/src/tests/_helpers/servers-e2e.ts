@@ -1,5 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
-import { HttpResponse } from 'msw';
+import { HttpResponse, ws } from 'msw';
 import * as gen from '$lib/client/msw.gen';
 import { serverInfoOf } from '../mocks/e2e/data';
 
@@ -129,3 +129,15 @@ export const survivalBody = {
 
 export const action = (page: Page, name: string) =>
   page.getByRole('button', { exact: true, name });
+
+const liveWs = ws.link('*/api/servers/:uuid/ws');
+
+/** Server live socket that sends `frames` (JSON) right after connecting. */
+export const liveFrames = (...frames: unknown[]) =>
+  liveWs.addEventListener('connection', ({ client }) => {
+    for (const frame of frames) {
+      client.send(JSON.stringify(frame));
+    }
+  });
+
+export const stateFrame = (status: string) => ({ status, type: 'state' });

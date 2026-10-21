@@ -22,7 +22,7 @@ test.describe('servers list', () => {
     await expect(survival.getByText('Paper')).toBeVisible();
     await expect(
       survival.getByRole('link', { name: 'Survival SMP' })
-    ).toHaveAttribute('href', '/servers/srv-survival/status');
+    ).toHaveAttribute('href', '/servers/srv-survival/console');
     // Container matches the nav icon (nodes use Server).
     await expect(survival.locator('svg.lucide-container')).toBeVisible();
 
@@ -195,9 +195,9 @@ test.describe('servers list', () => {
     await gotoReady(page, '/servers');
 
     const edit = row(page, 'Viking World').getByRole('link').last();
-    await expect(edit).toHaveAttribute('href', '/servers/srv-viking/status');
+    await expect(edit).toHaveAttribute('href', '/servers/srv-viking/console');
     await edit.click();
-    await expect(page).toHaveURL(/\/servers\/srv-viking\/status$/);
+    await expect(page).toHaveURL(/\/servers\/srv-viking\/console$/);
   });
 });
 
@@ -214,13 +214,13 @@ test.describe('servers without server:edit', () => {
     // Owners and write grantees edit without server:edit; the page enforces access.
     const edit = row(page, 'Survival SMP').getByRole('link').last();
     await expect(edit).not.toHaveAttribute('aria-disabled', 'true');
-    await expect(edit).toHaveAttribute('href', '/servers/srv-survival/status');
+    await expect(edit).toHaveAttribute('href', '/servers/srv-survival/console');
     await expect(
       row(page, 'Survival SMP').getByRole('button').last()
     ).toBeDisabled();
     // The name still links to the (read-only) server page.
     await expect(
       row(page, 'Survival SMP').getByRole('link', { name: 'Survival SMP' })
-    ).toHaveAttribute('href', '/servers/srv-survival/status');
+    ).toHaveAttribute('href', '/servers/srv-survival/console');
   });
 });

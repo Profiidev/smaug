@@ -1,19 +1,20 @@
 import type { ParamMatcher } from '@sveltejs/kit';
 
-export const match = ((
-  param: string
-): param is
-  | 'status'
-  | 'general'
-  | 'startup'
-  | 'variables'
-  | 'resources'
-  | 'permissions' =>
-  [
-    'status',
-    'general',
-    'startup',
-    'variables',
-    'resources',
-    'permissions'
-  ].includes(param)) satisfies ParamMatcher;
+/** Server page tabs, in display order. */
+export const SERVER_TABS = [
+  'console',
+  'files',
+  'backups',
+  'schedules',
+  'general',
+  'startup',
+  'variables',
+  'resources',
+  'permissions',
+  'actions'
+] as const;
+
+export type ServerTab = (typeof SERVER_TABS)[number];
+
+export const match = ((param: string): param is ServerTab =>
+  (SERVER_TABS as readonly string[]).includes(param)) satisfies ParamMatcher;

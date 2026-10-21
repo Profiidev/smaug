@@ -1,6 +1,5 @@
 <script lang="ts">
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
-  import * as Alert from '@profidev/pleiades/components/ui/alert';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import * as Card from '@profidev/pleiades/components/ui/card';
   import * as Item from '@profidev/pleiades/components/ui/item';
@@ -8,8 +7,6 @@
   import { toast } from '@profidev/pleiades/components/util/general';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Ban from '@lucide/svelte/icons/ban';
-  import CircleAlert from '@lucide/svelte/icons/circle-alert';
-  import Info from '@lucide/svelte/icons/info';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
   import Trash from '@lucide/svelte/icons/trash';
   import { invalidate } from '$app/navigation';
@@ -18,12 +15,11 @@
     reinstallServer,
     setServerInstalled,
     setServerSuspended,
-    type Allocation,
     type Named,
     type ServerInfo
   } from '$lib/client';
-  import StatusBadge from '../StatusBadge.svelte';
-  import { STATUS_DESCRIPTIONS, availableActions } from '../status';
+  import { availableActions } from '../status';
+  import { formatAllocation } from '../format';
   import TransferDialog from './TransferDialog.svelte';
 
   interface Props {
@@ -56,9 +52,6 @@
 
   const refresh = () => invalidate(`/api/servers/${server.uuid}`);
 
-  const formatAllocation = ({ ip, port }: Allocation) =>
-    ip.includes(':') ? `[${ip}]:${port}` : `${ip}:${port}`;
-
   let details = $derived([
     { label: 'Name', value: server.name },
     { label: 'Node', value: server.node.name },
@@ -76,7 +69,8 @@
     },
     { label: 'Egg', value: server.egg.name },
     { label: 'Image', mono: true, value: server.image },
-    { label: 'UUID', mono: true, value: server.uuid }
+    { label: 'UUID', mono: true, value: server.uuid },
+    { label: 'Created', value: server.created_at.toLocaleDateString() }
   ]);
 
   const reinstall = async () => {
@@ -136,77 +130,17 @@
 <div class="grid gap-4">
   <Card.Root>
     <Card.Header>
-      <Card.Title>Status</Card.Title>
-      <Card.Description>{STATUS_DESCRIPTIONS[server.status]}</Card.Description>
+      <Card.Title>Details</Card.Title>
     </Card.Header>
-    <Card.Content class="grid gap-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <StatusBadge status={server.status} />
-        <span class="text-muted-foreground text-xs">
-          Created {server.created_at.toLocaleDateString()}
-        </span>
-      </div>
-      {#if server.status === 'installing'}
-        <p class="text-muted-foreground text-sm">
-          Install progress appears here once the node reports it.
-        </p>
-      {:else if server.status === 'install_failed'}
-        <Alert.Root variant="destructive">
-          <CircleAlert />
-          <Alert.Title>Install failed</Alert.Title>
-          <Alert.Description>
-            The install script exited with an error. Check the egg's install
-            script, then reinstall.
-          </Alert.Description>
-        </Alert.Root>
-      {:else if server.status === 'suspended'}
-        <Alert.Root>
-          <Info />
-          <Alert.Title>Suspended</Alert.Title>
-          <Alert.Description>
-            Users cannot open or start this server. Files and allocations are
-            kept.
-          </Alert.Description>
-        </Alert.Root>
-      {/if}
-      {#if server.error}
-        <Alert.Root variant="destructive">
-          <CircleAlert />
-          <Alert.Title>Node reported an error</Alert.Title>
-          <Alert.Description>
-            <p class="font-mono text-xs break-all">{server.error}</p>
-          </Alert.Description>
-        </Alert.Root>
-      {/if}
+    <Card.Content>
+      <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+        {#each details as row (row.label)}
+          <dt class="text-muted-foreground">{row.label}</dt>
+          <dd class={['break-all', row.mono && 'font-mono']}>{row.value}</dd>
+        {/each}
+      </dl>
     </Card.Content>
   </Card.Root>
-
-  <div class="grid gap-4 md:grid-cols-2">
-    <Card.Root>
-      <Card.Header>
-        <Card.Title>Usage</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <!-- TODO(wings): CPU, memory and disk usage once the node reports them. -->
-        <p class="text-muted-foreground text-sm">
-          Usage is shown while the server is running.
-        </p>
-      </Card.Content>
-    </Card.Root>
-    <Card.Root>
-      <Card.Header>
-        <Card.Title>Details</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
-          {#each details as row (row.label)}
-            <dt class="text-muted-foreground">{row.label}</dt>
-            <dd class={['break-all', row.mono && 'font-mono']}>{row.value}</dd>
-          {/each}
-        </dl>
-      </Card.Content>
-    </Card.Root>
-  </div>
 
   <Card.Root>
     <Card.Header>

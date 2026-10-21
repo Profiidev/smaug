@@ -115,7 +115,7 @@
     const { uuid } = res.data;
     toast.success('Server created successfully.');
     setTimeout(() => {
-      goto(`/servers/${uuid}/status`);
+      goto(`/servers/${uuid}/console`);
     });
   };
 </script>
