@@ -42,6 +42,10 @@ pub struct Config {
   pub install_log_dir: PathBuf,
   /// `TZ` of every server container.
   pub timezone: String,
+  /// Bytes per file piece and stream chunk, at most the 16 MiB body limit.
+  pub chunk_size: u64,
+  /// Chunks in flight per archive stream.
+  pub stream_window: u32,
 }
 
 impl Default for Config {
@@ -63,6 +67,8 @@ impl Default for Config {
       agent_network: "smaug_agents".to_string(),
       install_log_dir: "/var/lib/smaug/install-logs".into(),
       timezone: "UTC".to_string(),
+      chunk_size: shared::msg::DEFAULT_CHUNK_SIZE,
+      stream_window: shared::msg::DEFAULT_WINDOW,
       auth: AuthConfig::default(),
     }
   }
@@ -75,7 +81,10 @@ impl Config {
       .merge(Serialized::defaults(Self::default()))
       .merge(Env::raw().global());
 
-    let config: Self = config.extract().expect("Failed to parse configuration");
+    let mut config: Self = config.extract().expect("Failed to parse configuration");
+    // a chunk plus its request must fit the signed body limit
+    config.chunk_size = config.chunk_size.clamp(1, 16 * 1024 * 1024);
+    config.stream_window = config.stream_window.max(1);
 
     config
   }
