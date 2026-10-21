@@ -113,7 +113,10 @@ impl MigrationTrait for Migration {
           .col(string(ServerAllocation::Ip))
           .col(integer(ServerAllocation::Port))
           .col(small_integer(ServerAllocation::Position))
-          .foreign_key(&mut server_fk(ServerAllocation::Table, ServerAllocation::ServerId))
+          .foreign_key(&mut server_fk(
+            ServerAllocation::Table,
+            ServerAllocation::ServerId,
+          ))
           .to_owned(),
       )
       .await?;
@@ -145,7 +148,10 @@ impl MigrationTrait for Migration {
               .col(ServerVariable::ServerId)
               .col(ServerVariable::EnvVariable),
           )
-          .foreign_key(&mut server_fk(ServerVariable::Table, ServerVariable::ServerId))
+          .foreign_key(&mut server_fk(
+            ServerVariable::Table,
+            ServerVariable::ServerId,
+          ))
           .to_owned(),
       )
       .await?;
@@ -163,7 +169,10 @@ impl MigrationTrait for Migration {
               .col(ServerUserAccess::ServerId)
               .col(ServerUserAccess::UserId),
           )
-          .foreign_key(&mut server_fk(ServerUserAccess::Table, ServerUserAccess::ServerId))
+          .foreign_key(&mut server_fk(
+            ServerUserAccess::Table,
+            ServerUserAccess::ServerId,
+          ))
           .foreign_key(
             ForeignKey::create()
               .from(ServerUserAccess::Table, ServerUserAccess::UserId)
@@ -188,7 +197,10 @@ impl MigrationTrait for Migration {
               .col(ServerGroupAccess::ServerId)
               .col(ServerGroupAccess::GroupId),
           )
-          .foreign_key(&mut server_fk(ServerGroupAccess::Table, ServerGroupAccess::ServerId))
+          .foreign_key(&mut server_fk(
+            ServerGroupAccess::Table,
+            ServerGroupAccess::ServerId,
+          ))
           .foreign_key(
             ForeignKey::create()
               .from(ServerGroupAccess::Table, ServerGroupAccess::GroupId)
