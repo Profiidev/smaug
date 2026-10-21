@@ -201,3 +201,16 @@ pub struct SyncResponse {
   /// Every stored server, orphans included.
   pub servers: HashMap<Uuid, Observed>,
 }
+
+/// Wings -> agent: everything to do before a start.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PrepareRequest {
+  pub config_files: Vec<ConfigFile>,
+  /// What `{{config.docker.interface}}` becomes.
+  pub interface: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct PrepareResponse {
+  pub disk_bytes: u64,
+}

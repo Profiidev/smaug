@@ -157,6 +157,12 @@ fn hmac(data: &str, key: &str) -> Result<String> {
   Ok(hex::encode(mac(data, key)?.finalize().into_bytes()))
 }
 
+/// Bearer token of a server's agent, derived from the wings token so wings
+/// never has to store it.
+pub fn agent_token(secret: &str, server: uuid::Uuid) -> Result<String> {
+  hmac(&format!("agent\n{server}"), secret)
+}
+
 fn verify(data: &str, key: &str, signature: &str) -> Result<()> {
   let Ok(signature) = hex::decode(signature) else {
     bail!(UNAUTHORIZED, "Invalid wings signature");
