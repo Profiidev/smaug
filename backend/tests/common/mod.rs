@@ -58,9 +58,16 @@ pub fn prepare_env() {
     std::env::set_var("PORT", "0");
     std::env::set_var("DB_URL", "sqlite::memory:");
     std::env::set_var("SITE_URL", "http://localhost/");
+    std::env::set_var("STORAGE_PATH", storage_path());
     // keep logs quiet during tests
     std::env::set_var("LOG_LEVEL", "off");
   }
+}
+
+/// Backup storage of this test process.
+// ponytail: left in the temp dir, clean up if it ever matters
+pub fn storage_path() -> std::path::PathBuf {
+  std::env::temp_dir().join(format!("smaug-storage-{}", std::process::id()))
 }
 
 /// A running test server plus a client (with a hand-rolled cookie jar).
@@ -234,6 +241,12 @@ impl TestServer {
 
   pub async fn put(&self, path: &str, body: Value) -> Response {
     self.send(self.client.put(self.url(path)).json(&body)).await
+  }
+
+  pub async fn patch(&self, path: &str, body: Value) -> Response {
+    self
+      .send(self.client.patch(self.url(path)).json(&body))
+      .await
   }
 
   pub async fn delete(&self, path: &str, body: Value) -> Response {
@@ -520,3 +533,5 @@ pub fn update_body(info: &Value) -> Value {
     "restart_on_crash": info["restart_on_crash"]
   })
 }
+
+pub mod wings;

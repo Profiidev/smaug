@@ -22,7 +22,7 @@ aide = { version = "0.16.0-alpha.4", features = [
 ] }
 axum = { version = "0.8.9", features = ["macros", "tracing", "ws"] }
 axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
-centaurus = { version = "0.17.7", features = ["uuid"] }
+centaurus = { version = "0.17.7", features = ["uuid", "storage"] }
 chrono = "0.4.45"
 dashmap = "6.2.1"
 dotenvy = "0.15.7"
@@ -68,6 +68,8 @@ regex = "1.13.1"
 hex = "0.4.3"
 indexmap = { version = "2.14.2", features = ["serde"] }
 rustls = { version = "0.23.46", features = ["aws-lc-rs"] }
+croner = "4.0.1"
+object_store = "0.14.1"
 
 [features]
 # only used for testing purposes

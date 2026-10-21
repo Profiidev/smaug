@@ -207,3 +207,18 @@ pub(super) struct ServerOptions {
   pub(super) nodes: Vec<Named>,
   pub(super) eggs: Vec<OptionEgg>,
 }
+
+#[derive(Deserialize, JsonSchema, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PowerAction {
+  Start,
+  Stop,
+  Restart,
+  /// Stops right away, skipping the stop steps.
+  Kill,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub(super) struct ServerPowerRequest {
+  pub(super) action: PowerAction,
+}

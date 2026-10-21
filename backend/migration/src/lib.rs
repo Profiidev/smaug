@@ -8,6 +8,7 @@ mod m20261021_120000_servers;
 mod m20261021_140000_server_stop;
 mod m20261021_150000_server_install_generation;
 mod m20261022_120000_server_power;
+mod m20261023_120000_backups_schedules;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -26,6 +27,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20261021_140000_server_stop::Migration),
       Box::new(m20261021_150000_server_install_generation::Migration),
       Box::new(m20261022_120000_server_power::Migration),
+      Box::new(m20261023_120000_backups_schedules::Migration),
     ]
   }
 }

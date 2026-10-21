@@ -270,6 +270,16 @@ impl<'db> ServerTable<'db> {
       .await
   }
 
+  /// Start or stop: a new power generation, so wings applies it once.
+  pub async fn set_power(&self, id: Uuid, running: bool) -> Result<(), DbErr> {
+    self
+      .update_columns(id, |q| {
+        q.col_expr(server::Column::DesiredRunning, Expr::value(running))
+          .col_expr(server::Column::PowerGeneration, next_generation())
+      })
+      .await
+  }
+
   /// A new install generation; the server is off until it finishes.
   pub async fn start_reinstall(&self, id: Uuid) -> Result<(), DbErr> {
     self

@@ -14,8 +14,8 @@ use reqwest::{Method, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde_json::Value;
 use shared::msg::{
-  Event, InstallResult, Power, PowerRequest, Runtime, ServerState, SyncRequest, SyncResponse,
-  WingsMessage,
+  Event, InstallResult, Power, PowerRequest, Runtime, ServerMetrics, ServerState, SyncRequest,
+  SyncResponse, WingsMessage,
 };
 use tokio::{
   spawn,
@@ -30,7 +30,11 @@ use uuid::Uuid;
 use crate::{
   db::DBTrait,
   nodes::auth::{WingsAuth, WsStream},
-  servers::spec,
+  servers::{
+    live::{Live, LiveFrame, LiveStats},
+    spec,
+    status::status,
+  },
   utils::{UpdateMessage, Updater, client},
 };
 
@@ -78,6 +82,7 @@ pub struct Link {
   runtime: Arc<RwLock<Option<Runtime>>>,
   db: Connection,
   updater: Updater,
+  live: Live,
 }
 
 impl WingsConnection {
@@ -91,6 +96,7 @@ impl WingsConnection {
     db: Connection,
     updater: Updater,
     lock: Arc<Mutex<()>>,
+    live: Live,
   ) -> Self {
     let ws_addr = format!(
       "{}://{}:{}/api",
@@ -120,6 +126,7 @@ impl WingsConnection {
       runtime: Default::default(),
       db,
       updater,
+      live,
     };
 
     let (tx, rx) = mpsc::channel(64);
@@ -154,15 +161,7 @@ impl WingsConnection {
     if !self.is_connected() {
       return None;
     }
-    let reported = self.link.states.get(&server).map(|s| *s);
-    // after a sync, a server wings did not report is not stored there yet
-    reported.or_else(|| {
-      self
-        .link
-        .synced
-        .load(Ordering::Relaxed)
-        .then(ServerState::default)
-    })
+    self.link.state(server)
   }
 
   /// Why wings could not do what was asked, `None` while there is no error or
@@ -205,6 +204,79 @@ impl Drop for WingsConnection {
 }
 
 impl Link {
+  fn state(&self, server: Uuid) -> Option<ServerState> {
+    let reported = self.states.get(&server).map(|s| *s);
+    // after a sync, a server wings did not report is not stored there yet
+    reported.or_else(|| {
+      self
+        .synced
+        .load(Ordering::Relaxed)
+        .then(ServerState::default)
+    })
+  }
+
+  /// A request to one of the server's routes, e.g. `/files/list`. Not
+  /// serialized with spec pushes, nothing it does depends on them.
+  pub fn server_request(
+    &self,
+    method: Method,
+    server: Uuid,
+    path: &str,
+  ) -> reqwest_middleware::RequestBuilder {
+    self
+      .client
+      .request(method, format!("{}/servers/{server}{path}", self.base))
+      .timeout(REQUEST_TIMEOUT)
+  }
+
+  /// One-shot power request, ordered after earlier spec pushes.
+  pub async fn power(&self, server: Uuid, action: Power) {
+    let _lock = self.lock.lock().await;
+    self.send_power(server, action).await;
+  }
+
+  /// Pushes the server's status to browsers watching it.
+  async fn publish_state(&self, server: Uuid) {
+    if !self.live.is_watched(server) {
+      return;
+    }
+    match self.db.server().find_by_id(server).await {
+      Ok(model) => self.live.publish(
+        server,
+        &LiveFrame::State {
+          status: status(&model, self.state(server)),
+        },
+      ),
+      Err(err) => debug!("Not publishing state of server {}: {:?}", server, err),
+    }
+  }
+
+  async fn publish_stats(&self, metrics: ServerMetrics) {
+    if !self.live.is_watched(metrics.uuid) {
+      return;
+    }
+    // ponytail: one query per watched server every 2 s, cache limits if that shows up
+    let model = match self.db.server().find_by_id(metrics.uuid).await {
+      Ok(model) => model,
+      Err(err) => {
+        debug!("Not publishing stats of server {}: {:?}", metrics.uuid, err);
+        return;
+      }
+    };
+    let stats = LiveStats {
+      cpu_millicores: metrics.cpu_millicores,
+      cpu_limit_millicores: model.cpu_limit.max(0) as u64,
+      memory_bytes: metrics.memory_bytes,
+      memory_limit_bytes: metrics.memory_limit_bytes,
+      disk_bytes: metrics.disk_bytes,
+      disk_limit_bytes: model.disk_mb.max(0) as u64 * 1024 * 1024,
+      net_rx_bps: metrics.net_rx_bps,
+      net_tx_bps: metrics.net_tx_bps,
+      uptime_ms: metrics.uptime_ms,
+    };
+    self.live.publish(metrics.uuid, &LiveFrame::Stats(stats));
+  }
+
   /// Best-effort request, the caller holds the lock. A failure is logged and
   /// triggers a full sync, which brings the node back in line with the DB.
   async fn send(&self, method: Method, path: &str, body: Option<Value>) {
@@ -421,6 +493,7 @@ impl Link {
         }
       }
       if changed {
+        self.publish_state(uuid).await;
         self
           .updater
           .broadcast(UpdateMessage::Servers { uuid })
@@ -488,8 +561,38 @@ impl Link {
         self.apply_stopped(uuid, generation).await?;
         uuid
       }
-      Event::Logs { .. } | Event::Metrics { .. } | Event::OpFinished { .. } => return Ok(()),
+      Event::Logs { uuid, lines } => {
+        self.live.publish(uuid, &LiveFrame::Logs { lines });
+        return Ok(());
+      }
+      Event::Metrics { servers } => {
+        for metrics in servers {
+          self.publish_stats(metrics).await;
+        }
+        return Ok(());
+      }
+      Event::OpFinished {
+        op,
+        uuid,
+        ok,
+        error,
+        ..
+      } => {
+        self.live.finish_op(
+          op,
+          if ok {
+            Ok(())
+          } else {
+            Err(error.clone().unwrap_or_default())
+          },
+        );
+        self
+          .live
+          .publish(uuid, &LiveFrame::OpFinished { op, ok, error });
+        return Ok(());
+      }
     };
+    self.publish_state(uuid).await;
     self
       .updater
       .broadcast(UpdateMessage::Servers { uuid })
@@ -505,6 +608,7 @@ impl Link {
     self.states.clear();
     self.errors.clear();
     for uuid in servers {
+      self.publish_state(uuid).await;
       self
         .updater
         .broadcast(UpdateMessage::Servers { uuid })

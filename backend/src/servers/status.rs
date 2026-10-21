@@ -23,7 +23,7 @@ pub enum ServerStatus {
 }
 
 /// `runtime` is what wings last reported, `None` while unknown.
-pub(super) fn status(server: &server::Model, runtime: Option<ServerState>) -> ServerStatus {
+pub(crate) fn status(server: &server::Model, runtime: Option<ServerState>) -> ServerStatus {
   if server.suspended {
     return ServerStatus::Suspended;
   }
@@ -52,11 +52,23 @@ pub(super) enum Action {
   Unsuspend,
   Transfer,
   Delete,
+  Start,
+  Stop,
+  Restart,
+  Kill,
 }
 
 /// Availability matrix from the design handoff.
 fn allowed(status: ServerStatus, action: Action) -> bool {
   use Action as A;
+  use ServerStatus as S;
+  match action {
+    A::Start => return matches!(status, S::Offline | S::Crashed),
+    A::Stop => return matches!(status, S::Running | S::Starting),
+    A::Restart => return status == S::Running,
+    A::Kill => return matches!(status, S::Running | S::Starting | S::Stopping),
+    _ => (),
+  }
   match status {
     ServerStatus::Running
     | ServerStatus::Starting
@@ -72,8 +84,13 @@ fn allowed(status: ServerStatus, action: Action) -> bool {
 }
 
 pub(super) fn ensure_allowed(server: &server::Model, action: Action) -> Result<()> {
-  // every runtime state allows the same actions, so it is left unknown
-  if !allowed(status(server, None), action) {
+  // every runtime state allows the same non-power actions, so it is left unknown
+  ensure_allowed_in(status(server, None), action)
+}
+
+/// Power actions depend on the runtime state, see [`status`].
+pub(super) fn ensure_allowed_in(status: ServerStatus, action: Action) -> Result<()> {
+  if !allowed(status, action) {
     bail!(CONFLICT, "Action is not available in the current state");
   }
   Ok(())
@@ -156,35 +173,67 @@ pub(super) mod test {
   #[test]
   fn action_availability_matrix() {
     use Action::*;
-    let actions = [Reinstall, Install, Suspend, Unsuspend, Transfer, Delete];
+    let actions = [
+      Reinstall, Install, Suspend, Unsuspend, Transfer, Delete, Start, Stop, Restart, Kill,
+    ];
     let rows = [
-      (ServerStatus::Running, [true, true, true, false, true, true]),
+      (
+        ServerStatus::Running,
+        [true, true, true, false, true, true, false, true, true, true],
+      ),
       (
         ServerStatus::Starting,
-        [true, true, true, false, true, true],
+        [
+          true, true, true, false, true, true, false, true, false, true,
+        ],
       ),
       (
         ServerStatus::Stopping,
-        [true, true, true, false, true, true],
+        [
+          true, true, true, false, true, true, false, false, false, true,
+        ],
       ),
-      (ServerStatus::Crashed, [true, true, true, false, true, true]),
-      (ServerStatus::Offline, [true, true, true, false, true, true]),
-      (ServerStatus::Unknown, [true, true, true, false, true, true]),
+      (
+        ServerStatus::Crashed,
+        [
+          true, true, true, false, true, true, true, false, false, false,
+        ],
+      ),
+      (
+        ServerStatus::Offline,
+        [
+          true, true, true, false, true, true, true, false, false, false,
+        ],
+      ),
+      (
+        ServerStatus::Unknown,
+        [
+          true, true, true, false, true, true, false, false, false, false,
+        ],
+      ),
       (
         ServerStatus::InstallFailed,
-        [true, true, true, false, true, true],
+        [
+          true, true, true, false, true, true, false, false, false, false,
+        ],
       ),
       (
         ServerStatus::NotInstalled,
-        [true, true, true, false, true, true],
+        [
+          true, true, true, false, true, true, false, false, false, false,
+        ],
       ),
       (
         ServerStatus::Installing,
-        [false, true, true, false, false, false],
+        [
+          false, true, true, false, false, false, false, false, false, false,
+        ],
       ),
       (
         ServerStatus::Suspended,
-        [false, true, false, true, false, true],
+        [
+          false, true, false, true, false, true, false, false, false, false,
+        ],
       ),
     ];
     for (status, expected) in rows {
@@ -199,5 +248,12 @@ pub(super) mod test {
       StatusCode::CONFLICT
     );
     assert!(ensure_allowed(&s, Install).is_ok());
+    assert_eq!(
+      ensure_allowed_in(ServerStatus::Offline, Stop)
+        .unwrap_err()
+        .status,
+      StatusCode::CONFLICT
+    );
+    assert!(ensure_allowed_in(ServerStatus::Offline, Start).is_ok());
   }
 }

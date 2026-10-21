@@ -12,12 +12,17 @@ use self::{
 
 mod access;
 mod actions;
+pub(crate) mod backups;
 mod error;
+mod files;
+pub mod live;
 mod management;
+pub(crate) mod power;
 mod rules;
+pub(crate) mod schedules;
 pub mod spec;
-mod status;
-mod types;
+pub(crate) mod status;
+pub(crate) mod types;
 mod validation;
 
 pub fn router() -> ApiRouter {
@@ -50,4 +55,16 @@ pub fn router() -> ApiRouter {
       "/{uuid}/transfer",
       post_with(transfer_server, |op| op.id("transfer_server")),
     )
+    .api_route(
+      "/{uuid}/power",
+      post_with(power::server_power, |op| op.id("server_power")),
+    )
+    .api_route(
+      "/{uuid}/command",
+      post_with(power::server_command, |op| op.id("server_command")),
+    )
+    .api_route("/{uuid}/ws", get_with(live::server_ws, live::docs))
+    .nest("/{uuid}/files", files::router())
+    .nest("/{uuid}/backups", backups::router())
+    .nest("/{uuid}/schedules", schedules::router())
 }

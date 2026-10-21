@@ -4,6 +4,7 @@ use axum::{Json, extract::Path};
 use centaurus::{
   db::{init::Connection, tables::ConnectionExt},
   error::Result,
+  storage::FileStorage,
 };
 use chrono::Utc;
 use entity::{sea_orm_active_enums::ServerInstallState, server};
@@ -13,6 +14,7 @@ use uuid::Uuid;
 
 use super::{
   access::{Access, has_perm, load},
+  backups::delete_server_backups,
   error::{FieldResult, fail_if, field_err},
   status::{Action, ensure_allowed, status},
   types::{
@@ -427,12 +429,14 @@ pub(super) async fn delete_server(
   auth: JwtAuth,
   db: Connection,
   wings: Wings,
+  storage: FileStorage,
   updater: Updater,
   Path(req): Path<ServerUuid>,
 ) -> Result<()> {
   let (server, _) = load(&db, auth.user_id, req.uuid, Access::Admin).await?;
   ensure_allowed(&server, Action::Delete)?;
   db.server().delete(server.id).await?;
+  delete_server_backups(&storage, server.id).await;
   wings.delete_server(server.node_id, server.id, false);
   info!("Deleted server with ID {}", req.uuid);
 
