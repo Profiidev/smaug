@@ -4,7 +4,7 @@ use aide::OperationIo;
 use axum::{Extension, extract::FromRequestParts};
 use centaurus::{bail, db::init::Connection, error::Result};
 use dashmap::DashMap;
-use shared::msg::{Power, Runtime, ServerState};
+use shared::msg::{Runtime, ServerState};
 use tokio::spawn;
 use tracing::{debug, warn};
 use uuid::Uuid;
@@ -124,9 +124,11 @@ impl Wings {
     }
   }
 
-  pub fn power(&self, node: Uuid, server: Uuid, action: Power) {
+  /// Sends the spec, which turned the power off, then kills the server so it
+  /// skips the stop steps.
+  pub fn put_and_kill(&self, node: Uuid, server: Uuid) {
     if let Some(link) = self.link(node) {
-      spawn(async move { link.power(server, action).await });
+      spawn(async move { link.put_and_kill(server).await });
     }
   }
 

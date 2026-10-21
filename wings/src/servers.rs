@@ -46,6 +46,10 @@ async fn sync(
     // one broken server must not keep the others from syncing, listed it is no orphan
     if let Err(err) = upsert(&store, docker.as_ref(), spec).await {
       warn!("Failed to sync server {uuid}: {err:?}");
+      // shown by the panel, cleared by the next upsert that works
+      let _ = store
+        .set_error(uuid, Some(format!("{SPEC_ERROR}: {err:#}")))
+        .await;
     }
   }
 
@@ -112,17 +116,34 @@ async fn power(store: Store, Path(uuid): Path<Uuid>, Json(req): Json<PowerReques
 /// pending install that has not run yet.
 pub(crate) async fn upsert(store: &Store, docker: Option<&Docker>, spec: ServerSpec) -> Result<()> {
   let (uuid, pending) = (spec.uuid, spec.install_generation);
-  if let Some(docker) = docker {
-    // listed again, e.g. transferred back: its files are no longer kept for a transfer
-    docker.keep_volume(uuid, false).await?;
-  }
   if !store.update(uuid, |d| d.set_server(spec.clone())).await? {
-    // the Docker store is lost when wings restarts, the install result is on disk
-    store.put(Desired::new(spec)).await?;
+    // the Docker store is lost when wings restarts, the install result and a
+    // stop wings made itself are on disk
+    let mut desired = Desired::new(spec);
+    let stopped = docker.and_then(|d| d.last_stopped(uuid));
+    if stopped.is_some() && stopped == desired.power_generation {
+      desired.power = DesiredPower::Stopped;
+    }
+    store.put(desired).await?;
+    if stopped.is_some() {
+      store.stop_self(uuid, stopped).await?;
+    }
     if let Some(result) = docker.and_then(|d| d.last_install(uuid)) {
       store.finish_install(uuid, result).await?;
     }
   }
+  if let Some(docker) = docker {
+    // listed again, e.g. transferred back: its files are no longer kept for a
+    // transfer. After the store, so a teardown that missed the store sees the marker.
+    docker.keep_volume(uuid, false).await?;
+  }
+  store
+    .change_error(
+      uuid,
+      |e| e.as_deref().is_some_and(|e| e.starts_with(SPEC_ERROR)),
+      None,
+    )
+    .await?;
 
   let observed = store.observed(uuid).await?.unwrap_or_default();
   if needs_install(pending, &observed) {
@@ -131,6 +152,9 @@ pub(crate) async fn upsert(store: &Store, docker: Option<&Docker>, spec: ServerS
   }
   Ok(())
 }
+
+/// Prefix of the error a failed upsert during a sync leaves.
+const SPEC_ERROR: &str = "Failed to apply the panel's spec";
 
 /// A pending install runs once: not while it runs, not after it finished.
 fn needs_install(pending: Option<u64>, observed: &Observed) -> bool {
@@ -141,18 +165,10 @@ fn needs_install(pending: Option<u64>, observed: &Observed) -> bool {
 }
 
 fn apply_power(desired: &mut Desired, action: Power) {
-  desired.power = match action {
-    Power::Start => DesiredPower::Running,
-    Power::Stop => DesiredPower::Stopped,
-    Power::Kill => {
-      desired.killed_at = Some(Utc::now());
-      DesiredPower::Stopped
-    }
-    Power::Restart => {
-      desired.restarted_at = Some(Utc::now());
-      DesiredPower::Running
-    }
-  };
+  match action {
+    Power::Kill => desired.killed_at = Some(Utc::now()),
+    Power::Restart => desired.restarted_at = Some(Utc::now()),
+  }
 }
 
 #[cfg(test)]
@@ -167,6 +183,8 @@ mod test {
     let store = memory();
     let (kept, orphan) = (Uuid::new_v4(), Uuid::new_v4());
     let mut desired = Desired::new(spec(kept));
+    // differs from the spec of the same generation, the sync must keep it
+    desired.power = DesiredPower::Running;
     apply_power(&mut desired, Power::Restart);
     store.put(desired.clone()).await.unwrap();
     store.put(Desired::new(spec(orphan))).await.unwrap();
@@ -193,16 +211,17 @@ mod test {
   }
 
   #[test]
-  fn kill_is_recorded_apart_from_stop() {
-    let mut desired = Desired::new(spec(Uuid::new_v4()));
-    apply_power(&mut desired, Power::Stop);
-    assert_eq!(
-      (desired.power, desired.killed_at),
-      (DesiredPower::Stopped, None)
-    );
+  fn power_requests_never_change_power() {
+    let mut s = spec(Uuid::new_v4());
+    s.power = DesiredPower::Running;
+    let mut desired = Desired::new(s);
     apply_power(&mut desired, Power::Kill);
-    assert_eq!(desired.power, DesiredPower::Stopped);
+    assert_eq!(desired.power, DesiredPower::Running);
     assert!(desired.killed_at.is_some());
+    desired.power = DesiredPower::Stopped;
+    apply_power(&mut desired, Power::Restart);
+    assert_eq!(desired.power, DesiredPower::Stopped);
+    assert!(desired.restarted_at.is_some());
   }
 
   #[tokio::test]

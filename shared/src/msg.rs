@@ -168,12 +168,15 @@ pub struct Allocation {
   pub port: u16,
 }
 
+/// One-shot power request. Never changes whether the server should run, that
+/// is only the spec's `power` and `power_generation`, so wings can not drift
+/// from the panel DB. Restarting a stopped server does nothing; a kill of a
+/// server that should run restarts it without the stop steps.
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Power {
-  Start,
-  Stop,
   Restart,
+  /// Skips the stop steps of the stop that runs or follows.
   Kill,
 }
 

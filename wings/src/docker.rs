@@ -34,6 +34,8 @@ use uuid::Uuid;
 use crate::config::Config;
 
 const LABEL: &str = "smaug.server";
+/// On the installer: the install generation it runs.
+const INSTALL_LABEL: &str = "smaug.install-generation";
 /// Same uid/gid as Pterodactyl's default `pterodactyl` user.
 const CONTAINER_UID: u32 = 988;
 const PULL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -453,7 +455,7 @@ impl Docker {
       .collect();
     for volume in &volumes {
       if let Some(uuid) = uuid(Some(&volume.labels))
-        && !self.kept_marker(uuid).exists()
+        && !self.is_kept(uuid)
       {
         uuids.insert(uuid);
       }
@@ -461,11 +463,17 @@ impl Docker {
     Ok(uuids)
   }
 
-  pub async fn teardown(&self, uuid: Uuid) -> Result<()> {
+  /// Whether the server's files are kept for a transfer.
+  pub fn is_kept(&self, uuid: Uuid) -> bool {
+    self.kept_marker(uuid).exists()
+  }
+
+  /// Removes the server's containers and, unless `keep_volume`, its files.
+  pub async fn teardown(&self, uuid: Uuid, keep_volume: bool) -> Result<()> {
     for name in [name(uuid), installer_name(uuid), agent_name(uuid)] {
       self.remove(&name).await?;
     }
-    if !self.kept_marker(uuid).exists() {
+    if !keep_volume {
       let options = RemoveVolumeOptionsBuilder::default().force(true).build();
       match self.client.remove_volume(&name(uuid), Some(options)).await {
         Err(err) if not_found(&err) => (),
@@ -474,6 +482,7 @@ impl Docker {
     }
     let _ = tokio::fs::remove_file(self.install_log(uuid)).await;
     let _ = tokio::fs::remove_file(self.install_result(uuid)).await;
+    let _ = tokio::fs::remove_file(self.stopped_result(uuid)).await;
     Ok(())
   }
 
@@ -485,21 +494,38 @@ impl Docker {
     self.install_log_dir.join(format!("{uuid}.result.json"))
   }
 
+  fn stopped_result(&self, uuid: Uuid) -> PathBuf {
+    self.install_log_dir.join(format!("{uuid}.stopped.json"))
+  }
+
   /// Keeps the result on disk, the memory store loses it on a wings restart.
   pub async fn save_install(&self, uuid: Uuid, result: InstallResult) {
-    let json = serde_json::to_vec(&result).expect("InstallResult is always serializable");
-    let written = async {
-      tokio::fs::create_dir_all(&self.install_log_dir).await?;
-      tokio::fs::write(self.install_result(uuid), json).await
-    };
-    if let Err(err) = written.await {
-      warn!("Failed to save install result of {uuid}: {err}");
-    }
+    self.save(self.install_result(uuid), &result).await;
   }
 
   pub fn last_install(&self, uuid: Uuid) -> Option<InstallResult> {
-    let raw = std::fs::read(self.install_result(uuid)).ok()?;
-    serde_json::from_slice(&raw).ok()
+    load(&self.install_result(uuid))
+  }
+
+  /// The power generation wings stopped the server at, see `Store::stop_self`.
+  /// On disk so a wings restart does not start it again.
+  pub async fn save_stopped(&self, uuid: Uuid, generation: u64) {
+    self.save(self.stopped_result(uuid), &generation).await;
+  }
+
+  pub fn last_stopped(&self, uuid: Uuid) -> Option<u64> {
+    load(&self.stopped_result(uuid))
+  }
+
+  async fn save(&self, path: PathBuf, value: &impl serde::Serialize) {
+    let json = serde_json::to_vec(value).expect("always serializable");
+    let written = async {
+      tokio::fs::create_dir_all(&self.install_log_dir).await?;
+      tokio::fs::write(&path, json).await
+    };
+    if let Err(err) = written.await {
+      warn!("Failed to save {}: {err}", path.display());
+    }
   }
 
   /// Removes a running installer, its install then fails.
@@ -512,7 +538,59 @@ impl Docker {
   /// script's exit code does not fail the install, only errors running it do.
   pub async fn install(&self, spec: &ServerSpec, script: &str) -> Result<()> {
     let name = installer_name(spec.uuid);
+    let generation = spec.install_generation.unwrap_or_default().to_string();
+    let env = self.env(spec);
+    let (image, res) = match self.started_installer(&name, &generation).await? {
+      // left by a wings restart: wait for that run instead of running the script again
+      Some(image) => {
+        info!("Waiting for the running install of {}", spec.uuid);
+        (image, self.wait_installer(&name).await)
+      }
+      None => {
+        let image = self.create_installer(spec, &name, &generation, &env).await?;
+        let res = match self.upload_script(&name, script).await {
+          Ok(()) => self.run_installer(&name).await,
+          Err(err) => Err(err),
+        };
+        (image, res)
+      }
+    };
+    self.write_install_log(spec, &name, &image, &env, &res).await;
     self.remove(&name).await?;
+    res.map(|_| ())
+  }
+
+  /// The image of an installer for `generation` that was started, `None` when
+  /// there is none. One only created may lack its script, it is replaced.
+  async fn started_installer(&self, name: &str, generation: &str) -> Result<Option<String>> {
+    let info = match self.client.inspect_container(name, None).await {
+      Err(err) if not_found(&err) => return Ok(None),
+      res => res.context("Failed to inspect install container")?,
+    };
+    let config = info.config.unwrap_or_default();
+    let ours = config
+      .labels
+      .as_ref()
+      .and_then(|l| l.get(INSTALL_LABEL))
+      .is_some_and(|g| g == generation);
+    let started = info
+      .state
+      .and_then(|s| s.started_at)
+      .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+      // docker reports never started as year 1
+      .is_some_and(|t| t.timestamp() > 0);
+    Ok((ours && started).then(|| config.image.unwrap_or_default()))
+  }
+
+  /// Creates the installer, returns its image.
+  async fn create_installer(
+    &self,
+    spec: &ServerSpec,
+    name: &str,
+    generation: &str,
+    env: &[String],
+  ) -> Result<String> {
+    self.remove(name).await?;
     let image = self.pull(&spec.install.image).await?;
 
     let memory = spec.limits.memory_mb.max(INSTALL_MEMORY_MB);
@@ -525,7 +603,8 @@ impl Docker {
       cap_drop: Some(INSTALL_CAP_DROP.map(String::from).to_vec()),
       ..self.host_config(memory, cpu, INSTALL_PIDS)
     };
-    let env = self.env(spec);
+    let mut labels = labels(spec.uuid);
+    labels.insert(INSTALL_LABEL.into(), generation.into());
     let config = ContainerCreateBody {
       image: Some(image.clone()),
       hostname: Some("installer".into()),
@@ -533,8 +612,8 @@ impl Docker {
         spec.install.entrypoint.clone(),
         "/mnt/install/install.sh".into(),
       ]),
-      env: Some(env.clone()),
-      labels: Some(labels(spec.uuid)),
+      env: Some(env.to_vec()),
+      labels: Some(labels),
       attach_stdout: Some(true),
       attach_stderr: Some(true),
       open_stdin: Some(true),
@@ -542,22 +621,28 @@ impl Docker {
       host_config: Some(host),
       ..Default::default()
     };
-    let options = CreateContainerOptionsBuilder::default().name(&name).build();
+    let options = CreateContainerOptionsBuilder::default().name(name).build();
     self
       .client
       .create_container(Some(options), config)
       .await
       .context("Failed to create install container")?;
-    let res = match self.upload_script(&name, script).await {
-      Ok(()) => self.run_installer(&name).await,
-      Err(err) => Err(err),
-    };
+    Ok(image)
+  }
 
+  async fn write_install_log(
+    &self,
+    spec: &ServerSpec,
+    name: &str,
+    image: &str,
+    env: &[String],
+    res: &Result<i64>,
+  ) {
     let mut log = format!(
       "Smaug Server Installation Log\n\n|\n| Details\n| ------------------------------\n  Server UUID:          {}\n  Container Image:      {}\n  Container Entrypoint: {}\n\n|\n| Environment Variables\n| ------------------------------\n",
       spec.uuid, image, spec.install.entrypoint
     );
-    for var in &env {
+    for var in env {
       log.push_str(&format!("  {var}\n"));
     }
     log.push_str("\n|\n| Script Output\n| ------------------------------\n");
@@ -565,11 +650,11 @@ impl Docker {
       .stdout(true)
       .stderr(true)
       .build();
-    let mut logs = self.client.logs(&name, Some(options));
+    let mut logs = self.client.logs(name, Some(options));
     while let Some(Ok(chunk)) = logs.next().await {
       log.push_str(&String::from_utf8_lossy(chunk.as_ref()));
     }
-    match &res {
+    match res {
       Ok(code) => log.push_str(&format!("\nInstaller exited with code {code}\n")),
       Err(err) => log.push_str(&format!("\nInstaller failed: {err:?}\n")),
     }
@@ -580,9 +665,6 @@ impl Docker {
     if let Err(err) = written.await {
       warn!("Failed to write install log for {}: {err}", spec.uuid);
     }
-
-    self.remove(&name).await?;
-    res.map(|_| ())
   }
 
   /// Puts the script at `/mnt/install/install.sh` of the created installer,
@@ -609,6 +691,11 @@ impl Docker {
       .start_container(name, None)
       .await
       .context("Failed to start install container")?;
+    self.wait_installer(name).await
+  }
+
+  /// Exit code of the installer, right away when it already exited.
+  async fn wait_installer(&self, name: &str) -> Result<i64> {
     match self.client.wait_container(name, None).next().await {
       Some(Ok(res)) => Ok(res.status_code),
       Some(Err(DockerError::DockerContainerWaitError { code, .. })) => Ok(code),
@@ -706,6 +793,10 @@ impl Docker {
       ..Default::default()
     }
   }
+}
+
+fn load<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Option<T> {
+  serde_json::from_slice(&std::fs::read(path).ok()?).ok()
 }
 
 fn labels(uuid: Uuid) -> HashMap<String, String> {

@@ -193,21 +193,23 @@ impl<'db> ServerTable<'db> {
   /// Replaces the columns the edit form owns (see `SPEC_COLUMNS`), all
   /// allocations and variables and, when given, all grants. Power, install
   /// and suspend state are changed only by their own targeted updates, so a
-  /// stale model never undoes them.
+  /// stale model never undoes them. Returns the server's node: a transfer
+  /// may have moved it since `server` was read.
   pub async fn update(
     &self,
     server: server::Model,
     allocations: Vec<(String, i32)>,
     variables: Vec<(String, String)>,
     grants: Option<Grants>,
-  ) -> Result<(), DbErr> {
+  ) -> Result<Uuid, DbErr> {
     let txn = self.db.begin().await?;
-    let (id, node) = (server.id, server.node_id);
+    let id = server.id;
     let mut model = server::ActiveModel::from(server);
     for column in SPEC_COLUMNS {
       model.reset(column);
     }
-    model.update(&txn).await?;
+    // the row stays locked until the commit, a transfer waits or went first
+    let node = model.update(&txn).await?.node_id;
     server_allocation::Entity::delete_many()
       .filter(server_allocation::Column::ServerId.eq(id))
       .exec(&txn)
@@ -249,7 +251,8 @@ impl<'db> ServerTable<'db> {
         .await?;
       }
     }
-    txn.commit().await
+    txn.commit().await?;
+    Ok(node)
   }
 
   /// Suspending also turns the server off; unsuspending leaves it off.
@@ -285,10 +288,17 @@ impl<'db> ServerTable<'db> {
       .await
   }
 
+  /// Not installed also turns the server off, nothing may run on missing files.
   pub async fn set_install_state(&self, id: Uuid, state: ServerInstallState) -> Result<(), DbErr> {
     self
       .update_columns(id, |q| {
-        q.col_expr(server::Column::InstallState, Expr::value(state))
+        let q = q.col_expr(server::Column::InstallState, Expr::value(state));
+        if state == ServerInstallState::NotInstalled {
+          q.col_expr(server::Column::DesiredRunning, Expr::value(false))
+            .col_expr(server::Column::PowerGeneration, next_generation())
+        } else {
+          q
+        }
       })
       .await
   }
@@ -364,13 +374,14 @@ impl<'db> ServerTable<'db> {
   ) -> Result<(), DbErr> {
     let txn = self.db.begin().await?;
     let (id, node) = (server.id, server.node_id);
-    server_allocation::Entity::delete_many()
-      .filter(server_allocation::Column::ServerId.eq(id))
-      .exec(&txn)
-      .await?;
+    // the server row first, like `update`, so the two never deadlock
     server::Entity::update_many()
       .col_expr(server::Column::NodeId, Expr::value(node))
       .filter(server::Column::Id.eq(id))
+      .exec(&txn)
+      .await?;
+    server_allocation::Entity::delete_many()
+      .filter(server_allocation::Column::ServerId.eq(id))
       .exec(&txn)
       .await?;
     insert_allocations(&txn, id, node, vec![allocation]).await?;

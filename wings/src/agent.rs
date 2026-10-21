@@ -20,19 +20,23 @@ static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 /// Applies config files and permissions, returns the bytes used. A freshly
 /// created agent gets 10 s to come up.
 pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str) -> Result<u64> {
-  for _ in 0..50 {
-    let health = CLIENT
-      .get(format!("{}/health", agent.url))
-      .bearer_auth(&agent.token)
-      .timeout(Duration::from_secs(2))
-      .send()
-      .await;
-    // any answer means it is up, a rejected token fails the prepare below
-    if health.is_ok() {
-      break;
+  let up = async {
+    loop {
+      let health = CLIENT
+        .get(format!("{}/health", agent.url))
+        .bearer_auth(&agent.token)
+        .timeout(Duration::from_secs(2))
+        .send()
+        .await;
+      // any answer means it is up, a rejected token fails the prepare below
+      if health.is_ok() {
+        return;
+      }
+      tokio::time::sleep(Duration::from_millis(200)).await;
     }
-    tokio::time::sleep(Duration::from_millis(200)).await;
-  }
+  };
+  // still down after 10 s: the prepare below fails
+  let _ = tokio::time::timeout(Duration::from_secs(10), up).await;
   let res: PrepareResponse = CLIENT
     .post(format!("{}/prepare", agent.url))
     .bearer_auth(&agent.token)

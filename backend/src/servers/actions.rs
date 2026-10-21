@@ -2,7 +2,6 @@ use axum::{Json, extract::Path};
 use centaurus::{bail, db::init::Connection, error::Result};
 use entity::sea_orm_active_enums::ServerInstallState;
 use http::StatusCode;
-use shared::msg::Power;
 use tracing::info;
 
 use super::{
@@ -59,7 +58,7 @@ pub(super) async fn set_server_installed(
     ServerInstallState::NotInstalled
   };
   db.server().set_install_state(server.id, state).await?;
-  // drops a pending install on the node
+  // drops a pending install on the node, not installed also stops it
   wings.put_server(server.node_id, server.id);
 
   updater
@@ -89,8 +88,7 @@ pub(super) async fn set_server_suspended(
   // suspending turned the power off, the kill skips the stop steps;
   // unsuspend leaves it off and needs nothing on the node
   if req.suspended {
-    wings.put_server(server.node_id, server.id);
-    wings.power(server.node_id, server.id, Power::Kill);
+    wings.put_and_kill(server.node_id, server.id);
   }
 
   updater

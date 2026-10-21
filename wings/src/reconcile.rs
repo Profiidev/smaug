@@ -41,6 +41,9 @@ const INSTALL_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 const INSTALL_STOP_TIMEOUT: Duration = Duration::from_secs(10);
 /// A crash within this time of the previous one is not restarted, like Wings.
 const CRASH_WINDOW: Duration = Duration::from_secs(60);
+/// An install that fails to run (not the script's exit code) is retried this
+/// often before it counts as failed, a Docker hiccup must not fail it.
+const INSTALL_ATTEMPTS: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StopStep {
@@ -71,6 +74,9 @@ enum Action {
 #[derive(Debug, Clone, Copy, Default)]
 struct Memory {
   attached: bool,
+  /// This worker saw the container running. An exit it did not see, e.g.
+  /// containers stopped by a host reboot, is no crash.
+  watched: bool,
   stop: Option<(StopStep, Instant)>,
   last_crash: Option<Instant>,
 }
@@ -94,7 +100,11 @@ fn decide(
   let started = container.and_then(|c| c.started_at);
   let requested_since_start =
     |at: Option<DateTime<Utc>>| at.is_some_and(|at| started.is_none_or(|s| s < at));
-  let restart = requested_since_start(desired.restarted_at);
+  // a start while a stop runs finishes the stop first, like a restart. A kill
+  // never changes the power: with power on it is a restart without stop steps
+  let restart = requested_since_start(desired.restarted_at)
+    || requested_since_start(desired.killed_at)
+    || mem.stop.is_some();
   let install = desired
     .server
     .install_generation
@@ -103,7 +113,8 @@ fn decide(
   match container {
     Some(c) if !c.running => {
       // like Wings, any exit the panel did not ask for is a crash, exit code 0 included
-      let crashed = desired.power == DesiredPower::Running && !restart && install.is_none();
+      let crashed =
+        mem.watched && desired.power == DesiredPower::Running && !restart && install.is_none();
       let restart = crashed
         && desired.server.restart_on_crash
         && mem.last_crash.is_none_or(|t| now - t >= CRASH_WINDOW);
@@ -160,6 +171,8 @@ struct Live {
   /// re-attached. New for every attach, an old pump can not clear a new one.
   attached: Arc<AtomicBool>,
   mem: Memory,
+  /// Desired state of the last step, how to stop the server once it is deleted.
+  last: Option<Desired>,
 }
 
 struct Ctx {
@@ -222,7 +235,7 @@ impl Ctx {
     // the error a failed step reported, cleared once a step succeeds again
     let mut reported: Option<String> = None;
     loop {
-      let next = match self.step(uuid, &mut live, &notify).await {
+      let next = match self.step(uuid, &mut live, &notify, failures).await {
         Ok(next) => {
           failures = 0;
           if let Some(error) = reported.take()
@@ -261,18 +274,62 @@ impl Ctx {
     }
   }
 
-  async fn step(&self, uuid: Uuid, live: &mut Live, notify: &Arc<Notify>) -> Result<Next> {
+  /// `failures` is the number of failed steps right before this one.
+  async fn step(
+    &self,
+    uuid: Uuid,
+    live: &mut Live,
+    notify: &Arc<Notify>,
+    failures: u32,
+  ) -> Result<Next> {
     let desired = self.store.get(uuid).await?;
-    let observed = self.store.observed(uuid).await?.unwrap_or_default();
+    let mut observed = self.store.observed(uuid).await?.unwrap_or_default();
+    // after a wings restart the store gets the result from disk only after this
+    // worker may have woken, an install that finished must not run again
+    if observed.last_install.is_none() {
+      observed.last_install = self.docker.last_install(uuid);
+    }
     let container = self.docker.inspect(uuid).await?;
     live.mem.attached = live.stdin.is_some() && live.attached.load(Ordering::Relaxed);
     let now = Instant::now();
 
-    let action = decide(desired.as_ref(), &observed, container, live.mem, now);
+    let action = match (&desired, &live.last) {
+      // transferred away, its files stay: stop it like a stop from the panel,
+      // so it saves them. Unknown after a wings restart, then it is killed.
+      (None, Some(last)) if container.is_some_and(|c| c.running) && self.docker.is_kept(uuid) => {
+        let stopping = Desired {
+          power: DesiredPower::Stopped,
+          ..last.clone()
+        };
+        decide(Some(&stopping), &observed, container, live.mem, now)
+      }
+      _ => decide(desired.as_ref(), &observed, container, live.mem, now),
+    };
+    if let Some(desired) = &desired {
+      live.last = Some(desired.clone());
+    }
     let Some(desired) = desired else {
       return Ok(match action {
+        Action::Stop(step, wait) => {
+          let stop = live
+            .last
+            .as_ref()
+            .map_or(StopAction::Signal(shared::msg::Signal::Kill), |l| {
+              l.server.stop.clone()
+            });
+          self.stop(uuid, &stop, step, live).await?;
+          live.mem.stop = Some((step, now));
+          Next::Wait(wait)
+        }
+        Action::Wait(wait) => Next::Wait(wait),
         Action::Teardown => {
-          self.docker.teardown(uuid).await?;
+          // marker first: a server put back (transfer back) is stored before its
+          // marker is cleared, so one of both checks keeps its files
+          let kept = self.docker.is_kept(uuid);
+          if self.store.get(uuid).await?.is_some() {
+            return Ok(Next::Now);
+          }
+          self.docker.teardown(uuid, kept).await?;
           info!("Removed server {uuid}");
           Next::Gone
         }
@@ -289,6 +346,7 @@ impl Ctx {
         self.docker.remove(&docker::name(uuid)).await?;
         live.stdin = None;
         live.mem.stop = None;
+        live.mem.watched = false;
         if !crashed {
           self.store.set_state(uuid, ServerState::Offline).await?;
           return Ok(Next::Now);
@@ -304,7 +362,7 @@ impl Ctx {
             false => "Crashed, restart on crash is off",
           };
           self.report(uuid, Some(why.into())).await;
-          self.store.stop_self(uuid).await?;
+          self.stop_self(uuid, &desired).await?;
         }
         Next::Now
       }
@@ -328,10 +386,15 @@ impl Ctx {
               self.docker.install(&desired.server, script).await
             };
             tokio::select! {
-              res = install => res.err().map(|err| {
-                warn!("Install of server {uuid} failed: {err:?}");
-                format!("Install failed: {err:#}")
-              }),
+              res = install => match res {
+                Ok(()) => None,
+                // retried by the worker with a backoff
+                Err(err) if failures + 1 < INSTALL_ATTEMPTS => return Err(err),
+                Err(err) => {
+                  warn!("Install of server {uuid} failed: {err:?}");
+                  Some(format!("Install failed: {err:#}"))
+                }
+              },
               () = self.superseded(uuid, notify, |d| d.server.install_generation == Some(generation)) => {
                 info!("Install of server {uuid} is no longer wanted, aborting");
                 self.docker.abort_install(uuid).await?;
@@ -379,6 +442,7 @@ impl Ctx {
         let (stdin, output) = self.docker.attach(uuid).await?;
         live.stdin = Some(stdin);
         live.attached = Arc::new(AtomicBool::new(true));
+        live.mem.watched = true;
         tokio::spawn(pump(
           self.store.clone(),
           uuid,
@@ -456,7 +520,7 @@ impl Ctx {
       Err(err) => {
         warn!("Failed to pull image of server {uuid}: {err:?}");
         return self
-          .give_up(uuid, format!("Failed to start: {err:#}"))
+          .give_up(desired, format!("Failed to start: {err:#}"))
           .await;
       }
     };
@@ -472,7 +536,7 @@ impl Ctx {
         used / 1024 / 1024,
         spec.limits.disk_mb
       );
-      return self.give_up(uuid, why).await;
+      return self.give_up(desired, why).await;
     }
 
     let (stdin, output) = match self.docker.start(spec, image).await {
@@ -480,7 +544,7 @@ impl Ctx {
       Err(err) => {
         warn!("Failed to start server {uuid}: {err:?}");
         return self
-          .give_up(uuid, format!("Failed to start: {err:#}"))
+          .give_up(desired, format!("Failed to start: {err:#}"))
           .await;
       }
     };
@@ -488,6 +552,7 @@ impl Ctx {
     live.stdin = Some(stdin);
     live.attached = Arc::new(AtomicBool::new(true));
     live.mem.stop = None;
+    live.mem.watched = true;
     let done: Vec<Matcher> = spec.startup_done.iter().map(|s| Matcher::new(s)).collect();
     if done.is_empty() {
       self.store.set_state(uuid, ServerState::Running).await?;
@@ -513,11 +578,24 @@ impl Ctx {
   }
 
   /// Like a failed start on Wings: the server ends up offline and stays there.
-  async fn give_up(&self, uuid: Uuid, why: String) -> Result<Next> {
+  async fn give_up(&self, desired: &Desired, why: String) -> Result<Next> {
+    let uuid = desired.server.uuid;
     self.report(uuid, Some(why)).await;
-    self.store.stop_self(uuid).await?;
+    self.stop_self(uuid, desired).await?;
     self.store.set_state(uuid, ServerState::Offline).await?;
     Ok(Next::Idle)
+  }
+
+  /// Turns the power off unless the panel changed it since `desired` was
+  /// read, and keeps that on disk for a wings restart.
+  async fn stop_self(&self, uuid: Uuid, desired: &Desired) -> Result<()> {
+    let generation = desired.power_generation;
+    if self.store.stop_self(uuid, generation).await?
+      && let Some(generation) = generation
+    {
+      self.docker.save_stopped(uuid, generation).await;
+    }
+    Ok(())
   }
 }
 
@@ -654,7 +732,10 @@ mod test {
   fn exits_are_crashes_unless_requested() {
     let now = Instant::now();
     let o = Observed::default();
-    let m = Memory::default();
+    let m = Memory {
+      watched: true,
+      ..Memory::default()
+    };
     let exited = container(false, Utc::now());
 
     let running = desired(DesiredPower::Running);
@@ -663,6 +744,26 @@ mod test {
       Action::Exited {
         crashed: true,
         restart: true
+      }
+    );
+    // stopped while wings did not watch it, e.g. by a host reboot
+    assert_eq!(
+      decide(Some(&running), &o, exited, Memory::default(), now),
+      Action::Exited {
+        crashed: false,
+        restart: false
+      }
+    );
+    // started again while the stop ran: the stop's exit is no crash
+    let stopping = Memory {
+      stop: Some((StopStep::Graceful, now)),
+      ..m
+    };
+    assert_eq!(
+      decide(Some(&running), &o, exited, stopping, now),
+      Action::Exited {
+        crashed: false,
+        restart: false
       }
     );
 
@@ -789,6 +890,15 @@ mod test {
     };
 
     assert_eq!(decide(Some(&d), &o, c, attached, now), Action::Idle);
+    // a start while the stop runs lets the stop finish
+    let stopping = Memory {
+      stop: Some((StopStep::Graceful, now)),
+      ..attached
+    };
+    assert_eq!(
+      decide(Some(&d), &o, c, stopping, now + Duration::from_secs(10)),
+      Action::Wait(Duration::from_secs(50))
+    );
     assert_eq!(
       decide(Some(&d), &o, c, Memory::default(), now),
       Action::Adopt
@@ -799,6 +909,24 @@ mod test {
       Action::Stop(StopStep::Graceful, _)
     ));
     assert_eq!(decide(Some(&d), &o, None, attached, now), Action::Start);
+    // a kill with power on restarts without the stop steps, its exit is no crash
+    let mut killed = desired(DesiredPower::Running);
+    killed.killed_at = Some(started + chrono::Duration::seconds(1));
+    assert!(matches!(
+      decide(Some(&killed), &o, c, attached, now),
+      Action::Stop(StopStep::Kill, _)
+    ));
+    let watched = Memory {
+      watched: true,
+      ..attached
+    };
+    assert_eq!(
+      decide(Some(&killed), &o, container(false, started), watched, now),
+      Action::Exited {
+        crashed: false,
+        restart: false
+      }
+    );
     let stopped = desired(DesiredPower::Stopped);
     assert_eq!(
       decide(Some(&stopped), &o, None, attached, now),
@@ -1040,7 +1168,7 @@ mod test {
     };
     // a failed assertion must not leave the server's containers behind
     let res = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(body)).await;
-    docker.teardown(uuid).await.unwrap();
+    docker.teardown(uuid, false).await.unwrap();
     let _ = std::fs::remove_dir_all(&config.install_log_dir);
     if let Err(panic) = res {
       std::panic::resume_unwind(panic);

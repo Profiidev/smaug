@@ -9,7 +9,7 @@ use std::{
 
 use centaurus::{bail, db::init::Connection, error::Result, eyre::Context};
 use dashmap::DashMap;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{FutureExt, SinkExt, StreamExt, future::BoxFuture};
 use reqwest::{Method, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde_json::Value;
@@ -239,6 +239,14 @@ impl Link {
 
   async fn send_put(&self, server: Uuid) {
     let spec = match self.db.server().find_by_id(server).await {
+      // moved away since the caller read it, the new node gets it instead
+      Ok(model) if model.node_id != self.uuid => {
+        debug!(
+          "Server {} is no longer on wings {}, skipping",
+          server, self.uuid
+        );
+        return;
+      }
       Ok(model) => spec::load(&self.db, &model).await,
       Err(err) => Err(err),
     };
@@ -264,9 +272,12 @@ impl Link {
     self.send(Method::DELETE, &path, None).await;
   }
 
-  pub async fn power(&self, server: Uuid, action: Power) {
+  /// Sends the spec, then the kill. In this order the spec has turned the
+  /// power off, a kill before it would restart the server instead.
+  pub async fn put_and_kill(&self, server: Uuid) {
     let _lock = self.lock.lock().await;
-    self.send_power(server, action).await;
+    self.send_put(server).await;
+    self.send_power(server, Power::Kill).await;
   }
 
   async fn send_power(&self, server: Uuid, action: Power) {
@@ -353,7 +364,15 @@ impl Link {
     let known: HashSet<Uuid> = servers.iter().map(|s| s.id).collect();
     for orphan in res.orphans.iter().filter(|o| !known.contains(o)) {
       // still in the DB means moved to another node, its files stay for the transfer
-      let keep_files = self.db.server().find_by_id(*orphan).await.is_ok();
+      let keep_files = match self.db.server().find_by_id(*orphan).await {
+        Ok(_) => true,
+        Err(err) if err.status == StatusCode::NOT_FOUND => false,
+        // unsure whether it was moved, a wrong guess would delete its only files
+        Err(err) => {
+          warn!("Failed to look up orphan {}, keeping it: {:?}", orphan, err);
+          continue;
+        }
+      };
       info!(
         "Deleting server {} unknown to the panel from wings {}",
         orphan, self.uuid
@@ -539,6 +558,13 @@ async fn connection_task(
   }
 }
 
+async fn handle(link: &Link, event: Event) {
+  debug!("Wings event from {}: {:?}", link.uuid, event);
+  if let Err(err) = link.handle(event).await {
+    warn!("Failed to handle wings event from {}: {:?}", link.uuid, err);
+  }
+}
+
 /// Full sync, returns when the next one is due.
 async fn sync(link: &Link) -> Instant {
   match link.sync().await {
@@ -559,20 +585,31 @@ async fn run_connection(link: &Link, stream: WsStream, rx: &mut mpsc::Receiver<W
   let uuid = link.uuid;
   let (mut sink, mut stream) = stream.split();
   let mut ping = interval(PING_INTERVAL);
-  // events wait in the socket until the sync is done
   let mut last_sync = Instant::now();
-  let mut sync_at = sync(link).await;
-  // pongs waited in the socket during the sync as well
+  let mut sync_at = Instant::now();
   let mut last_seen = Instant::now();
+  // pings and reads go on while a sync runs, so neither side times out. Events
+  // read meanwhile may be older than the sync's snapshot, they are applied
+  // after it in the order wings sent them.
+  let mut syncing: Option<BoxFuture<'_, Instant>> = None;
+  let mut queued: Vec<Event> = Vec::new();
 
   loop {
     tokio::select! {
-      _ = sleep_until(sync_at) => {
+      _ = sleep_until(sync_at), if syncing.is_none() => {
         last_sync = Instant::now();
-        sync_at = sync(link).await;
-        last_seen = Instant::now();
+        syncing = Some(sync(link).boxed());
       }
-      _ = link.resync.notified() => {
+      next = async { syncing.as_mut().expect("guarded").await }, if syncing.is_some() => {
+        syncing = None;
+        sync_at = next;
+        for event in queued.drain(..) {
+          handle(link, event).await;
+        }
+      }
+      // not while syncing: the notify keeps its permit, a failure during the
+      // sync then moves the next one up instead of being overwritten by it
+      _ = link.resync.notified(), if syncing.is_none() => {
         sync_at = sync_at.min(last_sync + RESYNC_RETRY);
       }
       msg = stream.next() => {
@@ -584,12 +621,8 @@ async fn run_connection(link: &Link, stream: WsStream, rx: &mut mpsc::Receiver<W
         match msg {
           tungstenite::Message::Binary(raw_msg) => {
             match serde_json::from_slice::<Event>(&raw_msg) {
-              Ok(event) => {
-                debug!("Wings event from {}: {:?}", uuid, event);
-                if let Err(err) = link.handle(event).await {
-                  warn!("Failed to handle wings event from {}: {:?}", uuid, err);
-                }
-              }
+              Ok(event) if syncing.is_some() => queued.push(event),
+              Ok(event) => handle(link, event).await,
               Err(err) => info!("Failed to parse wings message for {}: {}", uuid, err),
             }
           }

@@ -9,7 +9,12 @@ use axum::{
   routing::any,
 };
 use shared::msg::{Event, WingsMessage};
-use tokio::sync::broadcast::error::RecvError;
+use std::time::Duration;
+
+use tokio::{
+  sync::broadcast::error::RecvError,
+  time::{Instant, interval, timeout},
+};
 use tracing::{info, warn};
 
 use crate::{auth, store::Store};
@@ -25,6 +30,12 @@ async fn init_connection(ws: WebSocketUpgrade, store: Store) -> Response {
   ws.on_upgrade(move |socket| connection(socket, store))
 }
 
+/// The panel pings every 15 s, a sync included. A connection silent for
+/// longer is half-open, e.g. the panel host died.
+const LIVENESS_TIMEOUT: Duration = Duration::from_secs(90);
+/// A send blocked this long by a full socket buffer means the panel is gone.
+const SEND_TIMEOUT: Duration = Duration::from_secs(30);
+
 async fn connection(mut socket: WebSocket, store: Store) {
   let mut events = store.subscribe();
   if send(
@@ -38,9 +49,17 @@ async fn connection(mut socket: WebSocket, store: Store) {
   {
     return;
   }
+  let mut last_seen = Instant::now();
+  let mut check = interval(Duration::from_secs(30));
   loop {
     tokio::select! {
-      next = socket.recv() => match next {
+      _ = check.tick() => {
+        if last_seen.elapsed() > LIVENESS_TIMEOUT {
+          warn!("Panel connection timed out, closing");
+          break;
+        }
+      }
+      next = socket.recv() => match next.inspect(|_| last_seen = Instant::now()) {
         Some(Ok(ws::Message::Binary(raw_msg))) => {
           match serde_json::from_slice::<WingsMessage>(&raw_msg) {
             Ok(msg) => info!("Parsed wings message: {:?}", msg),
@@ -70,7 +89,15 @@ async fn connection(mut socket: WebSocket, store: Store) {
   }
 }
 
-async fn send(socket: &mut WebSocket, event: &Event) -> Result<(), axum::Error> {
+/// Fails on a closed socket or one that took longer than `SEND_TIMEOUT`.
+async fn send(socket: &mut WebSocket, event: &Event) -> Result<(), ()> {
   let msg = serde_json::to_vec(event).expect("Event is always serializable");
-  socket.send(ws::Message::Binary(msg.into())).await
+  match timeout(SEND_TIMEOUT, socket.send(ws::Message::Binary(msg.into()))).await {
+    Ok(Ok(())) => Ok(()),
+    Ok(Err(_)) => Err(()),
+    Err(_) => {
+      warn!("Sending to the panel timed out, closing");
+      Err(())
+    }
+  }
 }

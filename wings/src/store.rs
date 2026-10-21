@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+  Arc,
+  atomic::{AtomicBool, Ordering},
+};
 
 use axum::{Extension, extract::FromRequestParts};
 use centaurus::{error::Result, eyre::Context};
@@ -104,7 +107,8 @@ impl Store {
     };
     Self {
       backend,
-      events: broadcast::channel(256).0,
+      // a full buffer drops the panel connection, which costs a full sync
+      events: broadcast::channel(4096).0,
       changes: broadcast::channel(256).0,
     }
   }
@@ -277,7 +281,7 @@ impl Store {
       .await
   }
 
-  async fn change_error(
+  pub(crate) async fn change_error(
     &self,
     uuid: Uuid,
     when: impl Fn(&Option<String>) -> bool,
@@ -315,13 +319,22 @@ impl Store {
   }
 
   /// Wings turns the server off on its own (crash without restart, failed
-  /// start) and tells the panel, which turns its power off too.
-  pub async fn stop_self(&self, uuid: Uuid) -> Result<()> {
+  /// start) and tells the panel, which turns its power off too. Only while the
+  /// power is still from `generation`, the one the decision was based on: a
+  /// newer power from the panel wins. Returns whether it applied.
+  pub async fn stop_self(&self, uuid: Uuid, generation: Option<u64>) -> Result<bool> {
+    let applied = AtomicBool::new(false);
     self
-      .update(uuid, |d| d.power = DesiredPower::Stopped)
+      .update(uuid, |d| {
+        let current = d.power_generation == generation;
+        if current {
+          d.power = DesiredPower::Stopped;
+        }
+        applied.store(current, Ordering::Relaxed);
+      })
       .await?;
-    let Some(generation) = self.get(uuid).await?.and_then(|d| d.power_generation) else {
-      return Ok(());
+    let (true, Some(generation)) = (applied.into_inner(), generation) else {
+      return Ok(false);
     };
     self
       .update_observed(
@@ -332,7 +345,8 @@ impl Store {
         },
         json!({ "stopped_generation": generation }),
       )
-      .await
+      .await?;
+    Ok(true)
   }
 
   /// `apply` changes the memory store and returns the event to report, `None`
@@ -481,7 +495,13 @@ pub(crate) mod test {
     running.power = DesiredPower::Running;
     running.power_generation = 3;
     store.put(Desired::new(running)).await.unwrap();
-    store.stop_self(uuid).await.unwrap();
+    // a decision based on an older power does not stop it
+    assert!(!store.stop_self(uuid, Some(2)).await.unwrap());
+    assert_eq!(
+      store.get(uuid).await.unwrap().unwrap().power,
+      DesiredPower::Running
+    );
+    assert!(store.stop_self(uuid, Some(3)).await.unwrap());
 
     assert_eq!(
       store.get(uuid).await.unwrap().unwrap().power,

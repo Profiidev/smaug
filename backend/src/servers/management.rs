@@ -410,10 +410,11 @@ pub(super) async fn update_server(
   .await?;
 
   apply_spec(&mut server, req.spec);
-  db.server()
+  let node = db
+    .server()
     .update(server.clone(), allocations, variables, grants)
     .await?;
-  wings.put_server(server.node_id, server.id);
+  wings.put_server(node, server.id);
   info!("Updated server with ID {}", path.uuid);
 
   updater
