@@ -599,6 +599,7 @@ export const ServerStatus = {
   STOPPING: 'stopping',
   CRASHED: 'crashed',
   OFFLINE: 'offline',
+  UNKNOWN: 'unknown',
   NOT_INSTALLED: 'not_installed',
   INSTALLING: 'installing',
   INSTALL_FAILED: 'install_failed',

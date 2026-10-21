@@ -29,6 +29,11 @@ use crate::{
 
 const RESYNC: Duration = Duration::from_secs(60);
 const RETRY: Duration = Duration::from_secs(10);
+/// Longest wait between retries of a failing step, the wait doubles up to it.
+const MAX_RETRY: Duration = Duration::from_secs(300);
+/// An install script running longer is killed and the install fails.
+/// ponytail: fixed for every egg, make it configurable if real installs need longer
+const INSTALL_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 /// Wings stops a server for a reinstall with this timeout, then kills it.
 const INSTALL_STOP_TIMEOUT: Duration = Duration::from_secs(10);
 /// A crash within this time of the previous one is not restarted, like Wings.
@@ -206,11 +211,19 @@ impl Ctx {
 
   async fn worker(self: Arc<Self>, uuid: Uuid, notify: Arc<Notify>) {
     let mut live = Live::default();
+    let mut failures = 0;
     loop {
-      let next = self.step(uuid, &mut live).await.unwrap_or_else(|err| {
-        warn!("Failed to reconcile server {uuid}: {err:?}");
-        Next::Wait(RETRY)
-      });
+      let next = match self.step(uuid, &mut live, &notify).await {
+        Ok(next) => {
+          failures = 0;
+          next
+        }
+        Err(err) => {
+          warn!("Failed to reconcile server {uuid}: {err:?}");
+          failures += 1;
+          Next::Wait(backoff(failures))
+        }
+      };
       let wait = match next {
         Next::Now => continue,
         Next::Wait(wait) => wait,
@@ -231,7 +244,7 @@ impl Ctx {
     }
   }
 
-  async fn step(&self, uuid: Uuid, live: &mut Live) -> Result<Next> {
+  async fn step(&self, uuid: Uuid, live: &mut Live, notify: &Notify) -> Result<Next> {
     let desired = self.store.get(uuid).await?;
     let observed = self.store.observed(uuid).await?.unwrap_or_default();
     let container = self.docker.inspect(uuid).await?;
@@ -271,10 +284,7 @@ impl Ctx {
           info!("Server {uuid} crashed, not restarting");
           self
             .store
-            .put(Desired {
-              power: DesiredPower::Stopped,
-              ..desired
-            })
+            .update(uuid, |d| d.power = DesiredPower::Stopped)
             .await?;
         }
         Next::Now
@@ -294,17 +304,29 @@ impl Ctx {
           None => true,
           Some(script) => {
             info!("Installing server {uuid}");
-            let res = async {
+            let install = async {
               self.docker.ensure_volume(&desired.server).await?;
               self.docker.install(&desired.server, script).await
             };
-            let res = res.await;
-            res
-              .inspect_err(|err| warn!("Install of server {uuid} failed: {err:?}"))
-              .is_ok()
+            tokio::select! {
+              res = install => res
+                .inspect_err(|err| warn!("Install of server {uuid} failed: {err:?}"))
+                .is_ok(),
+              () = self.superseded(uuid, generation, notify) => {
+                info!("Install of server {uuid} is no longer wanted, aborting");
+                self.docker.abort_install(uuid).await?;
+                return Ok(Next::Now);
+              }
+              () = tokio::time::sleep(INSTALL_TIMEOUT) => {
+                warn!("Install of server {uuid} timed out");
+                self.docker.abort_install(uuid).await?;
+                false
+              }
+            }
           }
         };
         let result = InstallResult { generation, ok };
+        self.docker.save_install(uuid, result).await;
         self.store.finish_install(uuid, result).await?;
         self.store.set_state(uuid, ServerState::Offline).await?;
         Next::Now
@@ -329,6 +351,18 @@ impl Ctx {
         Next::Idle
       }
     })
+  }
+
+  /// Resolves once the server is deleted or no longer waits for this install.
+  async fn superseded(&self, uuid: Uuid, generation: u64, notify: &Notify) {
+    loop {
+      notify.notified().await;
+      match self.store.get(uuid).await {
+        Ok(Some(d)) if d.server.install_generation == Some(generation) => (),
+        Ok(_) => return,
+        Err(err) => warn!("Failed to check install of server {uuid}: {err:?}"),
+      }
+    }
   }
 
   async fn stop(
@@ -368,7 +402,7 @@ impl Ctx {
     let limit = u64::try_from(spec.limits.disk_mb).unwrap_or(0) * 1024 * 1024;
     if limit > 0 && used > limit {
       warn!("Server {uuid} is over its disk limit, not starting");
-      return self.give_up(desired).await;
+      return self.give_up(uuid).await;
     }
 
     self.store.set_state(uuid, ServerState::Starting).await?;
@@ -376,7 +410,7 @@ impl Ctx {
       Ok(attached) => attached,
       Err(err) => {
         warn!("Failed to start server {uuid}: {err:?}");
-        return self.give_up(desired).await;
+        return self.give_up(uuid).await;
       }
     };
     live.stdin = Some(stdin);
@@ -391,18 +425,21 @@ impl Ctx {
   }
 
   /// Like a failed start on Wings: the server ends up offline and stays there.
-  async fn give_up(&self, desired: &Desired) -> Result<Next> {
-    let uuid = desired.server.uuid;
+  async fn give_up(&self, uuid: Uuid) -> Result<Next> {
     self
       .store
-      .put(Desired {
-        power: DesiredPower::Stopped,
-        ..desired.clone()
-      })
+      .update(uuid, |d| d.power = DesiredPower::Stopped)
       .await?;
     self.store.set_state(uuid, ServerState::Offline).await?;
     Ok(Next::Idle)
   }
+}
+
+/// Wait after `failures` failed steps in a row: doubles from `RETRY` up to `MAX_RETRY`.
+fn backoff(failures: u32) -> Duration {
+  RETRY
+    .saturating_mul(1 << failures.saturating_sub(1).min(16))
+    .min(MAX_RETRY)
 }
 
 /// An egg `startup.done` entry: text contained in the line, or `regex:<expr>`.
@@ -719,6 +756,14 @@ mod test {
       }),
     };
     assert_eq!(decide(Some(&d), &done, None, m, now), Action::Start);
+  }
+
+  #[test]
+  fn retries_back_off() {
+    assert_eq!(backoff(1), RETRY);
+    assert_eq!(backoff(2), RETRY * 2);
+    assert_eq!(backoff(3), RETRY * 4);
+    assert_eq!(backoff(100), MAX_RETRY);
   }
 
   #[test]

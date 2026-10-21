@@ -16,7 +16,6 @@ use tracing::warn;
 use crate::{
   db::DBTrait,
   eggs::{EggConfig, EggInstallScript},
-  nodes::Wings,
 };
 
 static PLACEHOLDER: LazyLock<Regex> =
@@ -94,15 +93,6 @@ pub async fn load(db: &Connection, server: &server::Model) -> Result<ServerSpec>
     .collect();
   let variables = db.server().variables(server.id).await?;
   build(server, &egg, &allocations, variables)
-}
-
-/// Loads the current spec from the DB and sends it to the server's node.
-/// Best-effort like every wings push.
-pub async fn push(db: &Connection, wings: &Wings, server: &server::Model) {
-  match load(db, server).await {
-    Ok(spec) => wings.put_server(server.node_id, &spec).await,
-    Err(err) => warn!("Failed to build spec for server {}: {:?}", server.id, err),
-  }
 }
 
 /// Values for `{{...}}`: env names as is (startup commands) plus the

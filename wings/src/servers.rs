@@ -2,15 +2,17 @@ use std::collections::HashSet;
 
 use axum::{
   Extension, Json, Router,
-  extract::Path,
+  extract::{Path, Query},
   middleware::from_fn,
   routing::{post, put},
 };
 use centaurus::{bail, error::Result};
 use chrono::Utc;
+use serde::Deserialize;
 use shared::msg::{
   Observed, Power, PowerRequest, ServerSpec, ServerState, SyncRequest, SyncResponse,
 };
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -40,7 +42,11 @@ async fn sync(
 ) -> Result<Json<SyncResponse>> {
   let listed: HashSet<Uuid> = req.servers.iter().map(|s| s.uuid).collect();
   for spec in req.servers {
-    upsert(&store, docker.as_ref(), spec).await?;
+    let uuid = spec.uuid;
+    // one broken server must not keep the others from syncing, listed it is no orphan
+    if let Err(err) = upsert(&store, docker.as_ref(), spec).await {
+      warn!("Failed to sync server {uuid}: {err:?}");
+    }
   }
 
   let mut res = SyncResponse::default();
@@ -65,42 +71,57 @@ async fn put_server(
   upsert(&store, docker.as_ref(), spec).await
 }
 
-async fn delete_server(store: Store, Path(uuid): Path<Uuid>) -> Result<()> {
+#[derive(Deserialize)]
+struct DeleteQuery {
+  /// Leaves the server's files on the node, for a transfer.
+  #[serde(default)]
+  keep_files: bool,
+}
+
+async fn delete_server(
+  store: Store,
+  Extension(docker): Runtime,
+  Path(uuid): Path<Uuid>,
+  Query(query): Query<DeleteQuery>,
+) -> Result<()> {
+  // TODO(wings): keep the PVC on Kubernetes too, once its reconciler tears servers down
+  if query.keep_files
+    && let Some(docker) = docker
+  {
+    docker.keep_volume(uuid);
+  }
   store.delete(uuid).await
 }
 
 async fn power(store: Store, Path(uuid): Path<Uuid>, Json(req): Json<PowerRequest>) -> Result<()> {
-  let mut desired = get(&store, uuid).await?;
-  apply_power(&mut desired, req.action);
-  store.put(desired).await
+  if !store.update(uuid, |d| apply_power(d, req.action)).await? {
+    bail!(NOT_FOUND, "Server not found");
+  }
+  Ok(())
 }
 
 /// Sets the spec, keeping power of an existing server, and starts a pending
 /// install that has not run yet.
 pub(crate) async fn upsert(store: &Store, docker: Option<&Docker>, spec: ServerSpec) -> Result<()> {
   let (uuid, pending) = (spec.uuid, spec.install_generation);
-  let mut restored = false;
-  let desired = match store.get(uuid).await? {
-    Some(existing) => Desired {
-      server: spec,
-      ..existing
-    },
-    None => {
-      let mut desired = Desired::new(spec);
-      // the Docker store is lost when wings restarts, only the containers are
-      // left: a running one was meant to run, and the sync response says so
-      if let Some(docker) = docker
-        && docker.inspect(uuid).await?.is_some_and(|c| c.running)
-      {
-        desired.power = DesiredPower::Running;
-        restored = true;
-      }
-      desired
+  if !store.update(uuid, |d| d.server = spec.clone()).await? {
+    let mut desired = Desired::new(spec);
+    // the Docker store is lost when wings restarts, only the containers are
+    // left: a running one was meant to run, and the sync response says so
+    let running = match docker {
+      Some(docker) => docker.inspect(uuid).await?.is_some_and(|c| c.running),
+      None => false,
+    };
+    if running {
+      desired.power = DesiredPower::Running;
     }
-  };
-  store.put(desired).await?;
-  if restored {
-    store.set_state(uuid, ServerState::Running).await?;
+    store.put(desired).await?;
+    if running {
+      store.set_state(uuid, ServerState::Running).await?;
+    }
+    if let Some(result) = docker.and_then(|d| d.last_install(uuid)) {
+      store.finish_install(uuid, result).await?;
+    }
   }
 
   let observed = store.observed(uuid).await?.unwrap_or_default();
@@ -117,13 +138,6 @@ fn needs_install(pending: Option<u64>, observed: &Observed) -> bool {
     observed.state != ServerState::Installing
       && observed.last_install.map(|i| i.generation) != Some(generation)
   })
-}
-
-async fn get(store: &Store, uuid: Uuid) -> Result<Desired> {
-  match store.get(uuid).await? {
-    Some(desired) => Ok(desired),
-    None => Err(centaurus::anyhow!(NOT_FOUND, "Server not found")),
-  }
 }
 
 fn apply_power(desired: &mut Desired, action: Power) {

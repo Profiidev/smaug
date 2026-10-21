@@ -305,7 +305,8 @@ async fn create_defaults_and_install_state() {
   let uuid = c.create(body.clone()).await;
   let info = c.info(uuid).await;
   assert_eq!(info["install_state"], "installed");
-  assert_eq!(info["status"], "offline");
+  // no wings connected, the runtime state is unknown
+  assert_eq!(info["status"], "unknown");
   assert_eq!(info["owner"], Value::Null);
   // every variable gets its egg default
   assert_eq!(
@@ -848,7 +849,8 @@ impl Ctx {
       _ => {}
     }
     let expected = match state {
-      State::Offline => "offline",
+      // installed, the runtime state is unknown without a connected wings
+      State::Offline => "unknown",
       State::Installing => "installing",
       State::NotInstalled => "not_installed",
       State::InstallFailed => "install_failed",

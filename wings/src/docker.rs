@@ -2,6 +2,7 @@ use std::{
   collections::{BTreeMap, HashMap},
   path::PathBuf,
   pin::Pin,
+  sync::Arc,
   time::Duration,
 };
 
@@ -21,10 +22,11 @@ use bollard::{
 };
 use centaurus::{error::Result, eyre::Context};
 use chrono::{DateTime, Utc};
+use dashmap::DashSet;
 use futures::{Stream, StreamExt, TryStreamExt};
 use shared::{
   auth::agent_token,
-  msg::{ServerSpec, Signal},
+  msg::{InstallResult, ServerSpec, Signal},
 };
 use tokio::{io::AsyncWrite, sync::mpsc, time::timeout};
 use tracing::{info, warn};
@@ -86,6 +88,8 @@ pub struct Docker {
   /// The wings token, agent tokens are derived from it.
   secret: String,
   install_log_dir: PathBuf,
+  /// Servers whose next teardown leaves the volume, see `keep_volume`.
+  kept: Arc<DashSet<Uuid>>,
 }
 
 /// Game container and the server's volume.
@@ -143,6 +147,7 @@ impl Docker {
       agent_network: config.agent_network.clone(),
       secret: config.token.clone(),
       install_log_dir: config.install_log_dir.clone(),
+      kept: Default::default(),
     })
   }
 
@@ -189,9 +194,14 @@ impl Docker {
       Err(err) if not_found(&err) => None,
       res => Some(res.context("Failed to inspect agent")?),
     };
-    let outdated = current.as_ref().is_some_and(|c| c.image != image.id);
+    let token = format!("TOKEN={}", self.agent_token(uuid)?);
+    // a new wings token means a new agent token
+    let outdated = current.as_ref().is_some_and(|c| {
+      let env = c.config.as_ref().and_then(|c| c.env.as_ref());
+      c.image != image.id || !env.is_some_and(|env| env.contains(&token))
+    });
     if outdated {
-      info!("Agent image changed, recreating agent of {uuid}");
+      info!("Agent image or token changed, recreating agent of {uuid}");
       self.remove(&name).await?;
     }
     if current.is_none() || outdated {
@@ -213,10 +223,7 @@ impl Docker {
       let config = ContainerCreateBody {
         image: image.id.clone(),
         user: Some("0:0".into()),
-        env: Some(vec![
-          format!("TOKEN={}", self.agent_token(uuid)?),
-          "ROOT=/data".into(),
-        ]),
+        env: Some(vec![token, "ROOT=/data".into()]),
         labels: Some(labels(uuid)),
         host_config: Some(host),
         ..Default::default()
@@ -399,21 +406,57 @@ impl Docker {
     }
   }
 
+  /// The next teardown of `uuid` leaves its volume, the files of a server
+  /// transferred away stay until the transfer copies them.
+  // TODO(wings): kept volumes are never removed, clean them up once transfers copy files
+  pub fn keep_volume(&self, uuid: Uuid) {
+    self.kept.insert(uuid);
+  }
+
   pub async fn teardown(&self, uuid: Uuid) -> Result<()> {
     for name in [name(uuid), installer_name(uuid), agent_name(uuid)] {
       self.remove(&name).await?;
     }
-    let options = RemoveVolumeOptionsBuilder::default().force(true).build();
-    match self.client.remove_volume(&name(uuid), Some(options)).await {
-      Err(err) if not_found(&err) => (),
-      res => res.context("Failed to remove volume")?,
+    if self.kept.remove(&uuid).is_none() {
+      let options = RemoveVolumeOptionsBuilder::default().force(true).build();
+      match self.client.remove_volume(&name(uuid), Some(options)).await {
+        Err(err) if not_found(&err) => (),
+        res => res.context("Failed to remove volume")?,
+      }
     }
     let _ = tokio::fs::remove_file(self.install_log(uuid)).await;
+    let _ = tokio::fs::remove_file(self.install_result(uuid)).await;
     Ok(())
   }
 
   pub fn install_log(&self, uuid: Uuid) -> PathBuf {
     self.install_log_dir.join(format!("{uuid}.log"))
+  }
+
+  fn install_result(&self, uuid: Uuid) -> PathBuf {
+    self.install_log_dir.join(format!("{uuid}.result.json"))
+  }
+
+  /// Keeps the result on disk, the memory store loses it on a wings restart.
+  pub async fn save_install(&self, uuid: Uuid, result: InstallResult) {
+    let json = serde_json::to_vec(&result).expect("InstallResult is always serializable");
+    let written = async {
+      tokio::fs::create_dir_all(&self.install_log_dir).await?;
+      tokio::fs::write(self.install_result(uuid), json).await
+    };
+    if let Err(err) = written.await {
+      warn!("Failed to save install result of {uuid}: {err}");
+    }
+  }
+
+  pub fn last_install(&self, uuid: Uuid) -> Option<InstallResult> {
+    let raw = std::fs::read(self.install_result(uuid)).ok()?;
+    serde_json::from_slice(&raw).ok()
+  }
+
+  /// Removes a running installer, its install then fails.
+  pub async fn abort_install(&self, uuid: Uuid) -> Result<()> {
+    self.remove(&installer_name(uuid)).await
   }
 
   /// Runs the install script like Wings: `install.image` as root, `files` at

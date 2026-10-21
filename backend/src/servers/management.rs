@@ -15,7 +15,6 @@ use uuid::Uuid;
 use super::{
   access::{Access, has_perm, load},
   error::{FieldResult, fail_if, field_err},
-  spec,
   status::{Action, ensure_allowed, status},
   types::{
     Allocation, CreateServer, CreateServerResponse, GrantInfo, GrantsInfo, Limits,
@@ -346,7 +345,7 @@ pub(super) async fn create_server(
     .await?;
   // a pending install is part of the spec; without one no InstallFinished
   // comes, so start right away
-  spec::push(&db, &wings, &server).await;
+  wings.put_server(server.node_id, server.id).await;
   if req.skip_scripts && req.start_on_completion {
     wings.power(req.node, id, Power::Start).await;
   }
@@ -415,7 +414,7 @@ pub(super) async fn update_server(
   db.server()
     .update(server.clone(), allocations, variables, grants)
     .await?;
-  spec::push(&db, &wings, &server).await;
+  wings.put_server(server.node_id, server.id).await;
   info!("Updated server with ID {}", path.uuid);
 
   updater
@@ -434,7 +433,7 @@ pub(super) async fn delete_server(
   let (server, _) = load(&db, auth.user_id, req.uuid, Access::Admin).await?;
   ensure_allowed(&server, Action::Delete)?;
   db.server().delete(server.id).await?;
-  wings.delete_server(server.node_id, server.id).await;
+  wings.delete_server(server.node_id, server.id, false).await;
   info!("Deleted server with ID {}", req.uuid);
 
   updater

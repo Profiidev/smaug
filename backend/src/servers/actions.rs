@@ -8,7 +8,6 @@ use tracing::info;
 use super::{
   access::{Access, load},
   error::{FieldResult, fail_if, field_err},
-  spec,
   status::{Action, ensure_allowed},
   types::{InstallRequest, ServerUuid, SuspendRequest, TransferRequest},
   validation::{check_free, node_exists, parse_allocation},
@@ -33,7 +32,7 @@ pub(super) async fn reinstall_server(
   server.install_generation += 1;
   db.server().save(server.clone()).await?;
   // the spec carries the new install generation, wings runs it once
-  spec::push(&db, &wings, &server).await;
+  wings.put_server(server.node_id, server.id).await;
   info!("Reinstalling server with ID {}", req.uuid);
 
   updater
@@ -45,6 +44,7 @@ pub(super) async fn reinstall_server(
 pub(super) async fn set_server_installed(
   auth: JwtAuth,
   db: Connection,
+  wings: Wings,
   updater: Updater,
   Path(path): Path<ServerUuid>,
   Json(req): Json<InstallRequest>,
@@ -60,7 +60,9 @@ pub(super) async fn set_server_installed(
   } else {
     ServerInstallState::NotInstalled
   };
-  db.server().save(server).await?;
+  db.server().save(server.clone()).await?;
+  // drops a pending install on the node
+  wings.put_server(server.node_id, server.id).await;
 
   updater
     .broadcast(UpdateMessage::Servers { uuid: path.uuid })
@@ -131,9 +133,10 @@ pub(super) async fn transfer_server(
   let source = server.node_id;
   server.node_id = req.node;
   db.server().transfer(server.clone(), allocation).await?;
-  spec::push(&db, &wings, &server).await;
-  // TODO(wings): stream the server's files from the source to the target node before deleting them
-  wings.delete_server(source, path.uuid).await;
+  wings.put_server(server.node_id, server.id).await;
+  // TODO(wings): stream the server's files from the source to the target node,
+  // until then the source keeps them
+  wings.delete_server(source, path.uuid, true).await;
   info!("Transferred server {} to node {}", path.uuid, req.node);
 
   updater

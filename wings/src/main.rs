@@ -67,6 +67,7 @@ async fn state(router: ApiRouter, config: Config) -> ApiRouter {
       tokio::spawn(reconcile::run(store.clone(), docker.clone()));
       Some(docker)
     }
+    // TODO(wings): Kubernetes reconciler, until then GameServers are stored but never run
     Runtime::Kubernetes => None,
   };
   let router = store::state(router, store).layer(Extension(docker));

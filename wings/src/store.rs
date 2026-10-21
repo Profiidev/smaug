@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use kube::{
   Api, CustomResource,
-  api::{DeleteParams, ListParams, Patch, PatchParams},
+  api::{DeleteParams, ListParams, Patch, PatchParams, PostParams},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -162,6 +162,37 @@ impl Store {
     Ok(())
   }
 
+  /// Changes the desired state in place, `false` when the server is not
+  /// stored. Unlike `get` + `put` it never undoes a concurrent change.
+  pub async fn update(&self, uuid: Uuid, change: impl Fn(&mut Desired)) -> Result<bool> {
+    match &self.backend {
+      Backend::Memory(map) => match map.get_mut(&uuid) {
+        Some(mut e) => change(&mut e.0),
+        None => return Ok(false),
+      },
+      Backend::Kube(api) => loop {
+        let Some(mut gs) = api
+          .get_opt(&name(uuid))
+          .await
+          .context("Failed to get GameServer")?
+        else {
+          return Ok(false);
+        };
+        change(&mut gs.spec);
+        // the resource version makes a concurrent change fail, retry on top of it
+        match api.replace(&name(uuid), &PostParams::default(), &gs).await {
+          Err(kube::Error::Api(err)) if err.code == 409 => continue,
+          res => {
+            res.context("Failed to update GameServer")?;
+            break;
+          }
+        }
+      },
+    }
+    let _ = self.changes.send(uuid);
+    Ok(true)
+  }
+
   pub async fn delete(&self, uuid: Uuid) -> Result<()> {
     match &self.backend {
       Backend::Memory(map) => {
@@ -202,8 +233,7 @@ impl Store {
     Ok(())
   }
 
-  /// Records the end of an install and reports it to the panel. Called by the runtime.
-  #[allow(unused)]
+  /// Records the end of an install and reports it to the panel.
   pub async fn finish_install(&self, uuid: Uuid, result: InstallResult) -> Result<()> {
     self
       .update_observed(
@@ -319,7 +349,19 @@ pub(crate) mod test {
       )]
     );
 
+    assert!(
+      store
+        .update(uuid, |d| d.power = DesiredPower::Running)
+        .await
+        .unwrap()
+    );
+    assert_eq!(
+      store.get(uuid).await.unwrap().unwrap().power,
+      DesiredPower::Running
+    );
+
     store.delete(uuid).await.unwrap();
     assert!(store.get(uuid).await.unwrap().is_none());
+    assert!(!store.update(uuid, |_| ()).await.unwrap());
   }
 }

@@ -5,6 +5,9 @@ use shared::msg::{ConfigFile, PrepareRequest, PrepareResponse};
 
 use crate::docker::Agent;
 
+/// Walking a big volume for permissions and disk usage takes a while.
+const PREPARE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
 static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
   reqwest::Client::builder()
     .timeout(Duration::from_secs(60))
@@ -21,7 +24,8 @@ pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str
       .bearer_auth(&agent.token)
       .send()
       .await;
-    if health.is_ok_and(|r| r.status().is_success()) {
+    // any answer means it is up, a rejected token fails the prepare below
+    if health.is_ok() {
       break;
     }
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -29,6 +33,7 @@ pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str
   let res: PrepareResponse = CLIENT
     .post(format!("{}/prepare", agent.url))
     .bearer_auth(&agent.token)
+    .timeout(PREPARE_TIMEOUT)
     .json(&PrepareRequest {
       config_files: config_files.to_vec(),
       interface: interface.into(),

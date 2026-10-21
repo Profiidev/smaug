@@ -5,6 +5,7 @@ export type ServerStatus =
   | 'stopping'
   | 'crashed'
   | 'offline'
+  | 'unknown'
   | 'installing'
   | 'install_failed'
   | 'not_installed'
@@ -22,7 +23,8 @@ export const STATUS: Record<ServerStatus, { label: string; color: string }> = {
   starting: { color: 'oklch(0.80 0.15 85)', label: 'Starting' },
   stopping: { color: 'oklch(0.80 0.15 85)', label: 'Stopping' },
   suspended: { color: 'oklch(0.75 0.16 55)', label: 'Suspended' },
-  transferring: { color: 'oklch(0.70 0.14 250)', label: 'Transferring' }
+  transferring: { color: 'oklch(0.70 0.14 250)', label: 'Transferring' },
+  unknown: { color: 'oklch(0.60 0 0)', label: 'Unknown' }
 };
 
 /** One-line explanation shown on the Status tab. */
@@ -39,7 +41,8 @@ export const STATUS_DESCRIPTIONS: Record<ServerStatus, string> = {
   starting: 'The server is starting.',
   stopping: 'The server is stopping.',
   suspended: 'The server is suspended. It cannot be started or opened.',
-  transferring: 'The server is moving to another node.'
+  transferring: 'The server is moving to another node.',
+  unknown: "The server's node is unreachable, its current state is unknown."
 };
 
 export interface ServerActions {
@@ -58,6 +61,7 @@ const IDLE = new Set<ServerStatus>([
   'stopping',
   'crashed',
   'offline',
+  'unknown',
   'install_failed',
   'not_installed'
 ]);

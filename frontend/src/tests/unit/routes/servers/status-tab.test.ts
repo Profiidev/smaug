@@ -66,7 +66,8 @@ const STATES: Record<
   running: { install_state: 'installed', suspended: false },
   starting: { install_state: 'installed', suspended: false },
   stopping: { install_state: 'installed', suspended: false },
-  suspended: { install_state: 'installed', suspended: true }
+  suspended: { install_state: 'installed', suspended: true },
+  unknown: { install_state: 'installed', suspended: false }
 };
 
 const server = (

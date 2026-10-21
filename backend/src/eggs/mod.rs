@@ -23,7 +23,6 @@ use crate::{
   auth::jwt_auth::JwtAuth,
   db::DBTrait,
   nodes::Wings,
-  servers::spec,
   utils::{EggEditPerm, EggViewPerm, UpdateMessage, Updater, client},
 };
 
@@ -443,7 +442,7 @@ async fn edit_egg(
     .await;
   for uuid in servers {
     let server = db.server().find_by_id(uuid).await?;
-    spec::push(&db, &wings, &server).await;
+    wings.put_server(server.node_id, server.id).await;
     updater.broadcast(UpdateMessage::Servers { uuid }).await;
   }
   Ok(())

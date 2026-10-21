@@ -1,7 +1,10 @@
 //! File helper next to every server. Wings calls it over HTTP; it is the only
 //! process that touches the server's volume, mounted at `ROOT`.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+  path::PathBuf,
+  sync::{Arc, Mutex},
+};
 
 use axum::{
   Json, Router,
@@ -20,6 +23,9 @@ mod files;
 struct Agent {
   token: String,
   root: PathBuf,
+  /// One prepare at a time. A request wings gave up on keeps running, a
+  /// retry must not start a second walk over the volume next to it.
+  prepare: Mutex<()>,
 }
 
 #[tokio::main]
@@ -30,6 +36,7 @@ async fn main() {
     root: std::env::var("ROOT")
       .unwrap_or_else(|_| "/data".into())
       .into(),
+    prepare: Mutex::new(()),
   };
   let port = std::env::var("PORT").unwrap_or_else(|_| "8000".into());
   let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
@@ -75,12 +82,14 @@ async fn prepare(
   State(agent): State<Arc<Agent>>,
   Json(req): Json<PrepareRequest>,
 ) -> Result<Json<PrepareResponse>, StatusCode> {
-  let root = agent.root.clone();
   tokio::task::spawn_blocking(move || {
-    config_files::apply(&root, &req.config_files, &req.interface);
-    files::chown_all(&root)?;
+    // held in the blocking task, it outlives a dropped request
+    let _prepare = agent.prepare.lock().unwrap_or_else(|e| e.into_inner());
+    let root = &agent.root;
+    config_files::apply(root, &req.config_files, &req.interface);
+    files::chown_all(root)?;
     Ok::<_, std::io::Error>(PrepareResponse {
-      disk_bytes: files::disk_usage(&root),
+      disk_bytes: files::disk_usage(root),
     })
   })
   .await
@@ -108,6 +117,7 @@ mod test {
     let app = router(Agent {
       token: "secret".into(),
       root: root.clone(),
+      prepare: Mutex::new(()),
     });
     let body = serde_json::to_string(&PrepareRequest {
       config_files: vec![ConfigFile {

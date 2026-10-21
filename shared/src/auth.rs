@@ -68,8 +68,13 @@ impl SignData {
     let timestamp: i64 = get_header_value(headers, TIMESTAMP_HEADER)?
       .parse()
       .status_context(StatusCode::UNAUTHORIZED, "Invalid wings timestamp")?;
-    if (Utc::now().timestamp_millis() - timestamp).abs() > MAX_SKEW_MS {
-      bail!(UNAUTHORIZED, "Expired wings timestamp");
+    let skew = Utc::now().timestamp_millis() - timestamp;
+    if skew.abs() > MAX_SKEW_MS {
+      // a request in flight is never this old, the clocks differ
+      bail!(
+        UNAUTHORIZED,
+        "Expired wings timestamp, clocks differ by {skew} ms (check NTP)"
+      );
     }
 
     let data = SignData {

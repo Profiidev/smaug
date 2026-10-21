@@ -24,7 +24,8 @@ describe('STATUS map', () => {
       'starting',
       'stopping',
       'suspended',
-      'transferring'
+      'transferring',
+      'unknown'
     ]);
   });
 
@@ -89,6 +90,7 @@ describe('availableActions', () => {
     'stopping',
     'crashed',
     'offline',
+    'unknown',
     'install_failed',
     'not_installed'
   ] as const)('allows every action while %s', (status) => {
