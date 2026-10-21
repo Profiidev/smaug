@@ -24,6 +24,8 @@ describe('Permission enum', () => {
     expect(Permission.NODE_EDIT).toBe('node:edit');
     expect(Permission.EGG_VIEW).toBe('egg:view');
     expect(Permission.EGG_EDIT).toBe('egg:edit');
+    expect(Permission.SERVER_VIEW).toBe('server:view');
+    expect(Permission.SERVER_EDIT).toBe('server:edit');
   });
 
   it('pairs a view and edit permission for each resource', () => {

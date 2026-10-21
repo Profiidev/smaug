@@ -39,6 +39,15 @@
     </Collapsible.Trigger>
     <Collapsible.Content>
       {@render permission({
+        header: 'Servers',
+        read: Permission.SERVER_VIEW,
+        read_key: 'server$view',
+        read_label: 'View Server',
+        write: Permission.SERVER_EDIT,
+        write_key: 'server$edit',
+        write_label: 'Edit Server'
+      })}
+      {@render permission({
         header: 'Node View',
         read: Permission.NODE_VIEW,
         read_key: 'node$view',

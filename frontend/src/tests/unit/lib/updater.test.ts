@@ -37,6 +37,7 @@ describe('UpdateType enum', () => {
       'Eggs',
       'Group',
       'Nodes',
+      'Servers',
       'Settings',
       'User',
       'UserPermissions'
@@ -103,6 +104,16 @@ describe('updater message handling', () => {
   it('invalidates the egg list and detail on Eggs updates', () => {
     send({ type: UpdateType.Eggs, uuid: 'egg-1' });
     expect(invalidatedUrls()).toEqual(['/api/eggs', '/api/eggs/egg-1']);
+  });
+
+  it('invalidates every server endpoint via a path predicate on Servers updates', () => {
+    send({ type: UpdateType.Servers, uuid: 's1' });
+    expect(invalidate).toHaveBeenCalledOnce();
+    const [[predicate]] = vi.mocked(invalidate).mock.calls;
+    const matches = predicate as (u: URL) => boolean;
+    expect(matches(new URL('http://x/api/servers'))).toBe(true);
+    expect(matches(new URL('http://x/api/servers/s1/status'))).toBe(true);
+    expect(matches(new URL('http://x/api/nodes'))).toBe(false);
   });
 
   it('ignores unknown message types', () => {

@@ -4,8 +4,28 @@ export type ClientOptions = {
   baseUrl: 'http://localhost:5173' | (string & {});
 };
 
+/**
+ * What the caller may do with a server, ordered from least to most.
+ */
+export const Access = {
+  NONE: 'none',
+  READ: 'read',
+  WRITE: 'write',
+  ADMIN: 'admin'
+} as const;
+
+/**
+ * What the caller may do with a server, ordered from least to most.
+ */
+export type Access = (typeof Access)[keyof typeof Access];
+
 export type AccountUpdate = {
   username: string;
+};
+
+export type Allocation = {
+  ip: string;
+  port: number;
 };
 
 export type AuthConfig = {
@@ -49,6 +69,44 @@ export type CreateNodeRes = {
    * Only returned here and on regenerate, it can not be viewed later.
    */
   token: string;
+  uuid: string;
+};
+
+export type CreateServer = {
+  /**
+   * First one is the primary allocation.
+   */
+  allocations: Array<Allocation>;
+  /**
+   * 0 disables backups.
+   */
+  backup_limit: number;
+  egg: string;
+  /**
+   * env name -> value; missing variables keep their current value (or the
+   * egg default).
+   */
+  environment?: {
+    [key: string]: string;
+  };
+  image: string;
+  limits: Limits;
+  name: string;
+  node: string;
+  owner?: string | null;
+  /**
+   * Mark the server installed without running the egg install script.
+   */
+  skip_scripts: boolean;
+  start_on_completion: boolean;
+  startup: string;
+  /**
+   * Overridden commands are left alone by egg updates.
+   */
+  startup_overridden: boolean;
+};
+
+export type CreateServerResponse = {
   uuid: string;
 };
 
@@ -243,8 +301,48 @@ export type EmailChangeConfirm = {
   old_code: string;
 };
 
+export type FieldError = {
+  /**
+   * Dotted path of the offending request field, e.g. `allocations.1.port`
+   * or `variables.SERVER_JARFILE`.
+   */
+  field: string;
+  message: string;
+};
+
+/**
+ * Body of a 400 (validation) or 409 (allocation in use) response.
+ */
+export type FieldErrors = {
+  errors: Array<FieldError>;
+};
+
 export type GeneralSettings = {
   site_url: string;
+};
+
+export type Grant = {
+  access: ServerAccessLevel;
+  /**
+   * User or group id.
+   */
+  uuid: string;
+};
+
+export type GrantInfo = {
+  access: ServerAccessLevel;
+  name: string;
+  uuid: string;
+};
+
+export type GrantsBody = {
+  groups?: Array<Grant>;
+  users?: Array<Grant>;
+};
+
+export type GrantsInfo = {
+  groups: Array<GrantInfo>;
+  users: Array<GrantInfo>;
 };
 
 export type GroupCreateResponse = {
@@ -274,6 +372,10 @@ export type GroupViewPath = {
   uuid: string;
 };
 
+export type InstallRequest = {
+  installed: boolean;
+};
+
 export type IsSetupResponse = {
   db_backend: string;
   is_setup: boolean;
@@ -283,6 +385,15 @@ export type KeyRes = {
   key: string;
 };
 
+/**
+ * CPU in millicores (1000 = one core), memory and disk in MiB; 0 is unlimited.
+ */
+export type Limits = {
+  cpu: number;
+  disk: number;
+  memory: number;
+};
+
 export type ListEggsResponse = {
   eggs: Array<EggListItem>;
 };
@@ -290,6 +401,10 @@ export type ListEggsResponse = {
 export type ListGroupResponse = {
   admin_group?: string | null;
   groups: Array<GroupInfo>;
+};
+
+export type ListServersResponse = {
+  servers: Array<ServerListItem>;
 };
 
 export type LoginReq = {
@@ -315,6 +430,11 @@ export type MailSettings = {
 export type MailSettingsResponse = {
   from_env: Array<string>;
   settings: MailSettings;
+};
+
+export type Named = {
+  name: string;
+  uuid: string;
 };
 
 export type NodeInfo = {
@@ -349,6 +469,24 @@ export type OidcUrlQuery = {
   redirect_to?: string | null;
 };
 
+export type OptionEgg = {
+  /**
+   * label -> image, order preserved
+   */
+  docker_images: {
+    [key: string]: string;
+  };
+  name: string;
+  /**
+   * label -> command, order preserved; the first one is the default
+   */
+  startup_commands: {
+    [key: string]: string;
+  };
+  uuid: string;
+  variables: Array<EggVariable>;
+};
+
 export type PasswordUpdate = {
   new_password: string;
   old_password: string;
@@ -372,6 +510,85 @@ export const SsoType = { OIDC: 'Oidc', NONE: 'None' } as const;
 
 export type SsoType = (typeof SsoType)[keyof typeof SsoType];
 
+export const ServerAccessLevel = { READ: 'read', WRITE: 'write' } as const;
+
+export type ServerAccessLevel =
+  (typeof ServerAccessLevel)[keyof typeof ServerAccessLevel];
+
+export type ServerInfo = {
+  /**
+   * The caller's access level.
+   */
+  access: Access;
+  allocations: Array<Allocation>;
+  backup_limit: number;
+  created_at: Date;
+  egg: Named;
+  /**
+   * Only returned to admins.
+   */
+  grants?: GrantsInfo | null;
+  image: string;
+  install_state: ServerInstallState;
+  limits: Limits;
+  name: string;
+  node: Named;
+  owner?: Named | null;
+  start_on_completion: boolean;
+  startup: string;
+  startup_overridden: boolean;
+  status: ServerStatus;
+  suspended: boolean;
+  uuid: string;
+  /**
+   * Egg variables merged with the server's values; non-admins only see
+   * `user_viewable` ones.
+   */
+  variables: Array<VariableInfo>;
+};
+
+export const ServerInstallState = {
+  NOT_INSTALLED: 'not_installed',
+  INSTALLING: 'installing',
+  INSTALL_FAILED: 'install_failed',
+  INSTALLED: 'installed'
+} as const;
+
+export type ServerInstallState =
+  (typeof ServerInstallState)[keyof typeof ServerInstallState];
+
+export type ServerListItem = {
+  egg: Named;
+  extra_allocations: Array<Allocation>;
+  name: string;
+  node: Named;
+  owner?: Named | null;
+  primary_allocation?: Allocation | null;
+  status: ServerStatus;
+  uuid: string;
+};
+
+export type ServerOptions = {
+  eggs: Array<OptionEgg>;
+  groups: Array<Named>;
+  nodes: Array<Named>;
+  users: Array<Named>;
+};
+
+export const ServerStatus = {
+  OFFLINE: 'offline',
+  NOT_INSTALLED: 'not_installed',
+  INSTALLING: 'installing',
+  INSTALL_FAILED: 'install_failed',
+  SUSPENDED: 'suspended'
+} as const;
+
+export type ServerStatus = (typeof ServerStatus)[keyof typeof ServerStatus];
+
+export type ServerUuid = {
+  uuid: string;
+};
+
 export type SetupPayload = {
   admin_email: string;
   admin_password: string;
@@ -388,8 +605,18 @@ export type SimpleUserInfo = {
   name: string;
 };
 
+export type SuspendRequest = {
+  suspended: boolean;
+};
+
 export type TokenRegenerateRes = {
   token: string;
+};
+
+export type TransferRequest = {
+  ip: string;
+  node: string;
+  port: number;
 };
 
 export type UpdateNode = {
@@ -399,6 +626,38 @@ export type UpdateNode = {
   memory_limit_mb?: number | null;
   name: string;
   secure: boolean;
+};
+
+export type UpdateServer = {
+  /**
+   * First one is the primary allocation.
+   */
+  allocations: Array<Allocation>;
+  /**
+   * 0 disables backups.
+   */
+  backup_limit: number;
+  egg: string;
+  /**
+   * env name -> value; missing variables keep their current value (or the
+   * egg default).
+   */
+  environment?: {
+    [key: string]: string;
+  };
+  /**
+   * Replaces all grants when set (admin only).
+   */
+  grants?: GrantsBody | null;
+  image: string;
+  limits: Limits;
+  name: string;
+  owner?: string | null;
+  startup: string;
+  /**
+   * Overridden commands are left alone by egg updates.
+   */
+  startup_overridden: boolean;
 };
 
 export type UserAvatarResetRequest = {
@@ -447,6 +706,19 @@ export type UserSettingsResponse = {
 
 export type UserViewPath = {
   uuid: string;
+};
+
+export type VariableInfo = {
+  default_value: string;
+  description: string;
+  /**
+   * Whether the caller may change it.
+   */
+  editable: boolean;
+  env_variable: string;
+  name: string;
+  rules: Array<string>;
+  value: string;
 };
 
 export type IsSetupData = {
@@ -2120,3 +2392,351 @@ export type EggSourceResponses = {
 };
 
 export type EggSourceResponse2 = EggSourceResponses[keyof EggSourceResponses];
+
+export type ListServersData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/servers';
+};
+
+export type ListServersErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ListServersResponses = {
+  200: ListServersResponse;
+};
+
+export type ListServersResponse2 =
+  ListServersResponses[keyof ListServersResponses];
+
+export type CreateServerData = {
+  body: CreateServer;
+  path?: never;
+  query?: never;
+  url: '/api/servers';
+};
+
+export type CreateServerErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type CreateServerError = CreateServerErrors[keyof CreateServerErrors];
+
+export type CreateServerResponses = {
+  200: CreateServerResponse;
+};
+
+export type CreateServerResponse2 =
+  CreateServerResponses[keyof CreateServerResponses];
+
+export type ServerOptionsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/api/servers/options';
+};
+
+export type ServerOptionsErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ServerOptionsResponses = {
+  200: ServerOptions;
+};
+
+export type ServerOptionsResponse =
+  ServerOptionsResponses[keyof ServerOptionsResponses];
+
+export type DeleteServerData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}';
+};
+
+export type DeleteServerErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type DeleteServerResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ServerInfoData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}';
+};
+
+export type ServerInfoErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ServerInfoResponses = {
+  200: ServerInfo;
+};
+
+export type ServerInfoResponse = ServerInfoResponses[keyof ServerInfoResponses];
+
+export type UpdateServerData = {
+  body: UpdateServer;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}';
+};
+
+export type UpdateServerErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type UpdateServerError = UpdateServerErrors[keyof UpdateServerErrors];
+
+export type UpdateServerResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type ReinstallServerData = {
+  body?: never;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/reinstall';
+};
+
+export type ReinstallServerErrors = {
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type ReinstallServerResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type SetServerInstalledData = {
+  body: InstallRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/install';
+};
+
+export type SetServerInstalledErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type SetServerInstalledError =
+  SetServerInstalledErrors[keyof SetServerInstalledErrors];
+
+export type SetServerInstalledResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type SetServerSuspendedData = {
+  body: SuspendRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/suspend';
+};
+
+export type SetServerSuspendedErrors = {
+  /**
+   * Failed to parse the request body as JSON
+   */
+  400: string;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type SetServerSuspendedError =
+  SetServerSuspendedErrors[keyof SetServerSuspendedErrors];
+
+export type SetServerSuspendedResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};
+
+export type TransferServerData = {
+  body: TransferRequest;
+  path: {
+    uuid: string;
+  };
+  query?: never;
+  url: '/api/servers/{uuid}/transfer';
+};
+
+export type TransferServerErrors = {
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  400: FieldErrors;
+  /**
+   * Body of a 400 (validation) or 409 (allocation in use) response.
+   */
+  409: FieldErrors;
+  /**
+   * Expected request with `Content-Type: application/json`
+   */
+  415: string;
+  /**
+   * Failed to deserialize the JSON body into the target type
+   */
+  422: string;
+  /**
+   * An error occurred
+   */
+  '4XX': unknown;
+  /**
+   * An error occurred
+   */
+  '5XX': unknown;
+};
+
+export type TransferServerError =
+  TransferServerErrors[keyof TransferServerErrors];
+
+export type TransferServerResponses = {
+  /**
+   * no content
+   */
+  200: unknown;
+};

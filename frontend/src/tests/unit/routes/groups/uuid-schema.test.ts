@@ -23,6 +23,8 @@ describe('groupSettings schema', () => {
     expect(r.data?.node$edit).toBe(false);
     expect(r.data?.egg$view).toBe(false);
     expect(r.data?.egg$edit).toBe(false);
+    expect(r.data?.server$view).toBe(false);
+    expect(r.data?.server$edit).toBe(false);
   });
 });
 
@@ -75,8 +77,15 @@ describe('formatData', () => {
     expect(form.egg$edit).toBe(false);
   });
 
-  it('round-trips the node and egg permissions', () => {
-    const permissions = ['node:view', 'node:edit', 'egg:view', 'egg:edit'];
+  it('round-trips the node, egg and server permissions', () => {
+    const permissions = [
+      'node:view',
+      'node:edit',
+      'egg:view',
+      'egg:edit',
+      'server:view',
+      'server:edit'
+    ];
     const group: GroupDetails = {
       id: 'gid',
       name: 'Servers',
@@ -86,6 +95,7 @@ describe('formatData', () => {
     const form = formatData(group);
     expect(form.node$view && form.node$edit).toBe(true);
     expect(form.egg$view && form.egg$edit).toBe(true);
+    expect(form.server$view && form.server$edit).toBe(true);
     expect(reformatData(form, 'gid').permissions.toSorted()).toEqual(
       permissions.toSorted()
     );

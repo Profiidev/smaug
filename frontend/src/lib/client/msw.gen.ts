@@ -27,6 +27,8 @@ import type {
   CreateGroupResponses,
   CreateNodeData,
   CreateNodeResponses,
+  CreateServerData,
+  CreateServerResponses,
   CreateUserData,
   CreateUserResponses,
   DeleteEggData,
@@ -35,6 +37,7 @@ import type {
   DeleteGroupResponses,
   DeleteNodeData,
   DeleteNodeResponses,
+  DeleteServerResponses,
   DeleteUserData,
   DeleteUserResponses,
   EditEggData,
@@ -59,11 +62,13 @@ import type {
   ListGroupsResponses,
   ListGroupsSimpleResponses,
   ListNodesResponses,
+  ListServersResponses,
   ListUsersResponses,
   ListUsersSimpleResponses,
   MailActiveResponses,
   NodeInfoResponses,
   NodeTokenRegenerateResponses,
+  ReinstallServerResponses,
   ResetPasswordData,
   ResetPasswordResponses,
   ResetUserAvatarData,
@@ -76,9 +81,17 @@ import type {
   SaveUserSettingsResponses,
   SendResetLinkData,
   SendResetLinkResponses,
+  ServerInfoResponses,
+  ServerOptionsResponses,
+  SetServerInstalledData,
+  SetServerInstalledResponses,
+  SetServerSuspendedData,
+  SetServerSuspendedResponses,
   StartEmailChangeData,
   StartEmailChangeResponses,
   TestMailResponses,
+  TransferServerData,
+  TransferServerResponses,
   UpdateAccountData,
   UpdateAccountResponses,
   UpdateAvatarData,
@@ -87,6 +100,8 @@ import type {
   UpdateNodeResponses,
   UpdatePasswordData,
   UpdatePasswordResponses,
+  UpdateServerData,
+  UpdateServerResponses,
   UserInfoResponses
 } from './types.gen';
 
@@ -2051,6 +2066,432 @@ export function handleEggSource(
   );
 }
 
+export type HandleListServersResponse = {
+  body: ListServersResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers` operation.
+ */
+export function handleListServers(
+  response?: HandleListServersResponse | HttpResponseResolver<never, never>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<never, never>(
+    `${options?.baseUrl ?? '*'}/api/servers`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateServerResponse = {
+  body: CreateServerResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers` operation.
+ */
+export function handleCreateServer(
+  response?:
+    | HandleCreateServerResponse
+    | HttpResponseResolver<never, CreateServerData['body']>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<never, CreateServerData['body']>(
+    `${options?.baseUrl ?? '*'}/api/servers`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleServerOptionsResponse = {
+  body: ServerOptionsResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/options` operation.
+ */
+export function handleServerOptions(
+  response?: HandleServerOptionsResponse | HttpResponseResolver<never, never>,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<never, never>(
+    `${options?.baseUrl ?? '*'}/api/servers/options`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDeleteServerResponse = {
+  body: DeleteServerResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `DELETE /api/servers/{uuid}` operation.
+ */
+export function handleDeleteServer(
+  response?:
+    | HandleDeleteServerResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleServerInfoResponse = {
+  body: ServerInfoResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}` operation.
+ */
+export function handleServerInfo(
+  response?:
+    | HandleServerInfoResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleUpdateServerResponse = {
+  body: UpdateServerResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `PUT /api/servers/{uuid}` operation.
+ */
+export function handleUpdateServer(
+  response?:
+    | HandleUpdateServerResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        UpdateServerData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.put<
+    {
+      uuid: string;
+    },
+    UpdateServerData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleReinstallServerResponse = {
+  body: ReinstallServerResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/reinstall` operation.
+ */
+export function handleReinstallServer(
+  response?:
+    | HandleReinstallServerResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/reinstall`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleSetServerInstalledResponse = {
+  body: SetServerInstalledResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/install` operation.
+ */
+export function handleSetServerInstalled(
+  response?:
+    | HandleSetServerInstalledResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        SetServerInstalledData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    SetServerInstalledData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/install`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleSetServerSuspendedResponse = {
+  body: SetServerSuspendedResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/suspend` operation.
+ */
+export function handleSetServerSuspended(
+  response?:
+    | HandleSetServerSuspendedResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        SetServerSuspendedData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    SetServerSuspendedData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/suspend`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleTransferServerResponse = {
+  body: TransferServerResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/transfer` operation.
+ */
+export function handleTransferServer(
+  response?:
+    | HandleTransferServerResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        TransferServerData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    TransferServerData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/transfer`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
 export type MswHandlerFactories = {
   /**
    * Handler for the `GET /api/setup` operation.
@@ -2264,6 +2705,46 @@ export type MswHandlerFactories = {
    * Handler for the `GET /api/eggs/{uuid}/source` operation.
    */
   eggSource: typeof handleEggSource;
+  /**
+   * Handler for the `GET /api/servers` operation.
+   */
+  listServers: typeof handleListServers;
+  /**
+   * Handler for the `POST /api/servers` operation.
+   */
+  createServer: typeof handleCreateServer;
+  /**
+   * Handler for the `GET /api/servers/options` operation.
+   */
+  serverOptions: typeof handleServerOptions;
+  /**
+   * Handler for the `DELETE /api/servers/{uuid}` operation.
+   */
+  deleteServer: typeof handleDeleteServer;
+  /**
+   * Handler for the `GET /api/servers/{uuid}` operation.
+   */
+  serverInfo: typeof handleServerInfo;
+  /**
+   * Handler for the `PUT /api/servers/{uuid}` operation.
+   */
+  updateServer: typeof handleUpdateServer;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/reinstall` operation.
+   */
+  reinstallServer: typeof handleReinstallServer;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/install` operation.
+   */
+  setServerInstalled: typeof handleSetServerInstalled;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/suspend` operation.
+   */
+  setServerSuspended: typeof handleSetServerSuspended;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/transfer` operation.
+   */
+  transferServer: typeof handleTransferServer;
 };
 
 export type CreateMswHandlersResult = {
@@ -2340,7 +2821,17 @@ export function createMswHandlers(
     createEgg: wrap(handleCreateEgg),
     editEgg: wrap(handleEditEgg),
     eggInfo: wrap(handleEggInfo),
-    eggSource: wrap(handleEggSource)
+    eggSource: wrap(handleEggSource),
+    listServers: wrap(handleListServers),
+    createServer: wrap(handleCreateServer),
+    serverOptions: wrap(handleServerOptions),
+    deleteServer: wrap(handleDeleteServer),
+    serverInfo: wrap(handleServerInfo),
+    updateServer: wrap(handleUpdateServer),
+    reinstallServer: wrap(handleReinstallServer),
+    setServerInstalled: wrap(handleSetServerInstalled),
+    setServerSuspended: wrap(handleSetServerSuspended),
+    transferServer: wrap(handleTransferServer)
   };
   const all: CreateMswHandlersResult['all'] = (options = {}) => {
     type OverrideValue<R> = R | [response?: R, options?: RequestHandlerOptions];
@@ -2369,6 +2860,10 @@ export function createMswHandlers(
       invoke(pick.userInfo, overrides.userInfo),
       invoke(pick.nodeTokenRegenerate, overrides.nodeTokenRegenerate),
       invoke(pick.eggSource, overrides.eggSource),
+      invoke(pick.reinstallServer, overrides.reinstallServer),
+      invoke(pick.setServerInstalled, overrides.setServerInstalled),
+      invoke(pick.setServerSuspended, overrides.setServerSuspended),
+      invoke(pick.transferServer, overrides.transferServer),
       invoke(pick.getOidcSettings, overrides.getOidcSettings),
       invoke(pick.initOidc, overrides.initOidc),
       invoke(pick.key, overrides.key),
@@ -2388,10 +2883,14 @@ export function createMswHandlers(
       invoke(pick.saveMailSettings, overrides.saveMailSettings),
       invoke(pick.testMail, overrides.testMail),
       invoke(pick.listUsersSimple, overrides.listUsersSimple),
+      invoke(pick.serverOptions, overrides.serverOptions),
       invoke(pick.groupInfo, overrides.groupInfo),
       invoke(pick.nodeInfo, overrides.nodeInfo),
       invoke(pick.updateNode, overrides.updateNode),
       invoke(pick.eggInfo, overrides.eggInfo),
+      invoke(pick.deleteServer, overrides.deleteServer),
+      invoke(pick.serverInfo, overrides.serverInfo),
+      invoke(pick.updateServer, overrides.updateServer),
       invoke(pick.isSetup, overrides.isSetup),
       invoke(pick.completeSetup, overrides.completeSetup),
       invoke(pick.deleteGroup, overrides.deleteGroup),
@@ -2404,7 +2903,9 @@ export function createMswHandlers(
       invoke(pick.deleteEgg, overrides.deleteEgg),
       invoke(pick.listEggs, overrides.listEggs),
       invoke(pick.createEgg, overrides.createEgg),
-      invoke(pick.editEgg, overrides.editEgg)
+      invoke(pick.editEgg, overrides.editEgg),
+      invoke(pick.listServers, overrides.listServers),
+      invoke(pick.createServer, overrides.createServer)
     ];
   };
   return { all, pick };

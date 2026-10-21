@@ -10,6 +10,8 @@ export const groupSettings = z.object({
   name: z.string().min(1, 'Group name is required'),
   node$edit: z.boolean().default(false),
   node$view: z.boolean().default(false),
+  server$edit: z.boolean().default(false),
+  server$view: z.boolean().default(false),
   settings$edit: z.boolean().default(false),
   settings$view: z.boolean().default(false),
   user$edit: z.boolean().default(false),

@@ -109,7 +109,7 @@ test.describe('group detail', () => {
     ).toBeVisible();
   });
 
-  test('lists and saves the node and egg permissions', async ({
+  test('lists and saves the server, node and egg permissions', async ({
     network,
     page
   }) => {
@@ -122,11 +122,21 @@ test.describe('group detail', () => {
     );
     await gotoReady(page, '/groups/group-staff');
 
-    for (const name of ['View Node', 'Edit Node', 'View Egg', 'Edit Egg']) {
+    for (const name of [
+      'View Server',
+      'Edit Server',
+      'View Node',
+      'Edit Node',
+      'View Egg',
+      'Edit Egg'
+    ]) {
       // oxlint-disable-next-line no-await-in-loop
       await expect(page.getByRole('checkbox', { name })).toBeVisible();
     }
 
+    await page
+      .getByRole('checkbox', { name: 'View Server' })
+      .dispatchEvent('click');
     await page
       .getByRole('checkbox', { name: 'View Egg' })
       .dispatchEvent('click');
@@ -142,7 +152,11 @@ test.describe('group detail', () => {
     expect(bodies).toEqual([
       {
         name: 'Staff',
-        permissions: expect.arrayContaining(['egg:view', 'egg:edit']),
+        permissions: expect.arrayContaining([
+          'server:view',
+          'egg:view',
+          'egg:edit'
+        ]),
         users: [],
         uuid: 'group-staff'
       }

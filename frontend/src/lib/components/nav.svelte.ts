@@ -14,6 +14,7 @@ export const items: NavGroup[] = [
   },
   {
     items: [
+      { href: '/servers', icon: Server, label: 'Servers' },
       {
         href: '/nodes',
         icon: Server,

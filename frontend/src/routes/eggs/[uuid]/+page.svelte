@@ -35,8 +35,8 @@
   import InstallScriptFields from '../InstallScriptFields.svelte';
   import RuntimeFields from '../RuntimeFields.svelte';
   import ConfigFields from '../ConfigFields.svelte';
-  import SaveBar from '../SaveBar.svelte';
-  import SectionErrorDot from '../SectionErrorDot.svelte';
+  import SaveBar from '$lib/components/form/SaveBar.svelte';
+  import SectionErrorDot from '$lib/components/form/SectionErrorDot.svelte';
   import UpdateDialog from '../UpdateDialog.svelte';
   import { checkEggUpdate, type EggUpdate } from '../update';
 

@@ -37,6 +37,9 @@ import type {
   CreateNodeData,
   CreateNodeErrors,
   CreateNodeResponses,
+  CreateServerData,
+  CreateServerErrors,
+  CreateServerResponses,
   CreateUserData,
   CreateUserErrors,
   CreateUserResponses,
@@ -49,6 +52,9 @@ import type {
   DeleteNodeData,
   DeleteNodeErrors,
   DeleteNodeResponses,
+  DeleteServerData,
+  DeleteServerErrors,
+  DeleteServerResponses,
   DeleteUserData,
   DeleteUserErrors,
   DeleteUserResponses,
@@ -105,6 +111,9 @@ import type {
   ListNodesData,
   ListNodesErrors,
   ListNodesResponses,
+  ListServersData,
+  ListServersErrors,
+  ListServersResponses,
   ListUsersData,
   ListUsersErrors,
   ListUsersResponses,
@@ -122,6 +131,9 @@ import type {
   NodeTokenRegenerateData,
   NodeTokenRegenerateErrors,
   NodeTokenRegenerateResponses,
+  ReinstallServerData,
+  ReinstallServerErrors,
+  ReinstallServerResponses,
   ResetPasswordData,
   ResetPasswordErrors,
   ResetPasswordResponses,
@@ -140,6 +152,18 @@ import type {
   SendResetLinkData,
   SendResetLinkErrors,
   SendResetLinkResponses,
+  ServerInfoData,
+  ServerInfoErrors,
+  ServerInfoResponses,
+  ServerOptionsData,
+  ServerOptionsErrors,
+  ServerOptionsResponses,
+  SetServerInstalledData,
+  SetServerInstalledErrors,
+  SetServerInstalledResponses,
+  SetServerSuspendedData,
+  SetServerSuspendedErrors,
+  SetServerSuspendedResponses,
   StartEmailChangeData,
   StartEmailChangeErrors,
   StartEmailChangeResponses,
@@ -147,6 +171,9 @@ import type {
   TestMailErrors,
   TestMailResponses,
   TestTokenData,
+  TransferServerData,
+  TransferServerErrors,
+  TransferServerResponses,
   UpdateAccountData,
   UpdateAccountErrors,
   UpdateAccountResponses,
@@ -159,6 +186,9 @@ import type {
   UpdatePasswordData,
   UpdatePasswordErrors,
   UpdatePasswordResponses,
+  UpdateServerData,
+  UpdateServerErrors,
+  UpdateServerResponses,
   UserInfoData,
   UserInfoErrors,
   UserInfoResponses
@@ -898,3 +928,140 @@ export const eggSource = <ThrowOnError extends boolean = false>(
     EggSourceErrors,
     ThrowOnError
   >({ url: '/api/eggs/{uuid}/source', ...options });
+
+export const listServers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListServersData, ThrowOnError>
+): RequestResult<ListServersResponses, ListServersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListServersResponses,
+    ListServersErrors,
+    ThrowOnError
+  >({ url: '/api/servers', ...options });
+
+export const createServer = <ThrowOnError extends boolean = false>(
+  options: Options<CreateServerData, ThrowOnError>
+): RequestResult<CreateServerResponses, CreateServerErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateServerResponses,
+    CreateServerErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const serverOptions = <ThrowOnError extends boolean = false>(
+  options?: Options<ServerOptionsData, ThrowOnError>
+): RequestResult<ServerOptionsResponses, ServerOptionsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ServerOptionsResponses,
+    ServerOptionsErrors,
+    ThrowOnError
+  >({ url: '/api/servers/options', ...options });
+
+export const deleteServer = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteServerData, ThrowOnError>
+): RequestResult<DeleteServerResponses, DeleteServerErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteServerResponses,
+    DeleteServerErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}', ...options });
+
+export const serverInfo = <ThrowOnError extends boolean = false>(
+  options: Options<ServerInfoData, ThrowOnError>
+): RequestResult<ServerInfoResponses, ServerInfoErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ServerInfoResponses,
+    ServerInfoErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}', ...options });
+
+export const updateServer = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateServerData, ThrowOnError>
+): RequestResult<UpdateServerResponses, UpdateServerErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    UpdateServerResponses,
+    UpdateServerErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const reinstallServer = <ThrowOnError extends boolean = false>(
+  options: Options<ReinstallServerData, ThrowOnError>
+): RequestResult<
+  ReinstallServerResponses,
+  ReinstallServerErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ReinstallServerResponses,
+    ReinstallServerErrors,
+    ThrowOnError
+  >({ url: '/api/servers/{uuid}/reinstall', ...options });
+
+export const setServerInstalled = <ThrowOnError extends boolean = false>(
+  options: Options<SetServerInstalledData, ThrowOnError>
+): RequestResult<
+  SetServerInstalledResponses,
+  SetServerInstalledErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SetServerInstalledResponses,
+    SetServerInstalledErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/install',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const setServerSuspended = <ThrowOnError extends boolean = false>(
+  options: Options<SetServerSuspendedData, ThrowOnError>
+): RequestResult<
+  SetServerSuspendedResponses,
+  SetServerSuspendedErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SetServerSuspendedResponses,
+    SetServerSuspendedErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/suspend',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+export const transferServer = <ThrowOnError extends boolean = false>(
+  options: Options<TransferServerData, ThrowOnError>
+): RequestResult<TransferServerResponses, TransferServerErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    TransferServerResponses,
+    TransferServerErrors,
+    ThrowOnError
+  >({
+    url: '/api/servers/{uuid}/transfer',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });

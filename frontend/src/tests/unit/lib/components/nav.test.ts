@@ -47,7 +47,7 @@ describe('nav items', () => {
     expect(overview?.requiredPermission).toBeUndefined();
   });
 
-  it('lists Nodes and Eggs under Servers, gated by their view permissions', () => {
+  it('lists Servers (public), then Nodes and Eggs gated by their view permissions', () => {
     const servers = items.find((g) => g.label === 'Servers');
     expect(
       servers?.items.map(({ href, label, requiredPermission }) => ({
@@ -56,6 +56,7 @@ describe('nav items', () => {
         requiredPermission
       }))
     ).toEqual([
+      { href: '/servers', label: 'Servers', requiredPermission: undefined },
       {
         href: '/nodes',
         label: 'Nodes',

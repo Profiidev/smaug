@@ -1,16 +1,18 @@
-<script lang="ts">
+<script lang="ts" generics="T extends FormRecord">
   import { untrack } from 'svelte';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Save from '@lucide/svelte/icons/save';
-  import type { SuperForm } from '@profidev/pleiades/components/form/types';
-  import type { EggForm } from './schema.svelte';
+  import type {
+    FormRecord,
+    SuperForm
+  } from '@profidev/pleiades/components/form/types';
 
   interface Props {
-    formData: SuperForm<EggForm>;
+    formData: SuperForm<T>;
     /** Last loaded or saved value; becomes the form's clean (untainted) state. */
-    saved?: EggForm;
+    saved?: T;
     isLoading: boolean;
     isError: boolean;
     readonly: boolean;
