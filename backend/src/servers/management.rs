@@ -283,6 +283,8 @@ pub(super) async fn server_info(
     suspended: server.suspended,
     start_on_completion: server.start_on_completion,
     backup_limit: server.backup_limit,
+    stop_timeout: server.stop_timeout,
+    restart_on_crash: server.restart_on_crash,
     created_at: server.created_at,
   }))
 }
@@ -331,6 +333,8 @@ pub(super) async fn create_server(
     memory_mb: 0,
     disk_mb: 0,
     backup_limit: 0,
+    stop_timeout: 0,
+    restart_on_crash: false,
     created_at: Utc::now().fixed_offset(),
   };
   apply_spec(&mut server, req.spec);

@@ -486,7 +486,9 @@ pub fn server_body(node: Uuid, egg: Uuid, port: u16) -> Value {
     "image": "ghcr.io/java:21",
     "environment": { "FIRST": "hello" },
     "limits": { "cpu": 0, "memory": 0, "disk": 0 },
-    "backup_limit": 0
+    "backup_limit": 0,
+    "stop_timeout": 60,
+    "restart_on_crash": true
   })
 }
 
@@ -513,6 +515,8 @@ pub fn update_body(info: &Value) -> Value {
     "image": info["image"],
     "environment": environment,
     "limits": info["limits"],
-    "backup_limit": info["backup_limit"]
+    "backup_limit": info["backup_limit"],
+    "stop_timeout": info["stop_timeout"],
+    "restart_on_crash": info["restart_on_crash"]
   })
 }

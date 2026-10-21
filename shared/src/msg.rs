@@ -50,6 +50,11 @@ pub struct ServerSpec {
   /// First entry is the primary allocation.
   pub allocations: Vec<Allocation>,
   pub stop: StopAction,
+  /// Seconds each stop step may take before wings escalates
+  /// (stop action, then SIGTERM, then SIGKILL).
+  pub stop_timeout_s: u32,
+  /// Restart when the server exits without a stop or kill request.
+  pub restart_on_crash: bool,
   /// The server counts as running once a console line contains one of these.
   /// Empty means running as soon as the process started.
   pub startup_done: Vec<String>,

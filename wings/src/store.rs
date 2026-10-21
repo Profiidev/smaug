@@ -243,6 +243,8 @@ pub(crate) mod test {
       },
       allocations: vec![],
       stop: StopAction::Signal(Signal::Term),
+      stop_timeout_s: 60,
+      restart_on_crash: true,
       startup_done: vec![],
       config_files: vec![],
       file_denylist: vec![],

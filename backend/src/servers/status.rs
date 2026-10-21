@@ -92,6 +92,8 @@ pub(super) mod test {
       memory_mb: 512,
       disk_mb: 1024,
       backup_limit: 2,
+      stop_timeout: 60,
+      restart_on_crash: true,
       created_at: Utc::now().fixed_offset(),
     }
   }

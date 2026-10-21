@@ -76,6 +76,10 @@ pub(super) struct ServerSpec {
   pub(super) limits: Limits,
   /// 0 disables backups.
   pub(super) backup_limit: i32,
+  /// Seconds per stop step before wings escalates to SIGTERM, then SIGKILL.
+  pub(super) stop_timeout: i32,
+  /// Restart the server when it exits without being stopped.
+  pub(super) restart_on_crash: bool,
 }
 
 #[derive(Deserialize, JsonSchema, Debug)]
@@ -172,6 +176,8 @@ pub(super) struct ServerInfo {
   pub(super) start_on_completion: bool,
   pub(super) limits: Limits,
   pub(super) backup_limit: i32,
+  pub(super) stop_timeout: i32,
+  pub(super) restart_on_crash: bool,
   pub(super) created_at: chrono::DateTime<chrono::FixedOffset>,
   /// Egg variables merged with the server's values; non-admins only see
   /// `user_viewable` ones.

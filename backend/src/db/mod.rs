@@ -337,6 +337,8 @@ mod test {
       memory_mb: 5_000_000_000,
       disk_mb: 0,
       backup_limit: 0,
+      stop_timeout: 60,
+      restart_on_crash: true,
       // postgres keeps microseconds
       created_at: chrono::SubsecRound::trunc_subsecs(chrono::Utc::now(), 6).fixed_offset(),
     }

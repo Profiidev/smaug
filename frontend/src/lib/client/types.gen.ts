@@ -95,6 +95,10 @@ export type CreateServer = {
   node: string;
   owner?: string | null;
   /**
+   * Restart the server when it exits without being stopped.
+   */
+  restart_on_crash: boolean;
+  /**
    * Mark the server installed without running the egg install script.
    */
   skip_scripts: boolean;
@@ -104,6 +108,10 @@ export type CreateServer = {
    * Overridden commands are left alone by egg updates.
    */
   startup_overridden: boolean;
+  /**
+   * Seconds per stop step before wings escalates to SIGTERM, then SIGKILL.
+   */
+  stop_timeout: number;
 };
 
 export type CreateServerResponse = {
@@ -542,10 +550,12 @@ export type ServerInfo = {
   name: string;
   node: Named;
   owner?: Named | null;
+  restart_on_crash: boolean;
   start_on_completion: boolean;
   startup: string;
   startup_overridden: boolean;
   status: ServerStatus;
+  stop_timeout: number;
   suspended: boolean;
   uuid: string;
   /**
@@ -664,11 +674,19 @@ export type UpdateServer = {
   limits: Limits;
   name: string;
   owner?: string | null;
+  /**
+   * Restart the server when it exits without being stopped.
+   */
+  restart_on_crash: boolean;
   startup: string;
   /**
    * Overridden commands are left alone by egg updates.
    */
   startup_overridden: boolean;
+  /**
+   * Seconds per stop step before wings escalates to SIGTERM, then SIGKILL.
+   */
+  stop_timeout: number;
 };
 
 export type UserAvatarResetRequest = {

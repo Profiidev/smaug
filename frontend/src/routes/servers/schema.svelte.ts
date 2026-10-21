@@ -92,6 +92,9 @@ const grantRow = (kind: 'user' | 'group') =>
 const selectOne = (message: string) =>
   z.array(z.string()).min(1, message).max(1).default([]);
 
+/** Matches the backend; longer would block a stop for ages. */
+export const MAX_STOP_TIMEOUT = 3600;
+
 const count = (label: string, unit: string) =>
   z
     .number({ error: `${label} is required.` })
@@ -120,12 +123,22 @@ const generalObject = z.object({
 
 const startupObject = z.object({
   image: z.string().trim().min(1, 'Image is required.').default(''),
+  restartOnCrash: z.boolean().default(true),
   /** Create only; off sends `skip_scripts`. */
   runInstall: z.boolean().default(true),
   /** Create only. */
   startOnCompletion: z.boolean().default(true),
   startup: z.string().trim().min(1, 'Startup command is required.').default(''),
-  startupOverridden: z.boolean().default(false)
+  startupOverridden: z.boolean().default(false),
+  stopTimeout: z
+    .number({ error: 'Stop timeout is required.' })
+    .int('Stop timeout must be a whole number.')
+    .min(1, 'Stop timeout must be at least 1 second.')
+    .max(
+      MAX_STOP_TIMEOUT,
+      `Stop timeout must be at most ${MAX_STOP_TIMEOUT} seconds.`
+    )
+    .default(60)
 });
 
 const variablesObject = z.object({
@@ -378,8 +391,10 @@ const common = (f: ServerForm) => ({
   limits: toLimits(f),
   name: f.name.trim(),
   owner: f.owner[0] ?? null,
+  restart_on_crash: f.restartOnCrash,
   startup: f.startup.trim(),
-  startup_overridden: f.startupOverridden
+  startup_overridden: f.startupOverridden,
+  stop_timeout: f.stopTimeout
 });
 
 /** Form value -> `POST /servers` body. */
@@ -422,10 +437,12 @@ export const fromServerInfo = (info: ServerInfo): ServerForm => {
     name: info.name,
     node: [info.node.uuid],
     owner: info.owner ? [info.owner.uuid] : [],
+    restartOnCrash: info.restart_on_crash,
     runInstall: true,
     startOnCompletion: info.start_on_completion,
     startup: info.startup,
     startupOverridden: info.startup_overridden,
+    stopTimeout: info.stop_timeout,
     variables: info.variables.map((v) => ({
       defaultValue: v.default_value,
       description: v.description,
@@ -462,7 +479,8 @@ const DIRECT: Record<string, [Section, string]> = {
   name: ['general', 'name'],
   node: ['general', 'node'],
   owner: ['general', 'owner'],
-  startup: ['startup', 'startup']
+  startup: ['startup', 'startup'],
+  stop_timeout: ['startup', 'stopTimeout']
 };
 
 export const isFieldErrors = (

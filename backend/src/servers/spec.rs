@@ -64,6 +64,9 @@ pub fn build(
       })
       .collect(),
     stop: stop_action(config.stop.as_deref()),
+    // validated to 1..=3600 before it is stored
+    stop_timeout_s: server.stop_timeout as u32,
+    restart_on_crash: server.restart_on_crash,
     startup_done: startup_done(&config.startup),
     config_files: config_files(&config.files, &values),
     file_denylist: serde_json::from_value(egg.file_denylist.clone())?,
@@ -282,6 +285,8 @@ mod test {
     assert_eq!(spec.env["P_SERVER_UUID"], server.id.to_string());
     assert_eq!(spec.allocations.len(), 2);
     assert_eq!(spec.stop, StopAction::Command("stop".into()));
+    assert_eq!(spec.stop_timeout_s, 60);
+    assert!(spec.restart_on_crash);
     assert_eq!(spec.startup_done, vec![")! For help, type ".to_string()]);
     assert_eq!(spec.file_denylist, vec!["*.jar".to_string()]);
     assert_eq!(

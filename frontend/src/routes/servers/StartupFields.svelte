@@ -16,6 +16,7 @@
   import type { OptionEgg } from '$lib/client';
   import {
     defaultCommand,
+    MAX_STOP_TIMEOUT,
     type FieldsMode,
     type startupStage
   } from './schema.svelte';
@@ -207,4 +208,37 @@
       </p>
     {/if}
   </div>
+</div>
+
+<Separator />
+
+<div class="grid gap-4 md:grid-cols-2">
+  <div class="grid content-start gap-1">
+    <FormInput
+      {...props}
+      key="stopTimeout"
+      label="Stop timeout (seconds)"
+      type="number"
+      min={1}
+      max={MAX_STOP_TIMEOUT}
+    />
+    <p class="text-muted-foreground text-xs">
+      Time each stop step gets before the server is terminated, then killed.
+    </p>
+  </div>
+  <Item.Root variant="outline" size="sm" class="content-start">
+    <Item.Content>
+      <Item.Title>Restart on crash</Item.Title>
+      <Item.Description>
+        Starts the server again when it exits without being stopped.
+      </Item.Description>
+    </Item.Content>
+    <Item.Actions>
+      <Switch
+        aria-label="Restart on crash"
+        disabled={props.disabled}
+        bind:checked={$formData.restartOnCrash}
+      />
+    </Item.Actions>
+  </Item.Root>
 </div>

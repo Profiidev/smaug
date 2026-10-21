@@ -5,6 +5,7 @@ pub struct Migrator;
 mod m20260123_145152_node;
 mod m20260713_131936_eggs;
 mod m20261021_120000_servers;
+mod m20261021_140000_server_stop;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -20,6 +21,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20260123_145152_node::Migration),
       Box::new(m20260713_131936_eggs::Migration),
       Box::new(m20261021_120000_servers::Migration),
+      Box::new(m20261021_140000_server_stop::Migration),
     ]
   }
 }

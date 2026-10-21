@@ -26,6 +26,8 @@ pub struct Model {
   pub memory_mb: i64,
   pub disk_mb: i64,
   pub backup_limit: i32,
+  pub stop_timeout: i32,
+  pub restart_on_crash: bool,
   pub created_at: DateTimeWithTimeZone,
   #[sea_orm(
     belongs_to,
