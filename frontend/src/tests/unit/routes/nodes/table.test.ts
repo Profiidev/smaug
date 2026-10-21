@@ -1,23 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
+import MutedCell from '$lib/components/table/MutedCell.svelte';
 import Status from '$lib/components/table/Status.svelte';
+import NameCell from '$routes/servers/NameCell.svelte';
 import { columns } from '$routes/nodes/table.svelte';
-import { Permission } from '$lib/permissions.svelte';
-import type { NodeInfo, UserInfo } from '$lib/client';
+import type { NodeInfo } from '$lib/client';
 
 vi.mock('@tanstack/svelte-table', async (orig) => ({
   ...(await orig<object>()),
   renderComponent: (component: unknown, props: unknown) => ({
     component,
     props
-  }),
-  renderSnippet: (snippet: unknown) => ({ snippet })
-}));
-// Hand back the raw render fn so the address cell markup can be inspected.
-vi.mock('svelte', async (orig) => ({
-  ...(await orig<object>()),
-  createRawSnippet: (fn: unknown) => fn
+  })
 }));
 
 const node: NodeInfo = {
@@ -30,9 +25,8 @@ const node: NodeInfo = {
 };
 
 interface Cell {
-  component?: unknown;
+  component: unknown;
   props: Record<string, unknown>;
-  snippet?: () => { render: () => string };
 }
 
 const cellOf = (
@@ -40,33 +34,31 @@ const cellOf = (
   original: NodeInfo = node,
   args: Partial<Parameters<typeof columns>[0]> = {}
 ) => {
-  const col = columns({ deleteNode: vi.fn(), ...args }).find(
+  const col = columns({ canEdit: true, deleteNode: vi.fn(), ...args }).find(
     (c) => 'accessorKey' in c && c.accessorKey === key
   )!;
-  return (col.cell as (ctx: unknown) => Cell)({
-    row: {
-      getValue: (k: keyof NodeInfo) => original[k],
-      original
-    }
-  });
+  return (col.cell as (ctx: unknown) => Cell)({ row: { original } });
 };
 
-const userWith = (...permissions: Permission[]) =>
-  ({ permissions }) as unknown as UserInfo;
-
 describe('nodes table columns', () => {
-  it('shows status, name, address, secure, uuid and actions', () => {
-    const keys = columns({ deleteNode: vi.fn() }).map((c) =>
+  it('shows name, status, address, secure, uuid and actions', () => {
+    const keys = columns({ canEdit: true, deleteNode: vi.fn() }).map((c) =>
       'accessorKey' in c ? c.accessorKey : undefined
     );
     expect(keys).toEqual([
-      'connected',
       'name',
+      'connected',
       'address',
       'secure',
       'id',
       'actions'
     ]);
+  });
+
+  it('links the name to the node page', () => {
+    const cell = cellOf('name');
+    expect(cell.component).toBe(NameCell);
+    expect(cell.props).toEqual({ href: '/nodes/n1/setup', name: 'Alpha' });
   });
 
   it.each([true, false])('renders the status for connected=%s', (connected) => {
@@ -75,36 +67,44 @@ describe('nodes table columns', () => {
     expect(cell.props).toEqual({ connected });
   });
 
-  it('renders the address together with the port', () => {
+  it('renders the address with the port in mono', () => {
     const cell = cellOf('address');
-    expect(cell.snippet?.().render()).toContain('wings.example.com:8443');
+    expect(cell.component).toBe(MutedCell);
+    expect(cell.props).toEqual({
+      class: 'font-mono',
+      text: 'wings.example.com:8443'
+    });
+  });
+
+  it('renders the uuid in mono', () => {
+    const cell = cellOf('id');
+    expect(cell.component).toBe(MutedCell);
+    expect(cell.props).toEqual({ class: 'font-mono', text: 'n1' });
   });
 
   it('renders a green lock for secure nodes', () => {
     const cell = cellOf('secure');
     expect(cell.component).toBe(Lock);
     expect(cell.props.class).toContain('text-green-500');
+    expect(cell.props['aria-label']).toBe('HTTPS');
   });
 
   it('renders an orange open lock for insecure nodes', () => {
     const cell = cellOf('secure', { ...node, secure: false });
     expect(cell.component).toBe(LockOpen);
     expect(cell.props.class).toContain('text-orange-500');
+    expect(cell.props['aria-label']).toBe('HTTP');
   });
 
-  it('links edit to the node setup page', () => {
-    const { props } = cellOf('actions', node, {
-      user: userWith(Permission.NODE_EDIT)
-    });
-    expect(props.edit).toBe('/nodes/n1/setup');
+  it('links edit to the node page', () => {
+    expect(cellOf('actions').props.edit).toBe('/nodes/n1/setup');
   });
 
   it.each([
-    ['no user', undefined, true],
-    ['view only', userWith(Permission.NODE_VIEW), true],
-    ['node:edit', userWith(Permission.NODE_EDIT), false]
-  ])('actions disabled for %s: %s', (_name, user, disabled) => {
-    const { props } = cellOf('actions', node, { user });
+    [true, false],
+    [false, true]
+  ])('canEdit=%s disables actions: %s', (canEdit, disabled) => {
+    const { props } = cellOf('actions', node, { canEdit });
     expect(props.edit_disabled).toBe(disabled);
     expect(props.delete_disabled).toBe(disabled);
   });

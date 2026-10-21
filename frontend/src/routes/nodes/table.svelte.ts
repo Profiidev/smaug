@@ -1,67 +1,66 @@
-import { renderComponent, renderSnippet } from '@tanstack/svelte-table';
+import { renderComponent } from '@tanstack/svelte-table';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
 import {
   type TableColumnDef,
-  createColumn,
   createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
-import { createRawSnippet } from 'svelte';
+import MutedCell from '$lib/components/table/MutedCell.svelte';
 import Status from '$lib/components/table/Status.svelte';
-import { Permission } from '$lib/permissions.svelte';
-import type { NodeInfo, UserInfo } from '$lib/client';
+import type { NodeInfo } from '$lib/client';
+import NameCell from '../servers/NameCell.svelte';
 
 export const columns = ({
-  deleteNode,
-  user
+  canEdit,
+  deleteNode
 }: {
+  canEdit: boolean;
   deleteNode: (node: NodeInfo) => void;
-  user?: UserInfo;
 }): TableColumnDef<NodeInfo>[] => [
   {
-    accessorKey: 'connected',
-    cell: ({ row }) => {
-      const connected = row.getValue<boolean>('connected');
-      return renderComponent(Status, {
-        connected
-      });
-    },
-    header: () => {}
-  },
-  createColumn('name', 'Name'),
-  {
-    ...createColumnHeader('address', 'Address'),
-    cell: ({ row }) => {
-      const address = row.getValue<string>('address'),
-        { port } = row.original,
-        value = `${address}:${port}`;
-
-      return renderSnippet(
-        createRawSnippet(() => ({
-          render: () =>
-            `<div class="ml-4 truncate h-full w-full text-wrap">${value}</div>`
-        }))
-      );
-    }
+    ...createColumnHeader<NodeInfo>('name', 'Name'),
+    cell: ({ row }) =>
+      renderComponent(NameCell, {
+        href: `/nodes/${row.original.id}/setup`,
+        name: row.original.name
+      })
   },
   {
-    ...createColumnHeader('secure', 'Secure'),
+    ...createColumnHeader<NodeInfo>('connected', 'Status'),
+    cell: ({ row }) =>
+      renderComponent(Status, { connected: row.original.connected })
+  },
+  {
+    ...createColumnHeader<NodeInfo>('address', 'Address'),
+    cell: ({ row }) =>
+      renderComponent(MutedCell, {
+        class: 'font-mono',
+        text: `${row.original.address}:${row.original.port}`
+      })
+  },
+  {
+    ...createColumnHeader<NodeInfo>('secure', 'Secure'),
     cell: ({ row }) => {
-      const secure = row.getValue<boolean>('secure');
+      const { secure } = row.original;
       return renderComponent(secure ? Lock : LockOpen, {
-        class: `ml-3 ${secure ? 'text-green-500' : 'text-orange-500'}`
+        'aria-label': secure ? 'HTTPS' : 'HTTP',
+        class: `ml-4 ${secure ? 'text-green-500' : 'text-orange-500'}`
       });
     }
   },
-  createColumn('id', 'UUID'),
+  {
+    ...createColumnHeader<NodeInfo>('id', 'UUID'),
+    cell: ({ row }) =>
+      renderComponent(MutedCell, { class: 'font-mono', text: row.original.id })
+  },
   {
     accessorKey: 'actions',
     cell: ({ row }) =>
       renderComponent(Actions, {
-        delete_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
+        delete_disabled: !canEdit,
         edit: `/nodes/${row.original.id}/setup`,
-        edit_disabled: !user?.permissions.includes(Permission.NODE_EDIT),
+        edit_disabled: !canEdit,
         remove: () => deleteNode(row.original)
       }),
     enableHiding: false,

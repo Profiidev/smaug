@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { toast as sonner } from 'svelte-sonner';
 import { goto } from '$app/navigation';
+import { deleteEgg } from '$lib/client';
 import { toast } from '@profidev/pleiades/components/util/general';
 import ListPage from '$routes/eggs/+page.svelte';
 import CreatePage from '$routes/eggs/create/+page.svelte';
-import EditPage from '$routes/eggs/[uuid]/+page.svelte';
+import EditPage from '$routes/eggs/[uuid]/[tab=eggtab]/+page.svelte';
 import { type EggImport, importEgg } from '$routes/eggs/schema.svelte';
 import { adminUser, eggInfo, eggList } from '$mocks/e2e/data';
 import { Permission } from '$lib/permissions.svelte';
@@ -36,8 +38,19 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
+vi.mock('$lib/client', async (orig) => ({
+  ...(await orig<object>()),
+  deleteEgg: vi.fn()
+}));
+
+// FormDialog reports submit errors through svelte-sonner directly.
+beforeEach(() => {
+  vi.spyOn(sonner, 'error').mockImplementation(() => 0);
+});
+
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   pageState.state = {};
 });
 
@@ -92,7 +105,7 @@ describe('eggs list page', () => {
     expect(await screen.findByText('2 eggs')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Paper' })).toHaveAttribute(
       'href',
-      '/eggs/egg-paper'
+      '/eggs/egg-paper/general'
     );
   });
 
@@ -238,4 +251,77 @@ describe('egg edit page save bar', () => {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
   });
+});
+
+describe('egg delete errors', () => {
+  const failed = (status: number) =>
+    ({
+      data: undefined,
+      error: undefined,
+      request: new Request('http://x'),
+      response: new Response(null, { status })
+    }) as never;
+
+  const cases = [
+    [
+      409,
+      'Egg is still used by servers. Delete them or change their egg first.'
+    ],
+    [500, 'Failed to delete egg']
+  ] as const;
+
+  const confirm = async () => {
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(() => expect(sonner.error).toHaveBeenCalled());
+  };
+
+  it.each(cases)(
+    'list shows an error on %i with an empty body',
+    async (status, message) => {
+      vi.mocked(deleteEgg).mockResolvedValue(failed(status));
+      render(ListPage, {
+        props: { data: listData(eggList.default.eggs) } as never
+      });
+      await screen.findByText('2 eggs');
+      const row = screen.getByRole('link', { name: 'Paper' }).closest('tr')!;
+      const buttons = row.querySelectorAll('button');
+      await vi.waitFor(() =>
+        expect(buttons[buttons.length - 1]).not.toBeDisabled()
+      );
+      await fireEvent.click(buttons[buttons.length - 1]);
+      await confirm();
+      expect(sonner.error).toHaveBeenCalledWith(message);
+      expect(toast.success).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(cases)(
+    'edit page shows an error on %i with an empty body',
+    async (status, message) => {
+      vi.mocked(deleteEgg).mockResolvedValue(failed(status));
+      render(EditPage, {
+        props: {
+          data: {
+            eggRes: Promise.resolve({
+              data: structuredClone(eggInfo),
+              response: new Response()
+            }),
+            user: Promise.resolve(adminUser),
+            uuid: 'egg-paper'
+          }
+        } as never
+      });
+      const del = screen.getByRole('button', { name: 'Delete' });
+      await vi.waitFor(() => expect(del).not.toBeDisabled());
+      await fireEvent.click(del);
+      await screen.findByText(/Delete egg/);
+      await fireEvent.click(
+        screen.getAllByRole('button', { name: 'Delete' }).at(-1)!
+      );
+      await vi.waitFor(() => expect(sonner.error).toHaveBeenCalled());
+      expect(sonner.error).toHaveBeenCalledWith(message);
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(goto).not.toHaveBeenCalled();
+    }
+  );
 });

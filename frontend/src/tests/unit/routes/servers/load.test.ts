@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { load as listLoad } from '$routes/servers/+page';
 import { load as createLoad } from '$routes/servers/create/+page';
-import { load as editLoad } from '$routes/servers/[uuid]/+page';
-import { jsonFetch, runLoad } from '$test_helpers/load';
+import { load as rootLoad } from '$routes/servers/[uuid]/+page';
+import { load as editLoad } from '$routes/servers/[uuid]/[tab=servertab]/+page';
+import { match } from '../../../../params/servertab';
+import { catchRedirect, jsonFetch, runLoad } from '$test_helpers/load';
 import { options, serverInfo, servers } from './fixtures';
 
 const url = (q = '') => new URL(`http://localhost/servers${q}`);
@@ -136,5 +138,57 @@ describe('server edit load', () => {
       params
     });
     await expect(result.options).resolves.toBeUndefined();
+  });
+});
+
+describe('server edit load and tabs', () => {
+  it('does not read the tab param (switching tabs must not reload)', () => {
+    const params = new Proxy(
+      { uuid: 'srv-1' },
+      {
+        get: (t, k) => {
+          if (k === 'tab') {
+            throw new Error('load read params.tab');
+          }
+          return t[k as 'uuid'];
+        }
+      }
+    );
+    const result = runLoad(editLoad, { fetch: jsonFetch(serverInfo), params });
+    expect(Object.keys(result).toSorted()).toEqual([
+      'options',
+      'serverRes',
+      'uuid'
+    ]);
+  });
+});
+
+describe('servertab param matcher', () => {
+  it.each([
+    'status',
+    'general',
+    'startup',
+    'variables',
+    'resources',
+    'permissions'
+  ])('accepts %s', (tab) => {
+    expect(match(tab)).toBe(true);
+  });
+
+  it.each(['settings', 'bogus', '', 'Status', 'status/', 'transfer'])(
+    'rejects %j',
+    (tab) => {
+      expect(match(tab)).toBe(false);
+    }
+  );
+});
+
+describe('server [uuid] without a tab', () => {
+  it('redirects to the status tab', async () => {
+    const redirect = await catchRedirect(() =>
+      (rootLoad as (e: unknown) => unknown)({ params: { uuid: 'srv-1' } })
+    );
+    expect(redirect.status).toBe(307);
+    expect(redirect.location).toBe('/servers/srv-1/status');
   });
 });

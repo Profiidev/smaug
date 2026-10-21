@@ -1,16 +1,7 @@
-import { serverInfo, serverOptions } from '$lib/client';
+import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export const load = (({ fetch, params }) => {
-  const serverRes = serverInfo({ fetch, path: { uuid: params.uuid } });
-  return {
-    // Only admins may load (and need) the owner / egg / node / grant lists.
-    options: serverRes.then(async (r) =>
-      r.data?.access === 'admin'
-        ? (await serverOptions({ fetch })).data
-        : undefined
-    ),
-    serverRes,
-    uuid: params.uuid
-  };
+// The URL always names the open tab.
+export const load = (({ params }) => {
+  redirect(307, `/servers/${params.uuid}/status`);
 }) satisfies PageLoad;

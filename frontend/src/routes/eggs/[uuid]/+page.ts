@@ -1,7 +1,7 @@
-import { eggInfo } from '$lib/client';
+import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export const load = (({ fetch, params }) => ({
-  eggRes: eggInfo({ fetch, path: { uuid: params.uuid } }),
-  uuid: params.uuid
-})) satisfies PageLoad;
+// The URL always names the open tab.
+export const load = (({ params }) => {
+  redirect(307, `/eggs/${params.uuid}/general`);
+}) satisfies PageLoad;

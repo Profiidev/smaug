@@ -9,43 +9,32 @@
   } from '@profidev/pleiades/components/form/types';
 
   interface Props {
-    cpuUnlimit: boolean;
-    memoryUnlimit: boolean;
-    storageUnlimit: boolean;
-    readonly?: boolean;
     formData: SuperForm<FormValue<typeof advancedSettings>>;
     disabled: boolean;
   }
 
-  let { cpuUnlimit, memoryUnlimit, storageUnlimit, readonly, ...props }: Props =
-    $props();
+  let props: Props = $props();
+
+  let form = $derived(props.formData.form);
+
+  const unitOptions = Object.keys(units).map((unit) => ({
+    label: unit,
+    value: unit
+  }));
 </script>
 
-<FormSwitch
-  {...props}
-  key="cpu_unlimit"
-  label="Unlimited CPU"
-  onCheckedChange={(v) => (cpuUnlimit = v)}
-  disabled={readonly}
-/>
-{#if !cpuUnlimit}
+<FormSwitch {...props} key="cpu_unlimit" label="Unlimited CPU" />
+{#if !$form.cpu_unlimit}
   <FormInput
     {...props}
     key="cpu_limit"
     label="CPU Limit (in millicores)"
     placeholder="Enter CPU limit"
     type="number"
-    {readonly}
   />
 {/if}
-<FormSwitch
-  {...props}
-  key="memory_unlimit"
-  label="Unlimited Memory"
-  onCheckedChange={(v) => (memoryUnlimit = v)}
-  disabled={readonly}
-/>
-{#if !memoryUnlimit}
+<FormSwitch {...props} key="memory_unlimit" label="Unlimited Memory" />
+{#if !$form.memory_unlimit}
   <div class="grid w-full grid-cols-[1fr_auto] gap-2">
     <FormInput
       {...props}
@@ -53,7 +42,6 @@
       label="Available Memory"
       placeholder="Enter amount of memory"
       type="number"
-      {readonly}
     />
     <FormSelect
       {...props}
@@ -61,22 +49,12 @@
       key="memory_limit_unit"
       label="Unit"
       single={true}
-      data={Object.keys(units).map((unit) => ({
-        value: unit,
-        label: unit
-      }))}
-      {readonly}
+      data={unitOptions}
     />
   </div>
 {/if}
-<FormSwitch
-  {...props}
-  key="storage_unlimit"
-  label="Unlimited Storage"
-  onCheckedChange={(v) => (storageUnlimit = v)}
-  disabled={readonly}
-/>
-{#if !storageUnlimit}
+<FormSwitch {...props} key="storage_unlimit" label="Unlimited Storage" />
+{#if !$form.storage_unlimit}
   <div class="grid w-full grid-cols-[1fr_auto] gap-2">
     <FormInput
       {...props}
@@ -84,7 +62,6 @@
       label="Available Storage Space"
       placeholder="Enter amount of storage"
       type="number"
-      {readonly}
     />
     <FormSelect
       {...props}
@@ -92,11 +69,7 @@
       key="storage_size_unit"
       label="Unit"
       single={true}
-      data={Object.keys(units).map((unit) => ({
-        value: unit,
-        label: unit
-      }))}
-      {readonly}
+      data={unitOptions}
     />
   </div>
 {/if}

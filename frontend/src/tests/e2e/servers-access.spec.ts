@@ -34,7 +34,7 @@ test.describe('server edit with write access', () => {
         return HttpResponse.json(serverOptions.default) as never;
       })
     );
-    await gotoReady(page, '/servers/srv-survival');
+    await gotoReady(page, '/servers/srv-survival/status');
 
     await expect(
       page.getByText('Some settings need an administrator')
@@ -106,7 +106,7 @@ test.describe('server edit with read access', () => {
         return HttpResponse.json(serverOptions.default) as never;
       })
     );
-    await gotoReady(page, '/servers/srv-survival');
+    await gotoReady(page, '/servers/srv-survival/status');
 
     await expect(
       page.getByText('You have view-only access', { exact: true })
@@ -141,6 +141,28 @@ test.describe('server edit with read access', () => {
   });
 });
 
+test.describe('server edit /permissions without admin access', () => {
+  test.beforeEach(async ({ context }) => setupSession(context));
+
+  for (const access of ['write', 'read'] as const) {
+    test(`${access} access lands on Status`, async ({ network, page }) => {
+      network.use(asAccess(access));
+      await gotoReady(page, '/servers');
+      await gotoReady(page, '/servers/srv-survival/permissions');
+
+      await expect(page).toHaveURL(/\/servers\/srv-survival\/status$/);
+      await expect(tab(page, 'Status')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      await expect(tab(page, 'Permissions')).toHaveCount(0);
+      // Replaced, not pushed: Back leaves the server page.
+      await page.goBack();
+      await expect(page).toHaveURL(/\/servers$/);
+    });
+  }
+});
+
 test.describe('server edit edge cases', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
@@ -163,7 +185,7 @@ test.describe('server edit edge cases', () => {
     }) => {
       const update = recordUpdate();
       network.use(ownerless(access), update.handler);
-      await gotoReady(page, '/servers/srv-survival');
+      await gotoReady(page, '/servers/srv-survival/status');
       await openTab(page, 'General');
       await page.getByLabel('Name', { exact: true }).fill('Orphan');
       await save(page);
@@ -181,7 +203,7 @@ test.describe('server edit edge cases', () => {
       () => new HttpResponse(null, { status: 403 }) as never
     );
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival');
+    await gotoReady(page, '/servers/srv-survival/status');
     await openTab(page, 'General');
     await page.getByLabel('Name', { exact: true }).fill('Nope');
     await save(page);
@@ -213,7 +235,7 @@ test.describe('server edit edge cases', () => {
             }) as never)
       )
     );
-    await gotoReady(page, '/servers/srv-survival');
+    await gotoReady(page, '/servers/srv-survival/status');
     await openTab(page, 'General');
     await page.getByLabel('Name', { exact: true }).fill('Draft name');
     await openTab(page, 'Status');

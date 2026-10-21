@@ -85,8 +85,12 @@ describe('servers list page', () => {
     expect(await screen.findByText('2 servers')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'survival' })).toHaveAttribute(
       'href',
-      '/servers/srv-1'
+      '/servers/srv-1/status'
     );
+    // Container matches the nav; Server is the nodes list's icon.
+    const row = screen.getByRole('link', { name: 'survival' }).closest('tr')!;
+    expect(row.querySelector('svg.lucide-container')).not.toBeNull();
+    expect(row.querySelector('svg.lucide-server')).toBeNull();
     expect(screen.getByText('10.0.0.5:25565 +1')).toBeInTheDocument();
     expect(screen.getByText('[::1]:30000')).toBeInTheDocument();
     const table = screen.getByRole('table');
@@ -152,6 +156,23 @@ describe('servers list page', () => {
     await fireEvent.input(search, { target: { value: '25565' } });
     expect(screen.getByRole('link', { name: 'survival' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'creative' })).toBeNull();
+  });
+
+  it('combines search with the status filter in the count', async () => {
+    renderList();
+    await screen.findByText('2 servers');
+    const search = screen.getByPlaceholderText('Search...');
+    // Search and status filter share one toolbar row.
+    expect(search.parentElement).toBe(
+      screen.getByLabelText('Filter by status').parentElement
+    );
+    await fireEvent.input(search, { target: { value: 'survival' } });
+    expect(await screen.findByText('1 server')).toBeInTheDocument();
+    await chooseStatus('Installing');
+    expect(await screen.findByText('0 servers')).toBeInTheDocument();
+    await fireEvent.input(search, { target: { value: '' } });
+    expect(await screen.findByText('1 server')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'creative' })).toBeInTheDocument();
   });
 
   it('enables create for server:edit', async () => {
@@ -399,7 +420,9 @@ describe('server create page', () => {
     vi.mocked(createServer).mockResolvedValue(result(200, { uuid: 'srv-9' }));
     await fillWizard();
     await submitWizard();
-    await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/servers/srv-9'));
+    await vi.waitFor(() =>
+      expect(goto).toHaveBeenCalledWith('/servers/srv-9/status')
+    );
     expect(toast.success).toHaveBeenCalledWith('Server created successfully.');
     expect(createServer).toHaveBeenCalledWith({
       body: {

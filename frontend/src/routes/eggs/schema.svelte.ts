@@ -795,3 +795,8 @@ export const toEggBody = (data: EggForm): EggBody => {
 /** Server error body (a message string on 400) or `fallback`. */
 export const apiErrorMessage = (error: unknown, fallback: string) =>
   typeof error === 'string' && error.trim() ? error : fallback;
+
+export const deleteError = (status?: number) =>
+  status === 409
+    ? 'Egg is still used by servers. Delete them or change their egg first.'
+    : 'Failed to delete egg';

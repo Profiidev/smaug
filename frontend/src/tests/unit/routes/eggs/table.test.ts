@@ -51,7 +51,7 @@ describe('eggs table columns', () => {
   it('renders the name as an icon + link to the egg', () => {
     expect(cellOf('name')).toEqual({
       component: NameCell,
-      props: { href: '/eggs/egg-1', name: 'Paper' }
+      props: { href: '/eggs/egg-1/general', name: 'Paper' }
     });
   });
 
@@ -74,7 +74,7 @@ describe('eggs table columns', () => {
 
   it.each([true, false])('gates edit/delete on canEdit=%s', (canEdit) => {
     const { props } = actions(canEdit);
-    expect(props.edit).toBe('/eggs/egg-1');
+    expect(props.edit).toBe('/eggs/egg-1/general');
     expect(props.edit_disabled).toBe(!canEdit);
     expect(props.delete_disabled).toBe(!canEdit);
   });

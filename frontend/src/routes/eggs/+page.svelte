@@ -14,7 +14,7 @@
   import ImportButton from './ImportButton.svelte';
   import { Permission } from '$lib/permissions.svelte';
   import { deleteEgg, type EggListItem, type UserInfo } from '$lib/client';
-  import { apiErrorMessage, type EggImport } from './schema.svelte';
+  import { deleteError, type EggImport } from './schema.svelte';
   import { checkEggUpdate, type EggUpdate } from './update';
   import UpdateDialog from './UpdateDialog.svelte';
 
@@ -70,8 +70,8 @@
     const res = await deleteEgg({ body: { uuid: selected.uuid } });
     isLoading = false;
 
-    if (res.error) {
-      return { error: apiErrorMessage(res.error, 'Failed to delete egg') };
+    if (!res.response?.ok) {
+      return { error: deleteError(res.response?.status) };
     }
 
     toast.success(`Egg ${selected.name} deleted successfully`);

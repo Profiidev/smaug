@@ -18,16 +18,39 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
   },
   {
     path: '/nodes/node-1/setup',
-    ready: (p) => p.getByRole('heading', { name: 'Node Setup' })
+    ready: (p) => p.getByRole('heading', { name: /Node:/ })
   },
   {
-    path: '/nodes/node-1/settings',
-    ready: (p) => p.getByRole('heading', { name: 'Settings' })
+    path: '/nodes/node-1/general',
+    ready: (p) => p.getByPlaceholder('Enter name')
+  },
+  {
+    path: '/nodes/node-1/resources',
+    ready: (p) => p.getByRole('switch', { name: 'Unlimited CPU' })
   },
 
   { path: '/eggs', ready: (p) => p.getByRole('heading', { name: 'Eggs' }) },
   { path: '/eggs/create', ready: (p) => p.getByLabel('Egg Name') },
-  { path: '/eggs/egg-paper', ready: (p) => p.getByLabel('Egg Name') },
+  {
+    path: '/eggs/egg-paper/general',
+    ready: (p) => p.getByLabel('Egg Name')
+  },
+  {
+    path: '/eggs/egg-paper/variables',
+    ready: (p) => p.getByRole('button', { name: 'Add variable' })
+  },
+  {
+    path: '/eggs/egg-paper/install',
+    ready: (p) => p.getByLabel('Install Container Image')
+  },
+  {
+    path: '/eggs/egg-paper/runtime',
+    ready: (p) => p.getByRole('button', { name: 'Add image' })
+  },
+  {
+    path: '/eggs/egg-paper/config',
+    ready: (p) => p.getByLabel('File Path')
+  },
 
   {
     path: '/servers',
@@ -38,8 +61,28 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
     ready: (p) => p.getByLabel('Name', { exact: true })
   },
   {
-    path: '/servers/srv-survival',
+    path: '/servers/srv-survival/status',
     ready: (p) => p.getByRole('heading', { name: /Server:/ })
+  },
+  {
+    path: '/servers/srv-survival/general',
+    ready: (p) => p.getByLabel('Name', { exact: true })
+  },
+  {
+    path: '/servers/srv-survival/startup',
+    ready: (p) => p.getByRole('textbox', { name: 'Command' })
+  },
+  {
+    path: '/servers/srv-survival/variables',
+    ready: (p) => p.getByLabel('Server Jar File')
+  },
+  {
+    path: '/servers/srv-survival/resources',
+    ready: (p) => p.getByLabel('Backup limit')
+  },
+  {
+    path: '/servers/srv-survival/permissions',
+    ready: (p) => p.getByRole('button', { name: 'Add user' })
   },
 
   { path: '/users', ready: (p) => p.getByRole('heading', { name: 'Users' }) },

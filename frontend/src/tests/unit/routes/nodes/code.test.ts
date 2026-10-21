@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  dockerCompose,
-  dockerRun
-} from '$routes/nodes/[uuid]/setup/code.svelte';
+import { dockerCompose, dockerRun } from '$routes/nodes/[uuid]/code.svelte';
 
 // Vite's `define` replaces `__version__` with the npm package version.
 const image = `ghcr.io/profiidev/smaug/smaug-wings:${process.env.npm_package_version}`;

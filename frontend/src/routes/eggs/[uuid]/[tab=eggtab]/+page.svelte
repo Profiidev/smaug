@@ -14,11 +14,13 @@
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { Skeleton } from '@profidev/pleiades/components/ui/skeleton';
   import { deleteEgg, editEgg, type UserInfo } from '$lib/client';
   import {
     apiErrorMessage,
+    deleteError,
     eggSettings,
     formatData,
     reformatData,
@@ -29,16 +31,16 @@
     toEggBody,
     type EggForm,
     type ExportVersion
-  } from '../schema.svelte';
-  import GeneralFields from '../GeneralFields.svelte';
-  import VariablesFields from '../VariablesFields.svelte';
-  import InstallScriptFields from '../InstallScriptFields.svelte';
-  import RuntimeFields from '../RuntimeFields.svelte';
-  import ConfigFields from '../ConfigFields.svelte';
+  } from '../../schema.svelte';
+  import GeneralFields from '../../GeneralFields.svelte';
+  import VariablesFields from '../../VariablesFields.svelte';
+  import InstallScriptFields from '../../InstallScriptFields.svelte';
+  import RuntimeFields from '../../RuntimeFields.svelte';
+  import ConfigFields from '../../ConfigFields.svelte';
   import SaveBar from '$lib/components/form/SaveBar.svelte';
   import SectionErrorDot from '$lib/components/form/SectionErrorDot.svelte';
-  import UpdateDialog from '../UpdateDialog.svelte';
-  import { checkEggUpdate, type EggUpdate } from '../update';
+  import UpdateDialog from '../../UpdateDialog.svelte';
+  import { checkEggUpdate, type EggUpdate } from '../../update';
 
   const { data } = $props();
 
@@ -86,7 +88,15 @@
       value: 'config'
     }
   ];
-  let tab = $state('general');
+  // The route matcher guarantees a valid tab; the component is reused across
+  // tab URLs, so unsaved edits survive switching.
+  let tab = $derived(page.params.tab ?? 'general');
+
+  const setTab = (value: string) => {
+    if (value !== tab) {
+      goto(`/eggs/${data.uuid}/${value}`, { keepFocus: true, noScroll: true });
+    }
+  };
 
   let readonly = $derived(!user?.permissions.includes(Permission.EGG_EDIT));
 
@@ -117,8 +127,8 @@
     const res = await deleteEgg({ body: { uuid: data.uuid } });
     isLoading = false;
 
-    if (res.error) {
-      return { error: apiErrorMessage(res.error, 'Failed to delete egg') };
+    if (!res.response?.ok) {
+      return { error: deleteError(res.response?.status) };
     }
 
     toast.success(`Egg ${eggName} deleted successfully`);
@@ -274,7 +284,7 @@
   >
     {#snippet children({ props })}
       <Tabs.Root
-        bind:value={tab}
+        bind:value={() => tab, setTab}
         class="mx-auto flex min-h-0 w-full max-w-4xl grow flex-col gap-4"
       >
         <Tabs.List class="w-full shrink-0 overflow-x-auto overflow-y-hidden">
