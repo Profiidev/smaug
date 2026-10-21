@@ -70,7 +70,10 @@
   );
   // Non-admins cannot load the option lists; the server's own references keep the selects filled.
   let fieldOptions = $derived(
-    options ?? (server ? optionsFromInfo(server) : undefined)
+    options ??
+      (server
+        ? optionsFromInfo(server)
+        : { eggs: [], groups: [], nodes: [], users: [] })
   );
   let canDelete = $derived(
     admin && !!server && availableActions(server.status).delete
@@ -203,147 +206,147 @@
     </Button>
   </div>
   <Separator class="my-4" />
-  {#if server && saved && fieldOptions}
-    <BaseForm
-      class="flex min-h-0 grow flex-col gap-4"
-      schema={serverSettings}
-      initialValue={saved}
-      {onsubmit}
-      bind:this={form}
-      bind:isLoading={saving}
-    >
-      {#snippet children({ props })}
-        {@const values = fromStore(props.formData.form)}
-        {@const disabled = props.disabled || readonly}
-        <ApplyErrors formData={props.formData} errors={fieldErrors} />
-        <div class="mx-auto flex min-h-0 w-full max-w-4xl grow flex-col gap-4">
-          {#if readonly}
-            <Alert.Root>
-              <Info />
-              <Alert.Title>You have view-only access</Alert.Title>
-              <Alert.Description>
-                Fields are read-only. Ask an administrator for write access to
-                make changes.
-              </Alert.Description>
-            </Alert.Root>
-          {:else if !admin}
-            <Alert.Root>
-              <Info />
-              <Alert.Title>Some settings need an administrator</Alert.Title>
-              <Alert.Description>
-                You can change the name, startup command and variables. Owner,
-                egg, allocations, image and resources are read-only.
-              </Alert.Description>
-            </Alert.Root>
-          {/if}
-          <Tabs.Root bind:value={tab} class="flex min-h-0 grow flex-col gap-4">
-            <Tabs.List
-              class="w-full shrink-0 overflow-x-auto overflow-y-hidden"
-            >
-              <Tabs.Trigger value="status" class="cursor-pointer">
-                Status
-              </Tabs.Trigger>
-              {#each sections as section (section)}
-                <Tabs.Trigger value={section} class="cursor-pointer">
-                  {SECTION_TITLES[section]}
-                  <SectionErrorDot
-                    formData={props.formData}
-                    keys={SECTION_KEYS[section]}
-                  />
-                </Tabs.Trigger>
-              {/each}
-            </Tabs.List>
-            <Tabs.Content
-              value="status"
-              class="min-h-0 overflow-y-auto data-[state=inactive]:hidden"
-            >
-              {#if server}
-                <StatusTab
-                  {server}
-                  nodes={options?.nodes ?? []}
-                  ondelete={() => (deleteOpen = true)}
-                />
-              {/if}
-            </Tabs.Content>
+  <BaseForm
+    class="flex min-h-0 grow flex-col gap-4"
+    schema={serverSettings}
+    {onsubmit}
+    bind:this={form}
+    bind:isLoading={saving}
+  >
+    {#snippet children({ props })}
+      {@const values = fromStore(props.formData.form)}
+      {@const disabled = props.disabled || readonly}
+      <ApplyErrors formData={props.formData} errors={fieldErrors} />
+      <div class="mx-auto flex min-h-0 w-full max-w-4xl grow flex-col gap-4">
+        {#if server && readonly}
+          <Alert.Root>
+            <Info />
+            <Alert.Title>You have view-only access</Alert.Title>
+            <Alert.Description>
+              Fields are read-only. Ask an administrator for write access to
+              make changes.
+            </Alert.Description>
+          </Alert.Root>
+        {:else if server && !admin}
+          <Alert.Root>
+            <Info />
+            <Alert.Title>Some settings need an administrator</Alert.Title>
+            <Alert.Description>
+              You can change the name, startup command and variables. Owner,
+              egg, allocations, image and resources are read-only.
+            </Alert.Description>
+          </Alert.Root>
+        {/if}
+        <Tabs.Root bind:value={tab} class="flex min-h-0 grow flex-col gap-4">
+          <Tabs.List class="w-full shrink-0 overflow-x-auto overflow-y-hidden">
+            <Tabs.Trigger value="status" class="cursor-pointer">
+              Status
+            </Tabs.Trigger>
             {#each sections as section (section)}
-              <Tabs.Content
-                value={section}
-                class="flex min-h-0 flex-col data-[state=inactive]:hidden"
-              >
-                <Card.Root class="min-h-0">
-                  <Card.Header>
-                    <Card.Title>{SECTION_TITLES[section]}</Card.Title>
-                    <Card.Description>
-                      {SECTION_DESCRIPTIONS[section]}
-                    </Card.Description>
-                  </Card.Header>
-                  <Card.Content class="min-h-0 overflow-y-auto">
-                    <div class="grid gap-4">
-                      {#if section === 'general'}
-                        <GeneralFields
-                          formData={stageForm(props.formData)}
-                          {disabled}
-                          options={fieldOptions}
-                          mode="edit"
-                          locked={!admin}
-                          variablesEdited={variablesEdited(
-                            values.current.variables
-                          )}
-                          {oneggchange}
-                        />
-                      {:else if section === 'startup'}
-                        <StartupFields
-                          formData={stageForm(props.formData)}
-                          {disabled}
-                          egg={findEgg(options, values.current.egg[0])}
-                          mode="edit"
-                          imageDisabled={!admin}
-                        />
-                      {:else if section === 'variables'}
-                        <VariablesFields
-                          formData={stageForm(props.formData)}
-                          {disabled}
-                        />
-                      {:else if section === 'resources'}
-                        <ResourcesFields
-                          formData={stageForm(props.formData)}
-                          disabled={disabled || !admin}
-                        />
-                      {:else}
-                        <PermissionsFields
-                          formData={stageForm(props.formData)}
-                          {disabled}
-                          options={fieldOptions}
-                        />
-                      {/if}
-                    </div>
-                  </Card.Content>
-                </Card.Root>
-              </Tabs.Content>
+              <Tabs.Trigger value={section} class="cursor-pointer">
+                {SECTION_TITLES[section]}
+                <SectionErrorDot
+                  formData={props.formData}
+                  keys={SECTION_KEYS[section]}
+                />
+              </Tabs.Trigger>
             {/each}
-          </Tabs.Root>
-        </div>
-        <!-- Hidden, not unmounted: remounting would reset unsaved edits. -->
-        <div class={tab === 'status' ? 'hidden' : 'contents'}>
-          <SaveBar
-            formData={props.formData}
-            {saved}
-            isLoading={saving}
-            isError={saveFailed}
-            {readonly}
-            bind:dirty
-          />
-        </div>
-      {/snippet}
-      {#snippet footer()}{/snippet}
-    </BaseForm>
-  {:else}
-    <div class="mx-auto grid w-full max-w-4xl gap-4" aria-busy="true">
-      <Skeleton class="h-9 w-96 max-w-full" />
-      <Skeleton class="h-32 w-full" />
-      <Skeleton class="h-64 w-full" />
-    </div>
-  {/if}
+          </Tabs.List>
+          <Tabs.Content
+            value="status"
+            class="min-h-0 overflow-y-auto data-[state=inactive]:hidden"
+          >
+            {#if server}
+              <StatusTab
+                {server}
+                nodes={options?.nodes ?? []}
+                ondelete={() => (deleteOpen = true)}
+              />
+            {:else}
+              <Card.Root>
+                <Card.Header>
+                  <Card.Title>Status</Card.Title>
+                  <Skeleton class="h-4 w-64 max-w-full" />
+                </Card.Header>
+                <Card.Content>
+                  <Skeleton class="h-6 w-24" />
+                </Card.Content>
+              </Card.Root>
+            {/if}
+          </Tabs.Content>
+          {#each sections as section (section)}
+            <Tabs.Content
+              value={section}
+              class="flex min-h-0 flex-col data-[state=inactive]:hidden"
+            >
+              <Card.Root class="min-h-0">
+                <Card.Header>
+                  <Card.Title>{SECTION_TITLES[section]}</Card.Title>
+                  <Card.Description>
+                    {SECTION_DESCRIPTIONS[section]}
+                  </Card.Description>
+                </Card.Header>
+                <Card.Content class="min-h-0 overflow-y-auto">
+                  <div class="grid gap-4">
+                    {#if section === 'general'}
+                      <GeneralFields
+                        formData={stageForm(props.formData)}
+                        {disabled}
+                        options={fieldOptions}
+                        mode="edit"
+                        locked={!admin}
+                        savedEgg={saved?.egg[0]}
+                        variablesEdited={variablesEdited(
+                          values.current.variables
+                        )}
+                        {oneggchange}
+                      />
+                    {:else if section === 'startup'}
+                      <StartupFields
+                        formData={stageForm(props.formData)}
+                        {disabled}
+                        egg={findEgg(options, values.current.egg[0])}
+                        mode="edit"
+                        imageDisabled={!admin}
+                      />
+                    {:else if section === 'variables'}
+                      <VariablesFields
+                        formData={stageForm(props.formData)}
+                        {disabled}
+                      />
+                    {:else if section === 'resources'}
+                      <ResourcesFields
+                        formData={stageForm(props.formData)}
+                        disabled={disabled || !admin}
+                      />
+                    {:else}
+                      <PermissionsFields
+                        formData={stageForm(props.formData)}
+                        {disabled}
+                        options={fieldOptions}
+                      />
+                    {/if}
+                  </div>
+                </Card.Content>
+              </Card.Root>
+            </Tabs.Content>
+          {/each}
+        </Tabs.Root>
+      </div>
+      <!-- Hidden, not unmounted: remounting would reset unsaved edits. -->
+      <div class={tab === 'status' ? 'hidden' : 'contents'}>
+        <SaveBar
+          formData={props.formData}
+          {saved}
+          isLoading={saving}
+          isError={saveFailed}
+          {readonly}
+          bind:dirty
+        />
+      </div>
+    {/snippet}
+    {#snippet footer()}{/snippet}
+  </BaseForm>
 </div>
 
 <FormDialog

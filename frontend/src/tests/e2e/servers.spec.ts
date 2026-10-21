@@ -1016,7 +1016,10 @@ test.describe('server edit (admin)', () => {
     }
   });
 
-  test('shows a skeleton while loading', async ({ network, page }) => {
+  test('renders tabs and a disabled, empty form while loading', async ({
+    network,
+    page
+  }) => {
     network.use(
       gen.handleServerInfo(async () => {
         await delay('infinite');
@@ -1025,8 +1028,21 @@ test.describe('server edit (admin)', () => {
     );
     await page.goto('/servers/srv-survival');
 
-    await expect(page.locator('[aria-busy=true]')).toBeVisible();
-    await expect(page.getByRole('tab')).toHaveCount(0);
+    await expect(page.locator('[aria-busy=true]')).toHaveCount(0);
+    await expect(page.getByRole('tab')).toHaveText([
+      'Status',
+      'General',
+      'Startup',
+      'Variables',
+      'Resources'
+    ]);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.getByRole('tab', { name: 'General' }).click();
+    await expect(page.getByLabel('Name')).toHaveValue('');
+    await expect(page.getByLabel('Name')).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Save Changes' })
+    ).toBeDisabled();
   });
 
   test('redirects to the list when the server is missing', async ({ page }) => {

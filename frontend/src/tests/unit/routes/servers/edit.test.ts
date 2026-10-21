@@ -65,7 +65,8 @@ const pageData = (server: ServerInfo | undefined, status = 200) => ({
 
 const mount = async (server: ServerInfo = info()) => {
   render(EditPage, { props: { data: pageData(server) } as never });
-  await screen.findByRole('tab', { name: 'General' });
+  // Tabs render immediately; wait for the loaded server instead.
+  await screen.findByRole('heading', { name: `Server: ${server.name}` });
   await tick();
 };
 
@@ -87,7 +88,7 @@ const comboboxes = () =>
     .filter((b) => b.tagName === 'BUTTON' && b.closest('[role=tabpanel]'));
 
 describe('server edit page loading', () => {
-  it('shows skeletons until the server loads', () => {
+  it('renders tabs and a disabled, empty form until the server loads', () => {
     render(EditPage, {
       props: {
         data: {
@@ -100,8 +101,12 @@ describe('server edit page loading', () => {
     expect(
       screen.getByRole('heading', { name: 'Server:' })
     ).toBeInTheDocument();
-    expect(document.querySelector('[aria-busy=true]')).not.toBeNull();
-    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(document.querySelector('[aria-busy=true]')).toBeNull();
+    expect(
+      screen.getAllByRole('tab').map((t) => t.textContent?.trim())
+    ).toEqual(['Status', 'General', 'Startup', 'Variables', 'Resources']);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save Changes/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
     expect(
       screen.getByRole('link', { name: 'Back to servers' })

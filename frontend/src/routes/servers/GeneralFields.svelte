@@ -30,12 +30,15 @@
     oneggchange?: (egg: OptionEgg | undefined) => void;
     /** Disables the admin-only fields (owner, egg, allocations). */
     locked?: boolean;
+    /** Edit: the loaded/saved egg; arrives after mount and on every reload. */
+    savedEgg?: string;
   }
 
   let {
     variablesEdited = false,
     oneggchange,
     locked = false,
+    savedEgg,
     options,
     mode,
     ...props
@@ -49,7 +52,8 @@
     list.map((n) => ({ label: n.name, value: n.uuid }));
 
   // The egg the other sections were loaded for; a pick that is cancelled reverts to it.
-  let currentEgg: string | undefined = $state($formData.egg[0]);
+  const initialEgg = $formData.egg[0];
+  let currentEgg: string | undefined = $derived(savedEgg ?? initialEgg);
   let pendingEgg: string | undefined = $state();
   let confirmOpen = $state(false);
 
