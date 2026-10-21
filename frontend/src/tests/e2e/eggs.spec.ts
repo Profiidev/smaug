@@ -700,7 +700,10 @@ test.describe('egg detail', () => {
       page.getByRole('heading', { name: 'Egg: Paper' })
     ).toBeVisible();
     await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
+    await openTab(page, 'Variables');
+    await page.getByRole('button', { name: 'Toggle variable' }).click();
     await expect(page.getByLabel('Env Variable')).toHaveValue('SERVER_JARFILE');
+    await openTab(page, 'Config');
     await expect(page.getByLabel('File Path')).toHaveValue('server.properties');
     await expect(page.getByLabel('Stop Command')).toHaveValue('stop');
     await expectNoHorizontalOverflow(page);
@@ -718,6 +721,7 @@ test.describe('egg detail', () => {
     await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
     await page.getByLabel('Egg Name').fill('Paper 2');
     await openTab(page, 'Variables');
+    await page.getByRole('button', { name: 'Toggle variable' }).click();
     await page.getByLabel('Default Value').fill('paper.jar');
     await openTab(page, 'Runtime');
     await page.getByRole('button', { name: 'Add image' }).click();
@@ -795,7 +799,12 @@ test.describe('egg detail', () => {
     await gotoReady(page, '/eggs/egg-paper');
     await expect(page.getByLabel('Egg Name')).toHaveValue('Paper');
     await openTab(page, 'Variables');
+    const toggle = page.getByRole('button', { name: 'Toggle variable' });
+    await toggle.click();
     await page.getByLabel('Env Variable').fill('HOME');
+    // Collapse it again: the error must expand it so it is not hidden.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await openTab(page, 'General');
     await page.getByRole('button', { name: 'Save Changes' }).click();
     // The invalid field is on another tab: its trigger gets an error dot.
@@ -805,6 +814,7 @@ test.describe('egg detail', () => {
       page.getByRole('tab', { name: 'General' }).getByLabel('Has errors')
     ).toHaveCount(0);
     await variablesTab.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(
       page.getByText('Reserved name — choose another.')
     ).toBeVisible();
@@ -844,12 +854,33 @@ test.describe('egg detail', () => {
     ).toBeInViewport();
   });
 
+  test('variables load collapsed and toggle open', async ({ page }) => {
+    await gotoReady(page, '/eggs/egg-paper');
+    await openTab(page, 'Variables');
+    const toggle = page.getByRole('button', { name: 'Toggle variable' });
+    const header = page.locator('[data-slot="card-title"]', { has: toggle });
+    await expect(header).toContainText('SERVER_JARFILE');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByLabel('Env Variable')).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByLabel('Env Variable')).toBeVisible();
+    await toggle.click();
+    await expect(page.getByLabel('Env Variable')).toBeHidden();
+    await page.getByRole('button', { name: 'Add variable' }).click();
+    await expect(toggle.nth(1)).toHaveAttribute('aria-expanded', 'true');
+    await expect(header.nth(1)).toContainText('New variable');
+    await page.getByLabel('Env Variable').nth(1).fill('NEW_ENV');
+    await expect(header.nth(1)).toContainText('NEW_ENV');
+    await expectNoHorizontalOverflow(page);
+  });
+
   test('shows one section per tab', async ({ page }) => {
     await gotoReady(page, '/eggs/egg-paper');
     await expect(page.getByLabel('Egg Name')).toBeVisible();
-    await expect(page.getByLabel('Env Variable')).toBeHidden();
+    await expect(page.getByText('Startup variables (1)')).toBeHidden();
     await openTab(page, 'Variables');
-    await expect(page.getByLabel('Env Variable')).toBeVisible();
+    await expect(page.getByText('Startup variables (1)')).toBeVisible();
     await expect(page.getByLabel('Egg Name')).toBeHidden();
     await expectNoHorizontalOverflow(page);
   });
@@ -1012,6 +1043,7 @@ test.describe('eggs without egg:edit', () => {
       page.getByRole('button', { name: 'Save Changes' })
     ).toBeDisabled();
     await openTab(page, 'Variables');
+    await page.getByRole('button', { name: 'Toggle variable' }).click();
     await expect(page.getByLabel('Env Variable')).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Add variable' })
