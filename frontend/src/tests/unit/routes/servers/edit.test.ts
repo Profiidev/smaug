@@ -1,0 +1,448 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within
+} from '@testing-library/svelte';
+import { toast as sonner } from 'svelte-sonner';
+import { goto } from '$app/navigation';
+import { toast } from '@profidev/pleiades/components/util/general';
+import { type ServerInfo, deleteServer, updateServer } from '$lib/client';
+import EditPage from '$routes/servers/[uuid]/+page.svelte';
+import { fromServerInfo, toUpdateBody } from '$routes/servers/schema.svelte';
+import { options, serverInfo } from './fixtures';
+
+vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
+  ...(await orig<object>()),
+  toast: { error: vi.fn(), success: vi.fn() }
+}));
+
+vi.mock('$app/forms', async (orig) => ({
+  ...(await orig<object>()),
+  applyAction: vi.fn(async () => {})
+}));
+
+vi.mock('$lib/client', async (orig) => ({
+  ...(await orig<object>()),
+  deleteServer: vi.fn(),
+  updateServer: vi.fn()
+}));
+
+afterEach(cleanup);
+
+beforeEach(() => {
+  vi.spyOn(sonner, 'error').mockImplementation(() => 0);
+});
+
+const tick = async (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+const result = (status: number, body?: unknown) =>
+  ({
+    data: status === 200 ? (body ?? {}) : undefined,
+    error: status === 200 ? undefined : body,
+    request: new Request('http://x'),
+    response: new Response(null, { status })
+  }) as never;
+
+const info = (over: Partial<ServerInfo> = {}): ServerInfo => ({
+  ...structuredClone(serverInfo),
+  ...over
+});
+
+const asAccess = (access: ServerInfo['access']) =>
+  info({ access, grants: access === 'admin' ? serverInfo.grants : null });
+
+const pageData = (server: ServerInfo | undefined, status = 200) => ({
+  options: Promise.resolve(server?.access === 'admin' ? options : undefined),
+  serverRes: Promise.resolve({
+    data: server,
+    response: new Response(null, { status })
+  }),
+  uuid: 'srv-1'
+});
+
+const mount = async (server: ServerInfo = info()) => {
+  render(EditPage, { props: { data: pageData(server) } as never });
+  await screen.findByRole('tab', { name: 'General' });
+  await tick();
+};
+
+const openTab = async (name: string) => {
+  const tab = screen.getByRole('tab', { name: new RegExp(`^${name}`) });
+  await fireEvent.mouseDown(tab);
+  await fireEvent.click(tab);
+  await tick();
+};
+
+const save = async () => {
+  await fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  await tick(50);
+};
+
+const comboboxes = () =>
+  screen
+    .getAllByRole('combobox', { hidden: true })
+    .filter((b) => b.tagName === 'BUTTON' && b.closest('[role=tabpanel]'));
+
+describe('server edit page loading', () => {
+  it('shows skeletons until the server loads', () => {
+    render(EditPage, {
+      props: {
+        data: {
+          options: new Promise(() => {}),
+          serverRes: new Promise(() => {}),
+          uuid: 'srv-1'
+        }
+      } as never
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Server:' })
+    ).toBeInTheDocument();
+    expect(document.querySelector('[aria-busy=true]')).not.toBeNull();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(
+      screen.getByRole('link', { name: 'Back to servers' })
+    ).toHaveAttribute('href', '/servers');
+  });
+
+  it.each([
+    [404, '/servers?error=not_found'],
+    [500, '/servers?error=other'],
+    [403, '/servers?error=other']
+  ])('redirects on %i', async (status, target) => {
+    render(EditPage, {
+      props: { data: pageData(undefined, status) } as never
+    });
+    await vi.waitFor(() => expect(goto).toHaveBeenCalledWith(target));
+  });
+});
+
+describe('server edit page access', () => {
+  it('admin: header, every tab and enabled fields', async () => {
+    await mount();
+    expect(
+      screen.getByRole('heading', { name: 'Server: survival' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('tab').map((t) => t.textContent?.trim())
+    ).toEqual([
+      'Status',
+      'General',
+      'Startup',
+      'Variables',
+      'Resources',
+      'Permissions'
+    ]);
+    expect(screen.getByRole('tab', { name: 'Status' })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
+    expect(screen.getByLabelText('Name')).toBeEnabled();
+    expect(screen.getByLabelText('Image')).toBeEnabled();
+    expect(
+      screen.getByRole('switch', { hidden: true, name: 'Unlimited CPU' })
+    ).toBeEnabled();
+    for (const b of comboboxes()) {
+      if (b.textContent?.trim() !== 'eu-1') {
+        expect(b).toBeEnabled();
+      }
+    }
+    // The node only changes through Transfer.
+    expect(
+      comboboxes().find((b) => b.textContent?.trim() === 'eu-1')
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { hidden: true, name: 'Add grant' })
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Transfer…' })).toBeEnabled();
+  });
+
+  it('fills the selects from the loaded options', async () => {
+    await mount();
+    await openTab('Startup');
+    expect(screen.getByLabelText('Image name')).toHaveValue('Java 21');
+    expect(screen.getByLabelText('Startup command')).toHaveValue('');
+  });
+
+  it('hides the save bar on the Status tab only', async () => {
+    await mount();
+    const bar = () =>
+      screen.getByRole('button', { name: 'Save Changes' }).parentElement!
+        .parentElement!;
+    expect(bar()).toHaveClass('hidden');
+    await openTab('General');
+    expect(bar()).not.toHaveClass('hidden');
+  });
+
+  it('write: limited alert, no Permissions tab, admin fields locked', async () => {
+    await mount(asAccess('write'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Some settings need an administrator'
+    );
+    expect(
+      screen.queryByRole('tab', { name: 'Permissions' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toBeEnabled();
+    expect(screen.getByLabelText('Command')).toBeEnabled();
+    expect(screen.getByLabelText('Server Jar File')).toBeEnabled();
+    expect(screen.getByLabelText('Max players')).toBeDisabled();
+    expect(screen.getByLabelText('Image')).toBeDisabled();
+    expect(
+      screen.getByRole('switch', { hidden: true, name: 'Unlimited CPU' })
+    ).toBeDisabled();
+    expect(screen.getByLabelText('Backup limit')).toBeDisabled();
+    for (const b of comboboxes()) {
+      expect(b).toBeDisabled();
+    }
+    expect(comboboxes().map((b) => b.textContent?.trim())).toEqual([
+      'Ada Admin',
+      'eu-1',
+      'Paper'
+    ]);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reinstall' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Transfer…' })).toBeDisabled();
+  });
+
+  it('read: view-only alert and everything disabled', async () => {
+    await mount(asAccess('read'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'You have view-only access'
+    );
+    expect(
+      screen.queryByRole('tab', { name: 'Permissions' })
+    ).not.toBeInTheDocument();
+    for (const label of ['Name', 'Command', 'Server Jar File', 'Image']) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    }
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reinstall' })).toBeDisabled();
+  });
+
+  it('disables Delete while installing', async () => {
+    await mount(info({ install_state: 'installing', status: 'installing' }));
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete server' })
+    ).toBeDisabled();
+  });
+});
+
+describe('server edit page save', () => {
+  it('saves the whole form with grants for admins', async () => {
+    vi.mocked(updateServer).mockResolvedValue(result(200));
+    await mount();
+    await openTab('General');
+    await fireEvent.input(screen.getByLabelText('Name'), {
+      target: { value: 'renamed' }
+    });
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+    await save();
+    await vi.waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        'Server renamed updated successfully'
+      )
+    );
+    const expected = toUpdateBody(
+      { ...fromServerInfo(info()), name: 'renamed' },
+      true
+    );
+    expect(updateServer).toHaveBeenCalledWith({
+      body: expected,
+      path: { uuid: 'srv-1' }
+    });
+    expect(expected.grants).toBeDefined();
+    expect(
+      screen.getByRole('heading', { name: 'Server: renamed' })
+    ).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
+    );
+    expect(screen.getByLabelText('Name')).toHaveValue('renamed');
+  });
+
+  it('sends no grants for write access', async () => {
+    vi.mocked(updateServer).mockResolvedValue(result(200));
+    await mount(asAccess('write'));
+    await openTab('General');
+    await save();
+    await vi.waitFor(() => expect(updateServer).toHaveBeenCalled());
+    const [[{ body }]] = vi.mocked(updateServer).mock.calls;
+    expect(body).not.toHaveProperty('grants');
+    expect(body.environment).toEqual({ SERVER_JARFILE: 'paper.jar' });
+  });
+
+  it('shows 400 field errors on their tab and opens the first', async () => {
+    vi.mocked(updateServer).mockResolvedValue(
+      result(400, {
+        errors: [
+          { field: 'limits.cpu', message: 'CPU too high.' },
+          { field: 'variables.SERVER_JARFILE', message: 'Bad jar.' }
+        ]
+      })
+    );
+    await mount();
+    await openTab('General');
+    await save();
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Couldn't save server", {
+        description: 'Fix the highlighted fields.'
+      })
+    );
+    expect(await screen.findByText('Bad jar.')).toBeInTheDocument();
+    expect(screen.getByText('CPU too high.')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Variables/ })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+    for (const name of ['Variables', 'Resources']) {
+      const tab = screen.getByRole('tab', { name: new RegExp(`^${name}`) });
+      expect(within(tab).getByLabelText('Has errors')).toBeInTheDocument();
+    }
+    expect(
+      within(screen.getByRole('tab', { name: /^General/ })).queryByLabelText(
+        'Has errors'
+      )
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Save Changes' })
+    ).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('shows a 409 allocation conflict on General', async () => {
+    vi.mocked(updateServer).mockResolvedValue(
+      result(409, {
+        errors: [{ field: 'allocations.1', message: 'Allocation in use.' }]
+      })
+    );
+    await mount();
+    await openTab('Resources');
+    await save();
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Couldn't save server", {
+        description: 'An allocation is already in use.'
+      })
+    );
+    expect(await screen.findByText('Allocation in use.')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^General/ })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+  });
+
+  it('describes field errors it cannot place', async () => {
+    vi.mocked(updateServer).mockResolvedValue(
+      result(400, { errors: [{ field: 'mystery', message: 'Odd.' }] })
+    );
+    await mount();
+    await openTab('General');
+    await save();
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Couldn't save server", {
+        description: 'Odd.'
+      })
+    );
+  });
+
+  it.each([403, 500])('turns the save bar into Retry on %i', async (status) => {
+    vi.mocked(updateServer).mockResolvedValue(result(status, 'nope'));
+    await mount();
+    await openTab('General');
+    await save();
+    await vi.waitFor(() =>
+      expect(sonner.error).toHaveBeenCalledWith(
+        "Couldn't save changes. Check your connection and retry."
+      )
+    );
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('does not submit invalid fields', async () => {
+    await mount();
+    await openTab('General');
+    await fireEvent.input(screen.getByLabelText('Name'), {
+      target: { value: '' }
+    });
+    await save();
+    await tick(150);
+    expect(updateServer).not.toHaveBeenCalled();
+  });
+
+  it('reloads startup, image and variables after an egg change', async () => {
+    vi.mocked(updateServer).mockResolvedValue(result(200));
+    await mount();
+    await openTab('General');
+    const egg = comboboxes().find((b) => b.textContent?.trim() === 'Paper')!;
+    await fireEvent.click(egg);
+    await fireEvent.click(
+      await screen.findByRole('option', { name: 'Vanilla' })
+    );
+    await tick();
+    // The server's variables differ from the egg defaults, so it asks first.
+    await fireEvent.click(
+      await screen.findByRole('button', { name: 'Change egg' })
+    );
+    await tick(50);
+    expect(screen.getByLabelText('Command')).toHaveValue('./run.sh');
+    expect(screen.getByLabelText('Image')).toHaveValue('alpine:3');
+    expect(screen.getByText('No variables')).toBeInTheDocument();
+    await save();
+    await vi.waitFor(() => expect(updateServer).toHaveBeenCalled());
+    const [[{ body }]] = vi.mocked(updateServer).mock.calls;
+    expect(body).toMatchObject({
+      egg: 'egg-vanilla',
+      environment: {},
+      image: 'alpine:3',
+      startup: './run.sh',
+      startup_overridden: false
+    });
+  });
+});
+
+describe('server edit page delete', () => {
+  const confirmDelete = async (opener = 'Delete') => {
+    await fireEvent.click(screen.getByRole('button', { name: opener }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Delete server survival?')
+    ).toBeInTheDocument();
+    await fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete' })
+    );
+    await tick(50);
+  };
+
+  it.each(['Delete', 'Delete server'])(
+    'deletes from "%s" and returns to the list',
+    async (opener) => {
+      vi.mocked(deleteServer).mockResolvedValue(result(200));
+      await mount();
+      await confirmDelete(opener);
+      await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/servers'));
+      expect(toast.success).toHaveBeenCalledWith(
+        'Server survival deleted successfully'
+      );
+      expect(deleteServer).toHaveBeenCalledWith({ path: { uuid: 'srv-1' } });
+    }
+  );
+
+  it.each([409, 500])('keeps the dialog open on %i', async (status) => {
+    vi.mocked(deleteServer).mockResolvedValue(result(status, 'nope'));
+    await mount();
+    await confirmDelete();
+    await vi.waitFor(() =>
+      expect(sonner.error).toHaveBeenCalledWith('Failed to delete server')
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(goto).not.toHaveBeenCalled();
+  });
+});

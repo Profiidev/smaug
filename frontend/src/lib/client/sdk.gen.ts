@@ -8,6 +8,7 @@ import type {
   TDataShape
 } from './client';
 import { client } from './client.gen';
+import { serverInfoResponseTransformer } from './transformers.gen';
 import type {
   AuthConfigData,
   AuthConfigErrors,
@@ -979,7 +980,11 @@ export const serverInfo = <ThrowOnError extends boolean = false>(
     ServerInfoResponses,
     ServerInfoErrors,
     ThrowOnError
-  >({ url: '/api/servers/{uuid}', ...options });
+  >({
+    responseTransformer: serverInfoResponseTransformer,
+    url: '/api/servers/{uuid}',
+    ...options
+  });
 
 export const updateServer = <ThrowOnError extends boolean = false>(
   options: Options<UpdateServerData, ThrowOnError>

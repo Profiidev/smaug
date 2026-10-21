@@ -37,6 +37,10 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
     path: '/servers/create',
     ready: (p) => p.getByLabel('Name', { exact: true })
   },
+  {
+    path: '/servers/srv-survival',
+    ready: (p) => p.getByRole('heading', { name: /Server:/ })
+  },
 
   { path: '/users', ready: (p) => p.getByRole('heading', { name: 'Users' }) },
   {
