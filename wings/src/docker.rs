@@ -547,7 +547,9 @@ impl Docker {
         (image, self.wait_installer(&name).await)
       }
       None => {
-        let image = self.create_installer(spec, &name, &generation, &env).await?;
+        let image = self
+          .create_installer(spec, &name, &generation, &env)
+          .await?;
         let res = match self.upload_script(&name, script).await {
           Ok(()) => self.run_installer(&name).await,
           Err(err) => Err(err),
@@ -555,7 +557,9 @@ impl Docker {
         (image, res)
       }
     };
-    self.write_install_log(spec, &name, &image, &env, &res).await;
+    self
+      .write_install_log(spec, &name, &image, &env, &res)
+      .await;
     self.remove(&name).await?;
     res.map(|_| ())
   }
