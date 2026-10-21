@@ -497,6 +497,7 @@ async fn wings_events_update_servers() {
       json!({ "type": "InstallFinished", "uuid": uuid, "generation": 0, "ok": false }),
       json!({ "type": "InstallFinished", "uuid": uuid, "generation": 1, "ok": true }),
       json!({ "type": "State", "uuid": uuid, "state": "crashed" }),
+      json!({ "type": "Error", "uuid": uuid, "error": "Failed to start: boom" }),
     ],
   )
   .await;
@@ -510,6 +511,9 @@ async fn wings_events_update_servers() {
     StatusCode::OK
   );
 
-  let info = wait_for_server(&server, uuid, |i| i["status"] == "crashed").await;
+  let info = wait_for_server(&server, uuid, |i| {
+    i["status"] == "crashed" && i["error"] == "Failed to start: boom"
+  })
+  .await;
   assert_eq!(info["install_state"], "installed");
 }

@@ -65,6 +65,8 @@ pub struct Link {
   client: ClientWithMiddleware,
   /// Runtime state per server, as last reported. Empty while disconnected.
   states: Arc<DashMap<Uuid, ServerState>>,
+  /// Last error per server, as last reported. Empty while disconnected.
+  errors: Arc<DashMap<Uuid, String>>,
   /// Whether `states` holds a full sync. Servers missing from it are offline then.
   synced: Arc<AtomicBool>,
   /// Held by every request and the whole sync, so a request never lands in
@@ -107,6 +109,7 @@ impl WingsConnection {
         .with(WingsAuth::new(token.clone()))
         .build(),
       states: Default::default(),
+      errors: Default::default(),
       synced: Default::default(),
       lock: Default::default(),
       resync: Default::default(),
@@ -156,6 +159,15 @@ impl WingsConnection {
         .load(Ordering::Relaxed)
         .then(ServerState::default)
     })
+  }
+
+  /// Why wings could not do what was asked, `None` while there is no error or
+  /// it is unknown.
+  pub fn error(&self, server: Uuid) -> Option<String> {
+    if !self.is_connected() {
+      return None;
+    }
+    self.link.errors.get(&server).map(|e| e.clone())
   }
 
   pub fn runtime(&self) -> Option<Runtime> {
@@ -287,16 +299,20 @@ impl Link {
       self.send_delete(*orphan, keep_files).await;
     }
     self.states.clear();
+    self.errors.clear();
     for (uuid, observed) in &res.servers {
       if known.contains(uuid) {
         self.states.insert(*uuid, observed.state);
+        if let Some(error) = &observed.error {
+          self.errors.insert(*uuid, error.clone());
+        }
       }
     }
     self.synced.store(true, Ordering::Relaxed);
 
     for server in servers {
       let uuid = server.id;
-      let observed = res.servers.get(&uuid).copied().unwrap_or_default();
+      let observed = res.servers.get(&uuid).cloned().unwrap_or_default();
       if server.suspended && is_up(observed.state) {
         self.send_power(uuid, Power::Kill).await;
       }
@@ -350,6 +366,13 @@ impl Link {
         self.states.insert(uuid, state);
         uuid
       }
+      Event::Error { uuid, error } => {
+        match error {
+          Some(error) => self.errors.insert(uuid, error),
+          None => self.errors.remove(&uuid).map(|(_, e)| e),
+        };
+        uuid
+      }
       Event::InstallFinished { uuid, result } => {
         let server = self.db.server().find_by_id(uuid).await?;
         if self.apply_install(server, result).await? {
@@ -371,6 +394,7 @@ impl Link {
     self.synced.store(false, Ordering::Relaxed);
     let servers: Vec<Uuid> = self.states.iter().map(|e| *e.key()).collect();
     self.states.clear();
+    self.errors.clear();
     for uuid in servers {
       self
         .updater

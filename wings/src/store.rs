@@ -126,7 +126,7 @@ impl Store {
 
   pub async fn observed(&self, uuid: Uuid) -> Result<Option<Observed>> {
     Ok(match &self.backend {
-      Backend::Memory(map) => map.get(&uuid).map(|e| e.1),
+      Backend::Memory(map) => map.get(&uuid).map(|e| e.1.clone()),
       Backend::Kube(api) => api
         .get_opt(&name(uuid))
         .await
@@ -212,7 +212,7 @@ impl Store {
   /// Every stored server with its observed state.
   pub async fn list(&self) -> Result<Vec<(Uuid, Observed)>> {
     Ok(match &self.backend {
-      Backend::Memory(map) => map.iter().map(|e| (*e.key(), e.1)).collect(),
+      Backend::Memory(map) => map.iter().map(|e| (*e.key(), e.1.clone())).collect(),
       Backend::Kube(api) => api
         .list(&ListParams::default().labels("smaug.server"))
         .await
@@ -230,6 +230,22 @@ impl Store {
       .await?;
     // no receiver means no panel is connected, it gets the state on its next sync
     let _ = self.events.send(Event::State { uuid, state });
+    Ok(())
+  }
+
+  /// Records the server's last error and reports it to the panel, unless it
+  /// did not change. Retries keep failing the same way, they send nothing.
+  pub async fn set_error(&self, uuid: Uuid, error: Option<String>) -> Result<()> {
+    let Some(observed) = self.observed(uuid).await? else {
+      return Ok(());
+    };
+    if observed.error == error {
+      return Ok(());
+    }
+    self
+      .update_observed(uuid, |o| o.error = error.clone(), json!({ "error": error }))
+      .await?;
+    let _ = self.events.send(Event::Error { uuid, error });
     Ok(())
   }
 
@@ -345,6 +361,7 @@ pub(crate) mod test {
         Observed {
           state: ServerState::Running,
           last_install: Some(result),
+          error: None,
         }
       )]
     );

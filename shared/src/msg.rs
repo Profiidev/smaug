@@ -30,6 +30,11 @@ pub enum Event {
     #[serde(flatten)]
     result: InstallResult,
   },
+  /// The server's last error changed, see [`Observed::error`].
+  Error {
+    uuid: Uuid,
+    error: Option<String>,
+  },
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,12 +179,16 @@ pub enum ServerState {
 }
 
 /// What wings observed, next to the desired state it stores.
-#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq, Eq, Default)]
 pub struct Observed {
   pub state: ServerState,
   /// The last install that finished. Lets the panel catch up on
   /// `InstallFinished` events it missed while disconnected.
   pub last_install: Option<InstallResult>,
+  /// Why wings could not do what the panel asked, e.g. start or install the
+  /// server. Cleared once the server runs, installs or gets a power request.
+  #[serde(default)]
+  pub error: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, Copy, PartialEq, Eq)]

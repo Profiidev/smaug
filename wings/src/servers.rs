@@ -97,7 +97,8 @@ async fn power(store: Store, Path(uuid): Path<Uuid>, Json(req): Json<PowerReques
   if !store.update(uuid, |d| apply_power(d, req.action)).await? {
     bail!(NOT_FOUND, "Server not found");
   }
-  Ok(())
+  // a new request, an error from the last one is no longer current
+  store.set_error(uuid, None).await
 }
 
 /// Sets the spec, keeping power of an existing server, and starts a pending
@@ -218,6 +219,7 @@ mod test {
     );
 
     let done = |generation| Observed {
+      error: None,
       state: ServerState::Offline,
       last_install: Some(InstallResult {
         generation,
@@ -231,7 +233,7 @@ mod test {
       Some(2),
       &Observed {
         state: ServerState::Installing,
-        last_install: None
+        ..Default::default()
       }
     ));
   }

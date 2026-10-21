@@ -202,7 +202,7 @@ async fn server_crud_flow() {
   assert_eq!(
     info,
     json!({
-      "uuid": uuid, "name": "survival", "status": "installing", "access": "admin",
+      "uuid": uuid, "name": "survival", "status": "installing", "error": null, "access": "admin",
       "owner": { "uuid": c.admin, "name": "admin" },
       "node": { "uuid": c.node, "name": "node-1" },
       "egg": { "uuid": c.egg, "name": "Paper" },

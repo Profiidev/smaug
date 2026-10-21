@@ -10,10 +10,11 @@ pub enum ServerStatus {
   Running,
   Starting,
   Stopping,
-  /// Exited on its own; `restart_on_crash` may start it again.
+  // exited on its own; `restart_on_crash` may start it again
+  // (plain comments: variant docs turn the schema into `oneOf`, not an enum)
   Crashed,
   Offline,
-  /// The node is disconnected or not synced yet.
+  // the node is disconnected or not synced yet
   Unknown,
   NotInstalled,
   Installing,

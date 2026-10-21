@@ -117,6 +117,11 @@ impl Wings {
     }
   }
 
+  /// Last error wings reported for `server` on `node`.
+  pub fn error(&self, node: Uuid, server: Uuid) -> Option<String> {
+    self.wings.get(&node).and_then(|conn| conn.error(server))
+  }
+
   fn link(&self, node: Uuid) -> Option<Link> {
     let link = self.wings.get(&node).and_then(|conn| conn.link());
     if link.is_none() {

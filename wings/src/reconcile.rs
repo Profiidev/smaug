@@ -220,6 +220,7 @@ impl Ctx {
         }
         Err(err) => {
           warn!("Failed to reconcile server {uuid}: {err:?}");
+          self.report(uuid, Some(format!("{err:#}"))).await;
           failures += 1;
           Next::Wait(backoff(failures))
         }
@@ -282,6 +283,11 @@ impl Ctx {
           info!("Server {uuid} crashed, restarting");
         } else {
           info!("Server {uuid} crashed, not restarting");
+          let why = match desired.server.restart_on_crash {
+            true => "Crashed again within 60 s of the last crash, not restarted",
+            false => "Crashed, restart on crash is off",
+          };
+          self.report(uuid, Some(why.into())).await;
           self
             .store
             .update(uuid, |d| d.power = DesiredPower::Stopped)
@@ -300,8 +306,8 @@ impl Ctx {
       Action::Wait(wait) => Next::Wait(wait),
       Action::Install(generation) => {
         self.store.set_state(uuid, ServerState::Installing).await?;
-        let ok = match &desired.server.install.script {
-          None => true,
+        let failed = match &desired.server.install.script {
+          None => None,
           Some(script) => {
             info!("Installing server {uuid}");
             let install = async {
@@ -309,9 +315,10 @@ impl Ctx {
               self.docker.install(&desired.server, script).await
             };
             tokio::select! {
-              res = install => res
-                .inspect_err(|err| warn!("Install of server {uuid} failed: {err:?}"))
-                .is_ok(),
+              res = install => res.err().map(|err| {
+                warn!("Install of server {uuid} failed: {err:?}");
+                format!("Install failed: {err:#}")
+              }),
               () = self.superseded(uuid, generation, notify) => {
                 info!("Install of server {uuid} is no longer wanted, aborting");
                 self.docker.abort_install(uuid).await?;
@@ -320,11 +327,13 @@ impl Ctx {
               () = tokio::time::sleep(INSTALL_TIMEOUT) => {
                 warn!("Install of server {uuid} timed out");
                 self.docker.abort_install(uuid).await?;
-                false
+                Some(format!("Install timed out after {} h", INSTALL_TIMEOUT.as_secs() / 3600))
               }
             }
           }
         };
+        let ok = failed.is_none();
+        self.report(uuid, failed).await;
         let result = InstallResult { generation, ok };
         self.docker.save_install(uuid, result).await;
         self.store.finish_install(uuid, result).await?;
@@ -339,10 +348,15 @@ impl Ctx {
         if observed.state != ServerState::Running {
           self.store.set_state(uuid, ServerState::Running).await?;
         }
+        self.report(uuid, None).await;
         Next::Idle
       }
       Action::Idle => {
         live.mem.stop = None;
+        // running as asked, whatever failed before is over
+        if container.is_some_and(|c| c.running) && observed.error.is_some() {
+          self.report(uuid, None).await;
+        }
         // heals a state that lost a race, e.g. `Installing` set after the install finished
         let settled = matches!(observed.state, ServerState::Offline | ServerState::Crashed);
         if container.is_none() && !settled {
@@ -402,7 +416,12 @@ impl Ctx {
     let limit = u64::try_from(spec.limits.disk_mb).unwrap_or(0) * 1024 * 1024;
     if limit > 0 && used > limit {
       warn!("Server {uuid} is over its disk limit, not starting");
-      return self.give_up(uuid).await;
+      let why = format!(
+        "Uses {} MiB, over its disk limit of {} MiB, not started",
+        used / 1024 / 1024,
+        spec.limits.disk_mb
+      );
+      return self.give_up(uuid, why).await;
     }
 
     self.store.set_state(uuid, ServerState::Starting).await?;
@@ -410,9 +429,12 @@ impl Ctx {
       Ok(attached) => attached,
       Err(err) => {
         warn!("Failed to start server {uuid}: {err:?}");
-        return self.give_up(uuid).await;
+        return self
+          .give_up(uuid, format!("Failed to start: {err:#}"))
+          .await;
       }
     };
+    self.report(uuid, None).await;
     live.stdin = Some(stdin);
     live.mem.stop = None;
     let done: Vec<Matcher> = spec.startup_done.iter().map(|s| Matcher::new(s)).collect();
@@ -424,8 +446,17 @@ impl Ctx {
     Ok(Next::Idle)
   }
 
+  /// Records the server's last error for the panel. Failing to record it only
+  /// loses the message, so it is logged instead of failing the step.
+  async fn report(&self, uuid: Uuid, error: Option<String>) {
+    if let Err(err) = self.store.set_error(uuid, error).await {
+      warn!("Failed to record error of server {uuid}: {err:?}");
+    }
+  }
+
   /// Like a failed start on Wings: the server ends up offline and stays there.
-  async fn give_up(&self, uuid: Uuid) -> Result<Next> {
+  async fn give_up(&self, uuid: Uuid, why: String) -> Result<Next> {
+    self.report(uuid, Some(why)).await;
     self
       .store
       .update(uuid, |d| d.power = DesiredPower::Stopped)
@@ -749,6 +780,7 @@ mod test {
     assert_eq!(decide(Some(&d), &o, None, m, now), Action::Install(2));
 
     let done = Observed {
+      error: None,
       state: ServerState::Offline,
       last_install: Some(InstallResult {
         generation: 2,

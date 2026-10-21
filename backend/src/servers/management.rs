@@ -263,6 +263,7 @@ pub(super) async fn server_info(
   Ok(Json(ServerInfo {
     uuid: server.id,
     status: status(&server, wings.state(server.node_id, server.id)),
+    error: wings.error(server.node_id, server.id),
     access,
     owner: server.owner_id.map(|o| named(&users, o)),
     node: named(&nodes, server.node_id),

@@ -541,6 +541,11 @@ export type ServerInfo = {
   created_at: Date;
   egg: Named;
   /**
+   * Why the node could not do what was asked, e.g. start or install the
+   * server. `None` while there is none or the node is disconnected.
+   */
+  error?: string | null;
+  /**
    * Only returned to admins.
    */
   grants?: GrantsInfo | null;
