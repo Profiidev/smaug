@@ -13,12 +13,17 @@ use dotenvy::dotenv;
 use kube::CustomResourceExt;
 use tracing::info;
 
-use crate::{config::Config, store::Store};
+use shared::msg::Runtime;
+
+use crate::{config::Config, docker::Docker, store::Store};
 
 extern crate centaurus_wings as centaurus;
 
 mod auth;
 mod config;
+mod config_files;
+mod docker;
+mod reconcile;
 mod servers;
 mod store;
 mod ws;
@@ -55,6 +60,17 @@ fn router(_limiter: &mut RateLimiter) -> ApiRouter {
 
 async fn state(router: ApiRouter, config: Config) -> ApiRouter {
   let router = auth::state(router.into(), &config);
-  let router = store::state(router, Store::new(&config).await);
+  let store = Store::new(&config).await;
+  if config.runtime == Runtime::Docker {
+    let docker = Docker::new(&config.docker_network, &config.timezone)
+      .await
+      .expect("Failed to set up docker");
+    tokio::spawn(reconcile::run(
+      store.clone(),
+      docker,
+      config.data_dir.clone(),
+    ));
+  }
+  let router = store::state(router, store);
   router.layer(Extension(config)).into()
 }

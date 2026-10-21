@@ -37,12 +37,13 @@ services:
 
   wings:
     image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b03ecb064002e849d0f65dfa3690053241b0bfe4b893926f527d70655ff8bedc
-    user: '${HOST_UID:-0}:${HOST_GID:-0}'
     restart: unless-stopped
     volumes:
       - ./wings:/app
       - ./shared:/shared
       - /var/run/docker.sock:/var/run/docker.sock
+      # bind mounts resolve on the host, so server data needs the same path in both
+      - /var/lib/smaug/volumes:/var/lib/smaug/volumes
     networks:
       - nginx
     tty: true

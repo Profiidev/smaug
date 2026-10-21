@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use centaurus::{
   Config,
   backend::{
@@ -31,6 +33,12 @@ pub struct Config {
   pub token: String,
   pub runtime: Runtime,
   pub k8s_namespace: String,
+  /// Docker: server data lives in `<data_dir>/<uuid>/files`. Must be the same
+  /// path on the host when wings itself runs in a container.
+  pub data_dir: PathBuf,
+  pub docker_network: String,
+  /// `TZ` of every server container.
+  pub timezone: String,
 }
 
 impl Default for Config {
@@ -47,6 +55,9 @@ impl Default for Config {
       token: "test-token".to_string(),
       runtime: Runtime::Docker,
       k8s_namespace: "smaug-servers".to_string(),
+      data_dir: "/var/lib/smaug/volumes".into(),
+      docker_network: "smaug".to_string(),
+      timezone: "UTC".to_string(),
       auth: AuthConfig::default(),
     }
   }

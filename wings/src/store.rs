@@ -65,6 +65,8 @@ impl Desired {
 pub struct Store {
   backend: Backend,
   events: broadcast::Sender<Event>,
+  /// Uuids whose desired state changed, for the reconciler.
+  changes: broadcast::Sender<Uuid>,
 }
 
 #[derive(Clone)]
@@ -92,6 +94,7 @@ impl Store {
     Self {
       backend,
       events: broadcast::channel(256).0,
+      changes: broadcast::channel(256).0,
     }
   }
 
@@ -104,6 +107,10 @@ impl Store {
 
   pub fn subscribe(&self) -> broadcast::Receiver<Event> {
     self.events.subscribe()
+  }
+
+  pub fn subscribe_changes(&self) -> broadcast::Receiver<Uuid> {
+    self.changes.subscribe()
   }
 
   pub async fn get(&self, uuid: Uuid) -> Result<Option<Desired>> {
@@ -151,6 +158,7 @@ impl Store {
           .context("Failed to apply GameServer")?;
       }
     }
+    let _ = self.changes.send(uuid);
     Ok(())
   }
 
@@ -166,6 +174,7 @@ impl Store {
         }
       },
     }
+    let _ = self.changes.send(uuid);
     Ok(())
   }
 
@@ -251,6 +260,7 @@ pub(crate) mod test {
     Store {
       backend: Backend::Memory(Default::default()),
       events: broadcast::channel(16).0,
+      changes: broadcast::channel(16).0,
     }
   }
 
