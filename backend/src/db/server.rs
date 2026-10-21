@@ -6,7 +6,7 @@ use entity::{
   server_group_access, server_user_access, server_variable,
 };
 use http::StatusCode;
-use sea_orm::{Condition, ExprTrait, QueryOrder, TransactionTrait, prelude::*};
+use sea_orm::{QueryOrder, TransactionTrait, prelude::*};
 
 pub struct ServerTable<'db> {
   db: &'db DatabaseConnection,
@@ -128,27 +128,19 @@ impl<'db> ServerTable<'db> {
     )
   }
 
-  /// The `(ip, port)` pairs already used on `node` by servers other than `exclude`.
+  /// The `(ip, port)` pairs on `node` using any of `ports`, from servers other than `exclude`.
   pub async fn taken(
     &self,
     node: Uuid,
-    pairs: &[(String, i32)],
+    ports: &[i32],
     exclude: Option<Uuid>,
-  ) -> Result<HashSet<(String, i32)>, DbErr> {
-    if pairs.is_empty() {
-      return Ok(HashSet::new());
-    }
-    let mut any = Condition::any();
-    for (ip, port) in pairs {
-      any = any.add(
-        server_allocation::Column::Ip
-          .eq(ip)
-          .and(server_allocation::Column::Port.eq(*port)),
-      );
+  ) -> Result<Vec<(String, i32)>, DbErr> {
+    if ports.is_empty() {
+      return Ok(Vec::new());
     }
     let mut query = server_allocation::Entity::find()
       .filter(server_allocation::Column::NodeId.eq(node))
-      .filter(any);
+      .filter(server_allocation::Column::Port.is_in(ports.iter().copied()));
     if let Some(id) = exclude {
       query = query.filter(server_allocation::Column::ServerId.ne(id));
     }

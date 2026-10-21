@@ -76,20 +76,38 @@ pub(super) fn validate_spec(spec: &ServerSpec, errors: &mut Vec<FieldError>) -> 
       "At least one allocation is required.",
     ));
   }
-  let mut seen = HashSet::new();
-  let mut out = Vec::new();
+  let mut out: Vec<(String, i32)> = Vec::new();
   for (i, a) in spec.allocations.iter().enumerate() {
     if let Some(pair) = parse_allocation(&a.ip, a.port, &format!("allocations.{i}."), errors) {
-      if !seen.insert(pair.clone()) {
+      let field = format!("allocations.{i}");
+      if out.contains(&pair) {
+        errors.push(field_err(field, "Duplicate allocation."));
+      } else if out.iter().any(|o| overlaps(o, &pair)) {
         errors.push(field_err(
-          format!("allocations.{i}"),
-          "Duplicate allocation.",
+          field,
+          "Overlaps another allocation on the same port.",
         ));
       }
       out.push(pair);
     }
   }
   out
+}
+
+/// Whether two IPs can not be bound on the same port at once. A wildcard
+/// covers every address of its family, `::` (dual-stack) covers IPv4 too.
+pub(super) fn conflicts(a: &IpAddr, b: &IpAddr) -> bool {
+  let covers = |x: &IpAddr, y: &IpAddr| x.is_unspecified() && (x.is_ipv6() || y.is_ipv4());
+  a == b || covers(a, b) || covers(b, a)
+}
+
+/// [`conflicts`] on normalized `(ip, port)` pairs.
+fn overlaps((ip_a, port_a): &(String, i32), (ip_b, port_b): &(String, i32)) -> bool {
+  port_a == port_b
+    && match (ip_a.parse(), ip_b.parse()) {
+      (Ok(a), Ok(b)) => conflicts(&a, &b),
+      _ => ip_a == ip_b,
+    }
 }
 
 /// Final value of every egg variable. Supplied values win, then the current
@@ -217,11 +235,12 @@ pub(super) async fn check_free(
   exclude: Option<Uuid>,
   field: impl Fn(usize) -> String,
 ) -> FieldResult<()> {
-  let taken = db.server().taken(node, allocations, exclude).await?;
+  let ports: Vec<i32> = allocations.iter().map(|(_, port)| *port).collect();
+  let taken = db.server().taken(node, &ports, exclude).await?;
   let errors = allocations
     .iter()
     .enumerate()
-    .filter(|(_, a)| taken.contains(a))
+    .filter(|(_, a)| taken.iter().any(|t| overlaps(t, a)))
     .map(|(i, _)| field_err(field(i), "IP and port are already in use on this node."))
     .collect();
   fail_if(StatusCode::CONFLICT, errors)
@@ -546,6 +565,80 @@ mod test {
     ] {
       assert!(changes(f));
     }
+  }
+
+  #[test]
+  fn ip_conflicts() {
+    let c = |a: &str, b: &str| {
+      let (a, b) = (a.parse().unwrap(), b.parse().unwrap());
+      let res = conflicts(&a, &b);
+      assert_eq!(res, conflicts(&b, &a), "symmetric for {a} {b}");
+      res
+    };
+    // equal
+    assert!(c("10.0.0.1", "10.0.0.1"));
+    assert!(c("::1", "::1"));
+    assert!(c("0.0.0.0", "0.0.0.0"));
+    assert!(c("::", "::"));
+    // distinct specific
+    assert!(!c("10.0.0.1", "10.0.0.2"));
+    assert!(!c("::1", "127.0.0.1"));
+    // v4 wildcard covers v4 only
+    assert!(c("0.0.0.0", "127.0.0.1"));
+    assert!(!c("0.0.0.0", "::1"));
+    assert!(!c("0.0.0.0", "::ffff:10.0.0.1"));
+    // v6 wildcard covers everything
+    assert!(c("::", "::1"));
+    assert!(c("::", "127.0.0.1"));
+    assert!(c("::", "0.0.0.0"));
+  }
+
+  #[test]
+  fn pair_overlaps() {
+    let p = |ip: &str, port| (ip.to_string(), port);
+    assert!(overlaps(&p("0.0.0.0", 2000), &p("10.0.0.1", 2000)));
+    assert!(!overlaps(&p("0.0.0.0", 2000), &p("10.0.0.1", 2001)));
+    assert!(!overlaps(&p("10.0.0.1", 2000), &p("10.0.0.2", 2000)));
+    // unparsable stored values fall back to exact match
+    assert!(overlaps(&p("x", 2000), &p("x", 2000)));
+    assert!(!overlaps(&p("x", 2000), &p("0.0.0.0", 2000)));
+  }
+
+  #[test]
+  fn in_request_overlap() {
+    let run = |allocs: &[(&str, i32)]| {
+      let mut s = spec();
+      s.allocations = allocs
+        .iter()
+        .map(|(ip, port)| Allocation {
+          ip: ip.to_string(),
+          port: *port,
+        })
+        .collect();
+      let mut errors = Vec::new();
+      validate_spec(&s, &mut errors);
+      errors
+    };
+    let overlap = |i: usize| {
+      field_err(
+        format!("allocations.{i}"),
+        "Overlaps another allocation on the same port.",
+      )
+    };
+    assert_eq!(run(&[("10.0.0.1", 2000), ("0.0.0.0", 2000)]), [overlap(1)]);
+    assert_eq!(run(&[("::", 2000), ("10.0.0.1", 2000)]), [overlap(1)]);
+    assert_eq!(run(&[("::1", 2000), ("::", 2000)]), [overlap(1)]);
+    // exact duplicate keeps its own message
+    assert_eq!(
+      run(&[("0.0.0.0", 2000), ("10.0.0.1", 2000), ("0.0.0.0", 2000)]),
+      [
+        overlap(1),
+        field_err("allocations.2", "Duplicate allocation.")
+      ]
+    );
+    // different port or family is fine
+    assert!(run(&[("0.0.0.0", 2000), ("10.0.0.1", 2001)]).is_empty());
+    assert!(run(&[("0.0.0.0", 2000), ("::1", 2000)]).is_empty());
   }
 
   #[tokio::test]

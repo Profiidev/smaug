@@ -434,22 +434,18 @@ mod test {
       .await
       .unwrap();
 
-    // taken: same node only, own server excluded, empty input is a no-op
-    let wanted = [
-      pair("10.0.0.1", 2001),
-      pair("10.0.0.2", 2001),
-      pair("10.0.0.3", 1),
-    ];
-    let taken = servers.taken(node_a.id, &wanted, None).await.unwrap();
-    assert_eq!(taken.len(), 2);
-    let taken = servers.taken(node_a.id, &wanted, Some(id)).await.unwrap();
+    // taken: same node and port only, own server excluded, empty input is a no-op
+    let ports = [2001, 1];
+    let mut taken = servers.taken(node_a.id, &ports, None).await.unwrap();
+    taken.sort();
+    assert_eq!(taken, [pair("10.0.0.1", 2001), pair("10.0.0.2", 2001)]);
     assert_eq!(
-      taken.into_iter().collect::<Vec<_>>(),
+      servers.taken(node_a.id, &ports, Some(id)).await.unwrap(),
       [pair("10.0.0.2", 2001)]
     );
     assert!(
       servers
-        .taken(node_b.id, &wanted, None)
+        .taken(node_b.id, &ports, None)
         .await
         .unwrap()
         .is_empty()

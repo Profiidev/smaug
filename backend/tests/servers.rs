@@ -694,6 +694,96 @@ async fn allocation_conflicts() {
   assert_eq!(c.put(d, update).await.status(), StatusCode::OK);
 }
 
+#[tokio::test]
+async fn wildcard_allocation_conflicts() {
+  let c = ctx().await;
+  let with = |node: Uuid, ip: &str, port: i32| {
+    let mut body = c.body();
+    body["node"] = json!(node);
+    body["allocations"] = json!([{ "ip": ip, "port": port }]);
+    body
+  };
+  let conflict = |resp| async {
+    assert_eq!(
+      field_errors(resp, StatusCode::CONFLICT).await,
+      [(
+        "allocations.0".to_string(),
+        "IP and port are already in use on this node.".to_string()
+      )]
+    );
+  };
+
+  // specific then wildcard, and the reverse
+  c.create(with(c.node, "127.0.0.1", 4000)).await;
+  conflict(
+    c.server
+      .post("/servers", with(c.node, "0.0.0.0", 4000))
+      .await,
+  )
+  .await;
+  conflict(c.server.post("/servers", with(c.node, "::", 4000)).await).await;
+  c.create(with(c.node, "0.0.0.0", 4001)).await;
+  conflict(
+    c.server
+      .post("/servers", with(c.node, "127.0.0.1", 4001))
+      .await,
+  )
+  .await;
+  // 0.0.0.0 does not cover IPv6, another port or another node
+  c.create(with(c.node, "::1", 4001)).await;
+  c.create(with(c.node, "127.0.0.1", 4002)).await;
+  c.create(with(c.node2, "0.0.0.0", 4000)).await;
+  // :: covers IPv4 too
+  c.create(with(c.node, "::", 4003)).await;
+  conflict(
+    c.server
+      .post("/servers", with(c.node, "10.0.0.1", 4003))
+      .await,
+  )
+  .await;
+  // in-request overlap is a 400
+  let mut body = c.body();
+  body["allocations"] =
+    json!([{ "ip": "10.0.0.1", "port": 4004 }, { "ip": "0.0.0.0", "port": 4004 }]);
+  assert_eq!(
+    field_errors(
+      c.server.post("/servers", body).await,
+      StatusCode::BAD_REQUEST
+    )
+    .await,
+    [(
+      "allocations.1".to_string(),
+      "Overlaps another allocation on the same port.".to_string()
+    )]
+  );
+
+  // update: own wildcard swap is fine, overlapping another server is not
+  let own = c.create(with(c.node, "10.0.0.9", 4005)).await;
+  let mut update = update_body(&c.info(own).await);
+  update["allocations"] = json!([{ "ip": "0.0.0.0", "port": 4005 }]);
+  assert_eq!(c.put(own, update.clone()).await.status(), StatusCode::OK);
+  update["allocations"] = json!([{ "ip": "0.0.0.0", "port": 4000 }]);
+  conflict(c.put(own, update).await).await;
+
+  // transfer onto a port covered by a wildcard on the target node
+  let resp = c
+    .server
+    .post(
+      &format!("/servers/{own}/transfer"),
+      json!({ "node": c.node2, "ip": "10.0.0.1", "port": 4000 }),
+    )
+    .await;
+  assert_eq!(fields(resp, StatusCode::CONFLICT).await, ["port"]);
+  let resp = c
+    .server
+    .post(
+      &format!("/servers/{own}/transfer"),
+      json!({ "node": c.node2, "ip": "::1", "port": 4000 }),
+    )
+    .await;
+  assert_eq!(resp.status(), StatusCode::OK);
+}
+
 // ---- actions ----
 
 #[derive(Clone, Copy, Debug)]
