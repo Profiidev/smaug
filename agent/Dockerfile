@@ -14,7 +14,7 @@ COPY agent/Cargo.toml agent/
 COPY shared/Cargo.toml shared/
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["agent", "shared"]' Cargo.toml
+RUN sed -i -e '/^members = \[/{:a;/\]/!{N;ba}' -e 'c\members = ["agent", "shared"]' -e '}' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
@@ -39,7 +39,7 @@ COPY shared/Cargo.toml shared/
 COPY shared/src shared/src
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["agent", "shared"]' Cargo.toml
+RUN sed -i -e '/^members = \[/{:a;/\]/!{N;ba}' -e 'c\members = ["agent", "shared"]' -e '}' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
