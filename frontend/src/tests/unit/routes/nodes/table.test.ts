@@ -58,7 +58,7 @@ describe('nodes table columns', () => {
   it('links the name to the node page', () => {
     const cell = cellOf('name');
     expect(cell.component).toBe(NameCell);
-    expect(cell.props).toEqual({ href: '/nodes/n1', name: 'Alpha' });
+    expect(cell.props).toEqual({ href: '/nodes/n1/setup', name: 'Alpha' });
   });
 
   it.each([true, false])('renders the status for connected=%s', (connected) => {
@@ -97,7 +97,7 @@ describe('nodes table columns', () => {
   });
 
   it('links edit to the node page', () => {
-    expect(cellOf('actions').props.edit).toBe('/nodes/n1');
+    expect(cellOf('actions').props.edit).toBe('/nodes/n1/setup');
   });
 
   it.each([

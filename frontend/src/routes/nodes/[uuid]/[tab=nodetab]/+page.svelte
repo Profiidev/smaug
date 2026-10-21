@@ -10,6 +10,7 @@
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { z } from 'zod';
   import { Permission } from '$lib/permissions.svelte';
   import {
@@ -31,10 +32,10 @@
     stageForm,
     undoReformatData,
     type NodeForm
-  } from '../schema.svelte';
-  import GeneralSettingsFields from '../GeneralSettingsFields.svelte';
-  import AdvancedSettingsFields from '../AdvancedSettingsFields.svelte';
-  import SetupTab from './SetupTab.svelte';
+  } from '../../schema.svelte';
+  import GeneralSettingsFields from '../../GeneralSettingsFields.svelte';
+  import AdvancedSettingsFields from '../../AdvancedSettingsFields.svelte';
+  import SetupTab from '../SetupTab.svelte';
 
   const { data } = $props();
 
@@ -60,10 +61,15 @@
   let fieldErrors: Record<string, string> | undefined = $state.raw();
   let deleteOpen = $state(false);
   let isLoading = $state(false);
-  // svelte-ignore state_referenced_locally
-  let tab = $state(
-    sections.some((s) => s.value === data.tab) ? data.tab! : 'setup'
-  );
+  // The route matcher guarantees a valid tab; the component is reused across
+  // tab URLs, so unsaved edits survive switching.
+  let tab = $derived(page.params.tab ?? 'setup');
+
+  const setTab = (value: string) => {
+    if (value !== tab) {
+      goto(`/nodes/${data.uuid}/${value}`, { keepFocus: true, noScroll: true });
+    }
+  };
 
   let readonly = $derived(
     !node || !user?.permissions.includes(Permission.NODE_EDIT)
@@ -110,7 +116,7 @@
         return { error: 'Failed to update node' };
       }
       saveFailed = false;
-      tab = 'general';
+      setTab('general');
       // Applied after BaseForm finished handling this submit.
       setTimeout(() => (fieldErrors = field));
       toast.error("Couldn't save node", {
@@ -184,7 +190,7 @@
       {@const disabled = props.disabled || readonly}
       <ApplyErrors formData={props.formData} errors={fieldErrors} />
       <Tabs.Root
-        bind:value={tab}
+        bind:value={() => tab, setTab}
         class="mx-auto flex min-h-0 w-full max-w-4xl grow flex-col gap-4"
       >
         <Tabs.List class="w-full shrink-0 overflow-x-auto overflow-y-hidden">

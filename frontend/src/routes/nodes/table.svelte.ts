@@ -22,7 +22,7 @@ export const columns = ({
     ...createColumnHeader<NodeInfo>('name', 'Name'),
     cell: ({ row }) =>
       renderComponent(NameCell, {
-        href: `/nodes/${row.original.id}`,
+        href: `/nodes/${row.original.id}/setup`,
         name: row.original.name
       })
   },
@@ -59,7 +59,7 @@ export const columns = ({
     cell: ({ row }) =>
       renderComponent(Actions, {
         delete_disabled: !canEdit,
-        edit: `/nodes/${row.original.id}`,
+        edit: `/nodes/${row.original.id}/setup`,
         edit_disabled: !canEdit,
         remove: () => deleteNode(row.original)
       }),

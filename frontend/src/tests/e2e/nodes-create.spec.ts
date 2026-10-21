@@ -55,7 +55,7 @@ test.describe('node create', () => {
     await expectNoHorizontalOverflow(page);
     await page.getByRole('button', { name: 'Create' }).click();
 
-    await expect(page).toHaveURL(/\/nodes\/node-new\?tab=setup$/);
+    await expect(page).toHaveURL(/\/nodes\/node-new\/setup$/);
     await expect(page.getByText('Node created successfully.')).toBeVisible();
     expect(bodies).toEqual([
       {

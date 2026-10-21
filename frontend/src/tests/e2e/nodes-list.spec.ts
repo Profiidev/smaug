@@ -25,7 +25,7 @@ test.describe('nodes list', () => {
     await expect(page.getByRole('heading', { name: 'Nodes' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Node One' })).toHaveAttribute(
       'href',
-      '/nodes/node-1'
+      '/nodes/node-1/setup'
     );
     await expect(page.getByText('node1.example.com:443')).toBeVisible();
     await expect(page.getByText('10.0.0.2:8000')).toBeVisible();
@@ -46,7 +46,7 @@ test.describe('nodes list', () => {
     await gotoReady(page, '/nodes');
 
     await page.getByRole('link', { name: 'Node One' }).click();
-    await expect(page).toHaveURL(/\/nodes\/node-1$/);
+    await expect(page).toHaveURL(/\/nodes\/node-1\/setup$/);
     await expect(page.getByRole('heading', { name: /Node:/ })).toContainText(
       'Node One'
     );

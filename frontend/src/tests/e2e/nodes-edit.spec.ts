@@ -39,18 +39,90 @@ test.describe('node edit', () => {
     }
   });
 
-  test.describe('old sub-routes redirect to tabs', () => {
+  test.describe('the URL names the open tab', () => {
     for (const [path, name, url] of [
-      ['setup', 'Setup', /\/nodes\/node-1\?tab=setup$/],
-      ['settings', 'General', /\/nodes\/node-1\?tab=general$/]
+      ['', 'Setup', /\/nodes\/node-1\/setup$/],
+      ['/setup', 'Setup', /\/nodes\/node-1\/setup$/],
+      ['/general', 'General', /\/nodes\/node-1\/general$/],
+      ['/resources', 'Resources', /\/nodes\/node-1\/resources$/]
     ] as const) {
-      test(`/${path}`, async ({ page }) => {
-        await gotoReady(page, `/nodes/node-1/${path}`);
+      test(`/nodes/node-1${path} opens ${name}`, async ({ page }) => {
+        await gotoReady(page, `/nodes/node-1${path}`);
 
         await expect(page).toHaveURL(url);
         await expect(tab(page, name)).toHaveAttribute('aria-selected', 'true');
       });
     }
+
+    for (const path of ['bogus', 'settings', 'Setup']) {
+      test(`/nodes/node-1/${path} is a 404`, async ({ page }) => {
+        const res = await page.goto(`/nodes/node-1/${path}`);
+
+        expect(res?.status()).toBe(404);
+        await expect(page.getByRole('tab')).toHaveCount(0);
+      });
+    }
+
+    test('clicking tabs pushes history without refetching the node', async ({
+      page
+    }) => {
+      await gotoReady(page, '/nodes/node-1/setup');
+      await expect(page.getByRole('heading', { name: /Node:/ })).toContainText(
+        'Node One'
+      );
+      const fetched: string[] = [];
+      page.on('request', (req) => {
+        if (new URL(req.url()).pathname.startsWith('/api/nodes')) {
+          fetched.push(req.url());
+        }
+      });
+
+      await openTab(page, 'General');
+      await expect(page).toHaveURL(/\/nodes\/node-1\/general$/);
+      await openTab(page, 'Resources');
+      await expect(page).toHaveURL(/\/nodes\/node-1\/resources$/);
+      await expect(tab(page, 'Resources')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+
+      await page.goBack();
+      await expect(page).toHaveURL(/\/nodes\/node-1\/general$/);
+      await expect(tab(page, 'General')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      await page.goBack();
+      await expect(page).toHaveURL(/\/nodes\/node-1\/setup$/);
+      await expect(tab(page, 'Setup')).toHaveAttribute('aria-selected', 'true');
+      await page.goForward();
+      await expect(tab(page, 'General')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      await page.waitForLoadState('networkidle');
+      expect(fetched).toEqual([]);
+    });
+
+    test('unsaved edits survive tab switches and back navigation', async ({
+      page
+    }) => {
+      await gotoReady(page, '/nodes/node-1/general');
+      const name = page.getByPlaceholder('Enter name');
+      await expect(name).toHaveValue('Node One');
+      await name.fill('Draft Name');
+      await expect(page.getByText('Unsaved changes')).toBeVisible();
+
+      await openTab(page, 'Setup');
+      await expect(page).toHaveURL(/\/nodes\/node-1\/setup$/);
+      await openTab(page, 'Resources');
+      await page.goBack();
+      await page.goBack();
+      await expect(page).toHaveURL(/\/nodes\/node-1\/general$/);
+
+      await expect(name).toHaveValue('Draft Name');
+      await expect(page.getByText('Unsaved changes')).toBeVisible();
+    });
   });
 
   test('regenerates the node token', async ({ page }) => {
@@ -100,7 +172,7 @@ test.describe('node edit', () => {
         return ok();
       })
     );
-    await gotoReady(page, '/nodes/node-1?tab=general');
+    await gotoReady(page, '/nodes/node-1/general');
 
     const name = page.getByPlaceholder('Enter name');
     await expect(name).toHaveValue('Node One');
@@ -146,7 +218,7 @@ test.describe('node edit', () => {
       network.use(
         gen.handleUpdateNode(() => new HttpResponse(null, { status }) as never)
       );
-      await gotoReady(page, '/nodes/node-1?tab=resources');
+      await gotoReady(page, '/nodes/node-1/resources');
       await openTab(page, 'General');
       await expect(page.getByPlaceholder('Enter name')).toHaveValue('Node One');
       await openTab(page, 'Resources');
@@ -157,6 +229,7 @@ test.describe('node edit', () => {
         'aria-selected',
         'true'
       );
+      await expect(page).toHaveURL(/\/nodes\/node-1\/general$/);
       await expect(page.getByText(message).first()).toBeVisible();
       await expect(tab(page, 'General').getByLabel('Has errors')).toBeVisible();
     });
@@ -168,7 +241,7 @@ test.describe('node edit', () => {
         () => new HttpResponse(null, { status: 500 }) as never
       )
     );
-    await gotoReady(page, '/nodes/node-1?tab=general');
+    await gotoReady(page, '/nodes/node-1/general');
     await expect(page.getByPlaceholder('Enter name')).toHaveValue('Node One');
 
     await save(page);
@@ -232,7 +305,7 @@ test.describe('node edit without node:edit', () => {
   test.beforeEach(async ({ context }) => setupSession(context, 'readonly'));
 
   test('fields, save, delete and regenerate are disabled', async ({ page }) => {
-    await gotoReady(page, '/nodes/node-1?tab=general');
+    await gotoReady(page, '/nodes/node-1/general');
     await expect(page.getByPlaceholder('Enter name')).toHaveValue('Node One');
 
     await expect(page.getByPlaceholder('Enter name')).toBeDisabled();

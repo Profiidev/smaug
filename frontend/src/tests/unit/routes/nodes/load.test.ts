@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { load as listLoad } from '$routes/nodes/+page';
-import { load as detailLoad } from '$routes/nodes/[uuid]/+page';
-import { load as setupLoad } from '$routes/nodes/[uuid]/setup/+page';
-import { load as settingsLoad } from '$routes/nodes/[uuid]/settings/+page';
+import { load as rootLoad } from '$routes/nodes/[uuid]/+page';
+import { load as detailLoad } from '$routes/nodes/[uuid]/[tab=nodetab]/+page';
+import { match } from '../../../../params/nodetab';
 import { catchRedirect, jsonFetch, runLoad } from '$test_helpers/load';
 import type { NodeInfo } from '$lib/client';
 
@@ -64,19 +64,29 @@ describe('node [uuid] page load', () => {
       url: detailUrl()
     });
     expect(result.uuid).toBe('n1');
-    expect(result.tab).toBeNull();
     expect(result.nodeRes).toBeInstanceOf(Promise);
     expect((await result.nodeRes).data).toEqual(node);
     expect(requested(fetch)).toEqual({ method: 'GET', path: '/api/nodes/n1' });
   });
 
-  it('passes the ?tab= query through', () => {
+  it('does not read the tab param (switching tabs must not reload)', () => {
+    const params = new Proxy(
+      { uuid: 'n1' },
+      {
+        get: (t, k) => {
+          if (k === 'tab') {
+            throw new Error('load read params.tab');
+          }
+          return t[k as 'uuid'];
+        }
+      }
+    );
     const result = runLoad(detailLoad, {
       fetch: jsonFetch(node),
-      params: { uuid: 'n1' },
-      url: detailUrl('?tab=general')
+      params,
+      url: detailUrl('/general')
     });
-    expect(result.tab).toBe('general');
+    expect(Object.keys(result).toSorted()).toEqual(['nodeRes', 'uuid']);
   });
 
   it.each([404, 500])('exposes the %i status for the redirect', async (s) => {
@@ -91,15 +101,25 @@ describe('node [uuid] page load', () => {
   });
 });
 
-describe('old node sub-routes', () => {
-  it.each([
-    ['setup', setupLoad, '/nodes/n1?tab=setup'],
-    ['settings', settingsLoad, '/nodes/n1?tab=general']
-  ])('%s redirects to %s', async (_name, load, location) => {
+describe('nodetab param matcher', () => {
+  it.each(['setup', 'general', 'resources'])('accepts %s', (tab) => {
+    expect(match(tab)).toBe(true);
+  });
+
+  it.each(['settings', 'bogus', '', 'Setup', 'general/'])(
+    'rejects %j',
+    (tab) => {
+      expect(match(tab)).toBe(false);
+    }
+  );
+});
+
+describe('node [uuid] without a tab', () => {
+  it('redirects to the setup tab', async () => {
     const redirect = await catchRedirect(() =>
-      (load as (e: unknown) => unknown)({ params: { uuid: 'n1' } })
+      (rootLoad as (e: unknown) => unknown)({ params: { uuid: 'n1' } })
     );
     expect(redirect.status).toBe(307);
-    expect(redirect.location).toBe(location);
+    expect(redirect.location).toBe('/nodes/n1/setup');
   });
 });

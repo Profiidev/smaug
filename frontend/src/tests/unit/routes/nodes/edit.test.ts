@@ -15,7 +15,8 @@ import {
   nodeTokenRegenerate,
   updateNode
 } from '$lib/client';
-import EditPage from '$routes/nodes/[uuid]/+page.svelte';
+import EditPage from '$routes/nodes/[uuid]/[tab=nodetab]/+page.svelte';
+import { page } from '$test_helpers/page-state.svelte';
 import { adminUser } from '$mocks/e2e/data';
 import { Permission } from '$lib/permissions.svelte';
 
@@ -36,9 +37,19 @@ vi.mock('$lib/client', async (orig) => ({
   updateNode: vi.fn()
 }));
 
+vi.mock('$app/state', async () => import('$test_helpers/page-state.svelte'));
+
 afterEach(cleanup);
 
 beforeEach(() => {
+  page.params = { tab: 'setup', uuid: 'node-1' };
+  // Navigating to a tab URL updates the route param like SvelteKit does.
+  vi.mocked(goto).mockImplementation(async (url) => {
+    const [uuid, tab] = String(url).split('/').slice(2);
+    if (tab) {
+      page.params = { tab, uuid };
+    }
+  });
   vi.spyOn(sonner, 'error').mockImplementation(() => 0);
   sessionStorage.clear();
 });
@@ -67,15 +78,11 @@ const readonlyUser = {
   permissions: adminUser.permissions.filter((p) => p !== Permission.NODE_EDIT)
 };
 
-const pageData = (
-  info: NodeInfo = node,
-  { tab = null as string | null, user = adminUser } = {}
-) => ({
+const pageData = (info: NodeInfo = node, { user = adminUser } = {}) => ({
   nodeRes: Promise.resolve({
     data: info,
     response: new Response(null, { status: 200 })
   }),
-  tab,
   user: Promise.resolve(user),
   uuid: 'node-1'
 });
@@ -109,7 +116,6 @@ describe('node edit page loading', () => {
       props: {
         data: {
           nodeRes: new Promise(() => {}),
-          tab: null,
           user: Promise.resolve(adminUser),
           uuid: 'node-1'
         }
@@ -165,14 +171,54 @@ describe('node edit page tabs', () => {
   it.each([
     ['general', 'General'],
     ['resources', 'Resources'],
-    ['setup', 'Setup'],
-    ['bogus', 'Setup']
-  ])('opens ?tab=%s as %s', async (tab, name) => {
-    await mount(pageData(node, { tab }));
+    ['setup', 'Setup']
+  ])('opens the /%s param as %s', async (tab, name) => {
+    page.params = { tab, uuid: 'node-1' };
+    await mount();
     expect(screen.getByRole('tab', { name })).toHaveAttribute(
       'data-state',
       'active'
     );
+  });
+
+  it('defaults to Setup without a tab param', async () => {
+    page.params = { uuid: 'node-1' };
+    await mount();
+    expect(screen.getByRole('tab', { name: 'Setup' })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+  });
+
+  it('navigates to the tab URL keeping focus and scroll', async () => {
+    await mount();
+    await openTab('Resources');
+    expect(goto).toHaveBeenCalledExactlyOnceWith('/nodes/node-1/resources', {
+      keepFocus: true,
+      noScroll: true
+    });
+    expect(screen.getByRole('tab', { name: 'Resources' })).toHaveAttribute(
+      'data-state',
+      'active'
+    );
+  });
+
+  it('does not navigate when clicking the open tab', async () => {
+    await mount();
+    await openTab('Setup');
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('keeps unsaved edits when switching tabs', async () => {
+    await mount();
+    await openTab('General');
+    await fireEvent.input(nameInput(), { target: { value: 'Draft' } });
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+    await openTab('Resources');
+    await openTab('Setup');
+    await openTab('General');
+    expect(nameInput()).toHaveValue('Draft');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
   });
 
   it('fills the form from the node', async () => {
@@ -249,7 +295,8 @@ describe('node edit page save', () => {
     'shows the %i field error on General with a toast',
     async (status, message) => {
       vi.mocked(updateNode).mockResolvedValue(result(status, ''));
-      await mount(pageData(node, { tab: 'resources' }));
+      page.params = { tab: 'resources', uuid: 'node-1' };
+      await mount();
       await save();
       await vi.waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith("Couldn't save node", {
@@ -269,7 +316,8 @@ describe('node edit page save', () => {
 
   it('shows a retry button on other errors', async () => {
     vi.mocked(updateNode).mockResolvedValue(result(500, ''));
-    await mount(pageData(node, { tab: 'general' }));
+    page.params = { tab: 'general', uuid: 'node-1' };
+    await mount();
     await save();
     await vi.waitFor(() =>
       expect(sonner.error).toHaveBeenCalledWith('Failed to update node')

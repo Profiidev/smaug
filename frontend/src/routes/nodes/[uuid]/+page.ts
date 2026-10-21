@@ -1,8 +1,7 @@
-import { nodeInfo } from '$lib/client';
+import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export const load = (({ fetch, params, url }) => ({
-  nodeRes: nodeInfo({ fetch, path: { uuid: params.uuid } }),
-  tab: url.searchParams.get('tab'),
-  uuid: params.uuid
-})) satisfies PageLoad;
+// The URL always names the open tab.
+export const load = (({ params }) => {
+  redirect(307, `/nodes/${params.uuid}/setup`);
+}) satisfies PageLoad;

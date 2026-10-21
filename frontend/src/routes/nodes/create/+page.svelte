@@ -32,7 +32,7 @@
     // The token can not be fetched again; the Setup tab shows it once.
     sessionStorage.setItem('newNodeToken', token);
     setTimeout(() => {
-      goto(`/nodes/${uuid}?tab=setup`);
+      goto(`/nodes/${uuid}/setup`);
     });
   };
 </script>

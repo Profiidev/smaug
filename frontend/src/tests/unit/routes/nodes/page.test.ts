@@ -70,7 +70,7 @@ describe('nodes list page', () => {
     expect(await screen.findByText('2 nodes')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Node One' })).toHaveAttribute(
       'href',
-      '/nodes/node-1'
+      '/nodes/node-1/setup'
     );
     expect(screen.getByText('node1.example.com:443')).toBeInTheDocument();
     expect(screen.getByText('10.0.0.2:8000')).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe('node create page', () => {
     await fillWizard();
     await submit();
     await vi.waitFor(() =>
-      expect(goto).toHaveBeenCalledWith('/nodes/node-new?tab=setup')
+      expect(goto).toHaveBeenCalledWith('/nodes/node-new/setup')
     );
     expect(createNode).toHaveBeenCalledWith({
       body: {
