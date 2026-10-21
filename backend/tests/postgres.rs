@@ -4,7 +4,10 @@
 //! migration), and the flows below hit the user and group handlers.
 mod common;
 
-use common::{TestServer, egg_body, egg_envs, egg_keys, unique};
+use common::{
+  TestServer, create_egg, create_group, create_node, create_user, egg_body, egg_envs, egg_keys,
+  server_body, server_egg_body, unique, update_body, uuid_of,
+};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -223,5 +226,117 @@ async fn pg_node_flow() {
       .await
       .status(),
     StatusCode::NOT_FOUND
+  );
+}
+
+#[tokio::test]
+async fn pg_server_flow() {
+  let (server, admin) = TestServer::with_admin(TestServer::start_pg().await).await;
+  let node = create_node(&server, "node-1").await;
+  let node2 = create_node(&server, "node-2").await;
+  let egg = create_egg(&server, server_egg_body()).await;
+  let (member, email) = create_user(&server, "member").await;
+  let group = create_group(&server, json!([]), &[member]).await;
+
+  // installing: the enum column is written on create
+  let mut body = server_body(node, egg, 25565);
+  body["owner"] = json!(admin);
+  body["skip_scripts"] = json!(false);
+  body["limits"] = json!({ "cpu": 2000, "memory": 5_000_000_000_i64, "disk": 0 });
+  let resp = server.post("/servers", body.clone()).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  let uuid = uuid_of(&resp.json().await.unwrap());
+  let info: Value = server
+    .get(&format!("/servers/{uuid}"))
+    .await
+    .json()
+    .await
+    .unwrap();
+  assert_eq!(info["install_state"], "installing");
+  assert_eq!(info["status"], "installing");
+  assert_eq!(info["limits"]["memory"], 5_000_000_000_i64);
+
+  // same pair on the node hits the conflict check
+  assert_eq!(
+    server.post("/servers", body).await.status(),
+    StatusCode::CONFLICT
+  );
+
+  // grants with the access enum, read back through the member's group
+  let mut update = update_body(&info);
+  update["grants"] = json!({ "users": [], "groups": [{ "uuid": group, "access": "write" }] });
+  assert_eq!(
+    server
+      .put(&format!("/servers/{uuid}"), update)
+      .await
+      .status(),
+    StatusCode::OK
+  );
+
+  // install state transitions write every enum value we can reach
+  for (action, body, state) in [
+    ("install", json!({ "installed": true }), "installed"),
+    ("install", json!({ "installed": false }), "not_installed"),
+    ("reinstall", json!({}), "installing"),
+    ("install", json!({ "installed": true }), "installed"),
+  ] {
+    let resp = server
+      .post(&format!("/servers/{uuid}/{action}"), body)
+      .await;
+    assert_eq!(resp.status(), StatusCode::OK, "{action}");
+    let info: Value = server
+      .get(&format!("/servers/{uuid}"))
+      .await
+      .json()
+      .await
+      .unwrap();
+    assert_eq!(info["install_state"], state);
+  }
+  assert_eq!(
+    server
+      .post(
+        &format!("/servers/{uuid}/transfer"),
+        json!({ "node": node2, "ip": "10.0.0.1", "port": 3000 })
+      )
+      .await
+      .status(),
+    StatusCode::OK
+  );
+  assert_eq!(
+    server
+      .delete("/nodes", json!({ "uuid": node2 }))
+      .await
+      .status(),
+    StatusCode::CONFLICT
+  );
+
+  server.clear_cookies();
+  server.login(&email, "memberpass1").await;
+  let list: Value = server.get("/servers").await.json().await.unwrap();
+  assert_eq!(list["servers"][0]["uuid"], json!(uuid));
+  let info: Value = server
+    .get(&format!("/servers/{uuid}"))
+    .await
+    .json()
+    .await
+    .unwrap();
+  assert_eq!(info["access"], "write");
+  assert_eq!(info["node"]["uuid"], json!(node2));
+
+  server.clear_cookies();
+  server.login("admin@example.com", "hunter2pass").await;
+  assert_eq!(
+    server
+      .delete(&format!("/servers/{uuid}"), json!({}))
+      .await
+      .status(),
+    StatusCode::OK
+  );
+  assert_eq!(
+    server
+      .delete("/nodes", json!({ "uuid": node2 }))
+      .await
+      .status(),
+    StatusCode::OK
   );
 }

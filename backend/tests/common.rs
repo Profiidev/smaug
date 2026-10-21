@@ -381,3 +381,125 @@ pub fn egg_envs(info: &Value) -> Vec<&str> {
     .map(|v| v["env_variable"].as_str().unwrap())
     .collect()
 }
+
+pub const MEMBER_PASSWORD: &str = "memberpass1";
+
+pub fn uuid_of(v: &Value) -> Uuid {
+  v["uuid"]
+    .as_str()
+    .expect("uuid")
+    .parse()
+    .expect("parse uuid")
+}
+
+/// Creates a user (as the current, admin, session); returns its id and email.
+pub async fn create_user(server: &TestServer, name: &str) -> (Uuid, String) {
+  let email = format!("{}@example.com", unique(name));
+  let password = server.encrypt_password(MEMBER_PASSWORD).await;
+  let resp = server
+    .post(
+      "/user/management",
+      serde_json::json!({ "name": name, "email": email, "password": password }),
+    )
+    .await;
+  assert_eq!(resp.status(), StatusCode::OK, "create user");
+  (uuid_of(&resp.json().await.unwrap()), email)
+}
+
+/// Creates a group with `permissions` and `users` (as the admin session).
+pub async fn create_group(server: &TestServer, permissions: Value, users: &[Uuid]) -> Uuid {
+  let name = unique("group");
+  let resp = server
+    .post("/group", serde_json::json!({ "name": name }))
+    .await;
+  assert_eq!(resp.status(), StatusCode::OK, "create group");
+  let uuid = uuid_of(&resp.json().await.unwrap());
+  let resp = server
+    .put(
+      "/group",
+      serde_json::json!({ "uuid": uuid, "name": name, "permissions": permissions, "users": users }),
+    )
+    .await;
+  assert_eq!(resp.status(), StatusCode::OK, "edit group");
+  uuid
+}
+
+/// Creates a node whose wings never connect.
+pub async fn create_node(server: &TestServer, name: &str) -> Uuid {
+  let resp = server
+    .post(
+      "/nodes",
+      serde_json::json!({
+        "name": name, "address": "http://127.0.0.1:1", "secure": false,
+        "disk_limit_mb": null, "memory_limit_mb": null, "cpu_limit": null
+      }),
+    )
+    .await;
+  assert_eq!(resp.status(), StatusCode::OK, "create node");
+  uuid_of(&resp.json().await.unwrap())
+}
+
+/// `egg_body` with variables covering every visibility combination:
+/// FIRST and MAX_PLAYERS editable, LOCKED view-only, HIDDEN neither.
+pub fn server_egg_body() -> Value {
+  let mut egg = egg_body();
+  egg["variables"] = serde_json::json!([
+    { "name": "First", "description": "first var", "env_variable": "FIRST", "default_value": "1", "user_viewable": true, "user_editable": true, "rules": ["required", "string"], "sort": 1 },
+    { "name": "Max players", "description": "", "env_variable": "MAX_PLAYERS", "default_value": "20", "user_viewable": true, "user_editable": true, "rules": ["required", "integer", "between:1,100"], "sort": 2 },
+    { "name": "Locked", "description": "", "env_variable": "LOCKED", "default_value": "locked", "user_viewable": true, "user_editable": false, "rules": [], "sort": 3 },
+    { "name": "Hidden", "description": "", "env_variable": "HIDDEN", "default_value": "secret", "user_viewable": false, "user_editable": false, "rules": ["nullable"], "sort": 4 }
+  ]);
+  egg
+}
+
+pub async fn create_egg(server: &TestServer, body: Value) -> Uuid {
+  let resp = server.post("/eggs", body).await;
+  assert_eq!(resp.status(), StatusCode::OK, "create egg");
+  uuid_of(&resp.json().await.unwrap())
+}
+
+/// A valid create body; installed right away (`skip_scripts`).
+pub fn server_body(node: Uuid, egg: Uuid, port: u16) -> Value {
+  serde_json::json!({
+    "name": unique("server"),
+    "owner": null,
+    "node": node,
+    "egg": egg,
+    "allocations": [{ "ip": "10.0.0.5", "port": port }],
+    "skip_scripts": true,
+    "start_on_completion": true,
+    "startup": "java -jar a.jar",
+    "startup_overridden": false,
+    "image": "ghcr.io/java:21",
+    "environment": { "FIRST": "hello" },
+    "limits": { "cpu": 0, "memory": 0, "disk": 0 },
+    "backup_limit": 0
+  })
+}
+
+/// Turns a `server_info` response into an update body that changes nothing.
+pub fn update_body(info: &Value) -> Value {
+  let environment: serde_json::Map<String, Value> = info["variables"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .map(|v| {
+      (
+        v["env_variable"].as_str().unwrap().to_string(),
+        v["value"].clone(),
+      )
+    })
+    .collect();
+  serde_json::json!({
+    "name": info["name"],
+    "owner": info["owner"]["uuid"],
+    "egg": info["egg"]["uuid"],
+    "allocations": info["allocations"],
+    "startup": info["startup"],
+    "startup_overridden": info["startup_overridden"],
+    "image": info["image"],
+    "environment": environment,
+    "limits": info["limits"],
+    "backup_limit": info["backup_limit"]
+  })
+}

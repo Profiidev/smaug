@@ -19,6 +19,8 @@ pub struct Model {
   pub memory_limit_mb: Option<f64>,
   pub cpu_limit: Option<i32>,
   pub token: String,
+  #[sea_orm(has_many)]
+  pub servers: HasMany<super::server::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

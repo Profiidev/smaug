@@ -34,6 +34,9 @@ pub enum UpdateMessage {
   Eggs {
     uuid: Uuid,
   },
+  Servers {
+    uuid: Uuid,
+  },
 }
 
 pub fn permissions() -> Vec<&'static str> {
@@ -43,6 +46,8 @@ pub fn permissions() -> Vec<&'static str> {
     NodeEditPerm::name(),
     EggViewPerm::name(),
     EggEditPerm::name(),
+    ServerViewPerm::name(),
+    ServerEditPerm::name(),
   ]);
   perms
 }
@@ -51,6 +56,8 @@ permission!(NodeViewPerm, "node:view");
 permission!(NodeEditPerm, "node:edit");
 permission!(EggViewPerm, "egg:view");
 permission!(EggEditPerm, "egg:edit");
+permission!(ServerViewPerm, "server:view");
+permission!(ServerEditPerm, "server:edit");
 
 pub fn client() -> Client {
   Client::builder()
@@ -66,11 +73,18 @@ mod test {
   #[test]
   fn permissions_include_app_and_centaurus_ones() {
     let perms = permissions();
-    for p in ["node:view", "node:edit", "egg:view", "egg:edit"] {
+    for p in [
+      "node:view",
+      "node:edit",
+      "egg:view",
+      "egg:edit",
+      "server:view",
+      "server:edit",
+    ] {
       assert!(perms.contains(&p), "missing {p}");
     }
     let base = permission::permissions();
     assert!(base.iter().all(|p| perms.contains(p)));
-    assert_eq!(perms.len(), base.len() + 4);
+    assert_eq!(perms.len(), base.len() + 6);
   }
 }

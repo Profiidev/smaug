@@ -2,11 +2,13 @@ use centaurus::db::init::Connection;
 
 pub mod egg;
 pub mod node;
+pub mod server;
 
 #[allow(unused)]
 pub trait DBTrait {
   fn node(&self) -> node::NodeTable<'_>;
   fn egg(&self) -> egg::EggTable<'_>;
+  fn server(&self) -> server::ServerTable<'_>;
 }
 
 impl DBTrait for Connection {
@@ -16,6 +18,10 @@ impl DBTrait for Connection {
 
   fn egg(&self) -> egg::EggTable<'_> {
     egg::EggTable::new(&self.0)
+  }
+
+  fn server(&self) -> server::ServerTable<'_> {
+    server::ServerTable::new(&self.0)
   }
 }
 
@@ -76,6 +82,9 @@ mod test {
     assert!(pg_table_exists(&conn, "node").await);
     assert!(pg_table_exists(&conn, "egg").await);
     assert!(pg_table_exists(&conn, "egg_variable").await);
+    for t in SERVER_TABLES {
+      assert!(pg_table_exists(&conn, t).await, "{t}");
+    }
 
     // every migration's `down` must work on postgres
     Migrator::down(&conn.0, None).await.unwrap();
@@ -83,13 +92,27 @@ mod test {
     assert!(!pg_table_exists(&conn, "node").await);
     assert!(!pg_table_exists(&conn, "egg").await);
     assert!(!pg_table_exists(&conn, "egg_variable").await);
+    for t in SERVER_TABLES {
+      assert!(!pg_table_exists(&conn, t).await, "{t}");
+    }
 
     Migrator::up(&conn.0, None).await.unwrap();
     assert!(pg_table_exists(&conn, "user").await);
     assert!(pg_table_exists(&conn, "node").await);
     assert!(pg_table_exists(&conn, "egg").await);
     assert!(pg_table_exists(&conn, "egg_variable").await);
+    for t in SERVER_TABLES {
+      assert!(pg_table_exists(&conn, t).await, "{t}");
+    }
   }
+
+  const SERVER_TABLES: [&str; 5] = [
+    "server",
+    "server_allocation",
+    "server_variable",
+    "server_user_access",
+    "server_group_access",
+  ];
 
   fn egg_model(name: &str) -> entity::egg::Model {
     use serde_json::json;
@@ -192,7 +215,7 @@ mod test {
     changed.id = id;
     changed.description = Some("new".into());
     eggs
-      .update_egg(changed.clone(), vec![var(id, "ONE", None)])
+      .update_egg(changed.clone(), vec![var(id, "ONE", None)], "x")
       .await
       .unwrap();
     let (found, vars) = eggs.find_by_id(id).await.unwrap();
@@ -204,7 +227,7 @@ mod test {
     let ghost = egg_model("ghost");
     assert!(
       eggs
-        .update_egg(ghost.clone(), vec![var(ghost.id, "G", None)])
+        .update_egg(ghost.clone(), vec![var(ghost.id, "G", None)], "x")
         .await
         .is_err()
     );
@@ -295,5 +318,321 @@ mod test {
       http::StatusCode::NOT_FOUND
     );
     assert_eq!(nodes.list_nodes().await.unwrap().len(), 1);
+  }
+
+  fn server_model(node: Uuid, egg: Uuid, owner: Option<Uuid>) -> entity::server::Model {
+    entity::server::Model {
+      id: Uuid::now_v7(),
+      name: "s".into(),
+      owner_id: owner,
+      node_id: node,
+      egg_id: egg,
+      startup: "old".into(),
+      startup_overridden: false,
+      image: "img".into(),
+      install_state: entity::sea_orm_active_enums::ServerInstallState::InstallFailed,
+      suspended: false,
+      start_on_completion: true,
+      cpu_limit: 0,
+      memory_mb: 5_000_000_000,
+      disk_mb: 0,
+      backup_limit: 0,
+      // postgres keeps microseconds
+      created_at: chrono::SubsecRound::trunc_subsecs(chrono::Utc::now(), 6).fixed_offset(),
+    }
+  }
+
+  fn pair(ip: &str, port: i32) -> (String, i32) {
+    (ip.into(), port)
+  }
+
+  #[tokio::test]
+  async fn pg_server_table() {
+    use std::collections::HashMap;
+
+    use centaurus::db::tables::ConnectionExt;
+    use entity::sea_orm_active_enums::{ServerAccessLevel, ServerInstallState};
+
+    use crate::db::{DBTrait, server::Grants};
+
+    let (conn, _pg) = test_pg_db().await;
+    let node_a = node("a");
+    let node_b = node("b");
+    conn.node().create_node(node_a.clone()).await.unwrap();
+    conn.node().create_node(node_b.clone()).await.unwrap();
+    let egg = egg_model("egg");
+    let egg_id = egg.id;
+    conn
+      .egg()
+      .create_egg(
+        egg,
+        vec![var(egg_id, "KEEP", None), var(egg_id, "DROP", None)],
+      )
+      .await
+      .unwrap();
+    let user = conn
+      .user()
+      .create_user(
+        "u".into(),
+        "u@x.com".into(),
+        "h".into(),
+        "s".into(),
+        false,
+        None,
+      )
+      .await
+      .unwrap();
+    let group = conn.group().create_group("g".into()).await.unwrap();
+    conn
+      .group()
+      .add_users_to_group(group, vec![user])
+      .await
+      .unwrap();
+
+    let servers = conn.server();
+    let s = server_model(node_a.id, egg_id, Some(user));
+    let id = s.id;
+    servers
+      .create(
+        s.clone(),
+        vec![pair("10.0.0.1", 2000), pair("10.0.0.1", 2001)],
+        vec![("KEEP".into(), "k".into()), ("DROP".into(), "d".into())],
+      )
+      .await
+      .unwrap();
+    // enum and big integer columns round trip
+    assert_eq!(
+      servers.find_by_id(id).await.unwrap().install_state,
+      s.install_state
+    );
+    assert_eq!(servers.find_by_id(id).await.unwrap(), s);
+    assert_eq!(
+      servers.find_by_id(Uuid::now_v7()).await.unwrap_err().status,
+      http::StatusCode::NOT_FOUND
+    );
+    let allocs = servers.allocations(vec![id]).await.unwrap();
+    assert_eq!(
+      allocs
+        .iter()
+        .map(|a| (a.position, a.port, a.node_id))
+        .collect::<Vec<_>>(),
+      [(0, 2000, node_a.id), (1, 2001, node_a.id)]
+    );
+
+    // a second server can not reuse a pair on the same node (unique index)
+    let other = server_model(node_a.id, egg_id, None);
+    assert!(
+      servers
+        .create(other.clone(), vec![pair("10.0.0.1", 2001)], vec![])
+        .await
+        .is_err()
+    );
+    // the failed create rolled back
+    assert_eq!(servers.list(None).await.unwrap().len(), 1);
+    servers
+      .create(other.clone(), vec![pair("10.0.0.2", 2001)], vec![])
+      .await
+      .unwrap();
+
+    // taken: same node only, own server excluded, empty input is a no-op
+    let wanted = [
+      pair("10.0.0.1", 2001),
+      pair("10.0.0.2", 2001),
+      pair("10.0.0.3", 1),
+    ];
+    let taken = servers.taken(node_a.id, &wanted, None).await.unwrap();
+    assert_eq!(taken.len(), 2);
+    let taken = servers.taken(node_a.id, &wanted, Some(id)).await.unwrap();
+    assert_eq!(
+      taken.into_iter().collect::<Vec<_>>(),
+      [pair("10.0.0.2", 2001)]
+    );
+    assert!(
+      servers
+        .taken(node_b.id, &wanted, None)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert!(
+      servers
+        .taken(node_a.id, &[], None)
+        .await
+        .unwrap()
+        .is_empty()
+    );
+
+    // list: ordered by name, filtered by id
+    let mut renamed = other.clone();
+    renamed.name = "a".into();
+    servers.save(renamed).await.unwrap();
+    let ids: Vec<_> = servers
+      .list(None)
+      .await
+      .unwrap()
+      .into_iter()
+      .map(|s| s.id)
+      .collect();
+    assert_eq!(ids, [other.id, id]);
+    assert_eq!(servers.list(Some(vec![id])).await.unwrap().len(), 1);
+    assert!(servers.list(Some(vec![])).await.unwrap().is_empty());
+    assert_eq!(servers.owned_ids(user).await.unwrap(), [id]);
+    assert_eq!(servers.count_by_node(node_a.id).await.unwrap(), 2);
+    assert_eq!(servers.count_by_node(node_b.id).await.unwrap(), 0);
+    assert_eq!(servers.count_by_egg(egg_id).await.unwrap(), 2);
+
+    // update replaces allocations, variables and (when given) grants
+    let mut changed = s.clone();
+    changed.install_state = ServerInstallState::Installed;
+    servers
+      .update(
+        changed.clone(),
+        vec![pair("10.0.0.9", 3000)],
+        vec![("KEEP".into(), "k2".into())],
+        Some(Grants {
+          users: vec![entity::server_user_access::Model {
+            server_id: id,
+            user_id: user,
+            access: ServerAccessLevel::Read,
+          }],
+          groups: vec![entity::server_group_access::Model {
+            server_id: id,
+            group_id: group,
+            access: ServerAccessLevel::Write,
+          }],
+        }),
+      )
+      .await
+      .unwrap();
+    assert_eq!(servers.find_by_id(id).await.unwrap(), changed);
+    assert_eq!(servers.allocations(vec![id]).await.unwrap().len(), 1);
+    assert_eq!(
+      servers.variables(id).await.unwrap(),
+      HashMap::from([("KEEP".to_string(), "k2".to_string())])
+    );
+    let mut levels = servers.grants_for_user(user, Some(id)).await.unwrap();
+    levels.sort_by_key(|(_, l)| *l == ServerAccessLevel::Write);
+    assert_eq!(
+      levels,
+      [
+        (id, ServerAccessLevel::Read),
+        (id, ServerAccessLevel::Write)
+      ]
+    );
+    assert!(
+      servers
+        .grants_for_user(user, Some(other.id))
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    assert_eq!(servers.grants_for_user(user, None).await.unwrap().len(), 2);
+    // without grants they are kept
+    servers
+      .update(changed.clone(), vec![pair("10.0.0.9", 3000)], vec![], None)
+      .await
+      .unwrap();
+    let grants = servers.grants(id).await.unwrap();
+    assert_eq!((grants.users.len(), grants.groups.len()), (1, 1));
+    // a failing update rolls back
+    assert!(
+      servers
+        .update(changed.clone(), vec![pair("10.0.0.2", 2001)], vec![], None)
+        .await
+        .is_err()
+    );
+    assert_eq!(servers.allocations(vec![id]).await.unwrap()[0].port, 3000);
+
+    // egg sync: startup for non-overridden servers, variables pruned and added
+    servers
+      .update(
+        changed.clone(),
+        vec![pair("10.0.0.9", 3000)],
+        vec![("KEEP".into(), "k".into()), ("DROP".into(), "d".into())],
+        None,
+      )
+      .await
+      .unwrap();
+    let mut pinned = other.clone();
+    pinned.name = "a".into();
+    pinned.startup = "mine".into();
+    pinned.startup_overridden = true;
+    servers.save(pinned).await.unwrap();
+    let mut new_egg = egg_model("egg");
+    new_egg.id = egg_id;
+    let mut fresh = var(egg_id, "NEW", None);
+    fresh.default_value = "n".into();
+    let mut ids = conn
+      .egg()
+      .update_egg(new_egg, vec![var(egg_id, "KEEP", None), fresh], "new start")
+      .await
+      .unwrap();
+    ids.sort();
+    let mut expected = vec![id, other.id];
+    expected.sort();
+    assert_eq!(ids, expected);
+    assert_eq!(servers.find_by_id(id).await.unwrap().startup, "new start");
+    assert_eq!(servers.find_by_id(other.id).await.unwrap().startup, "mine");
+    assert_eq!(
+      servers.variables(id).await.unwrap(),
+      HashMap::from([
+        ("KEEP".to_string(), "k".to_string()),
+        ("NEW".to_string(), "n".to_string())
+      ])
+    );
+    assert_eq!(
+      servers.variables(other.id).await.unwrap(),
+      HashMap::from([
+        ("KEEP".to_string(), String::new()),
+        ("NEW".to_string(), "n".to_string())
+      ])
+    );
+    // an egg without servers syncs nothing
+    let lonely = egg_model("lonely");
+    conn.egg().create_egg(lonely.clone(), vec![]).await.unwrap();
+    assert!(
+      conn
+        .egg()
+        .update_egg(lonely, vec![], "x")
+        .await
+        .unwrap()
+        .is_empty()
+    );
+
+    // transfer moves node and keeps only the new allocation
+    let mut moved = servers.find_by_id(id).await.unwrap();
+    moved.node_id = node_b.id;
+    servers
+      .transfer(moved.clone(), pair("10.0.0.1", 2001))
+      .await
+      .unwrap();
+    assert_eq!(servers.find_by_id(id).await.unwrap().node_id, node_b.id);
+    let allocs = servers.allocations(vec![id]).await.unwrap();
+    assert_eq!(
+      allocs
+        .iter()
+        .map(|a| (a.node_id, a.port, a.position))
+        .collect::<Vec<_>>(),
+      [(node_b.id, 2001, 0)]
+    );
+
+    // nodes and eggs in use are protected by the FK
+    assert!(conn.node().delete_node(node_b.id).await.is_err());
+    assert!(conn.egg().delete_egg(egg_id).await.is_err());
+
+    // deleting the owner nulls it, deleting the group drops its grants
+    conn.user().delete_user(user).await.unwrap();
+    assert_eq!(servers.find_by_id(id).await.unwrap().owner_id, None);
+    let grants = servers.grants(id).await.unwrap();
+    assert_eq!((grants.users.len(), grants.groups.len()), (0, 1));
+    conn.group().delete_group(group).await.unwrap();
+    assert!(servers.grants(id).await.unwrap().groups.is_empty());
+
+    // delete cascades and reports rows
+    assert_eq!(servers.delete(Uuid::now_v7()).await.unwrap(), 0);
+    assert_eq!(servers.delete(id).await.unwrap(), 1);
+    assert!(servers.allocations(vec![id]).await.unwrap().is_empty());
+    assert!(servers.variables(id).await.unwrap().is_empty());
+    assert_eq!(conn.node().delete_node(node_b.id).await.unwrap(), 1);
   }
 }

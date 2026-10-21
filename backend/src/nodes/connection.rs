@@ -112,6 +112,8 @@ async fn connection_task(
     match WingsAuth::connect_websocket(&addr, &token).await {
       Ok(stream) => {
         connected.store(true, Ordering::Relaxed);
+        // TODO(wings): full sync on (re)connect: send every server on this node
+        // (spec, suspended/install state, allocations, variables) and drop unknown ones
         updater.broadcast(UpdateMessage::Nodes { uuid }).await;
         debug!("Wings connection to {} established", uuid);
 
