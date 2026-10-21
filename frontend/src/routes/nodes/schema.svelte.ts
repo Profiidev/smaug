@@ -1,5 +1,9 @@
 import type { CreateNode, NodeInfo } from '$lib/client';
-import type { FormValue } from '@profidev/pleiades/components/form/types';
+import type {
+  FormRecord,
+  FormValue,
+  SuperForm
+} from '@profidev/pleiades/components/form/types';
 import z from 'zod';
 
 export const units = {
@@ -17,9 +21,7 @@ export const units = {
 const convertToMB = (amount: number, unitArray: string[]) =>
   (amount * (units as Record<string, number>)[unitArray[0]]) / (1000 * 1000);
 
-export const reformatData = (
-  data: FormValue<typeof generalSettings> & FormValue<typeof advancedSettings>
-): CreateNode => ({
+export const reformatData = (data: NodeForm): CreateNode => ({
   address: data.address,
   cpu_limit: data.cpu_unlimit ? undefined : data.cpu_limit,
   disk_limit_mb: data.storage_unlimit
@@ -47,9 +49,7 @@ const selectUnit = (mb: number): [number, string[]] => {
   return [unit_amount, [unit]];
 };
 
-export const undoReformatData = (
-  node: NodeInfo
-): FormValue<typeof generalSettings> & FormValue<typeof advancedSettings> => {
+export const undoReformatData = (node: NodeInfo): NodeForm => {
   const [storage_size, storage_unit] = selectUnit(
       node.disk_limit_mb ?? (100 * units.GiB) / units.MB
     ),
@@ -95,6 +95,28 @@ export const advancedSettings = z.object({
   storage_unlimit: z.boolean().default(true)
 });
 
-export const summary = z.object({
-  _phantom_summary: z.string().default('')
-});
+export const nodeSettings = generalSettings.extend(advancedSettings.shape);
+export type NodeForm = FormValue<typeof nodeSettings>;
+
+/** Form keys per detail-page tab, for the tab error dots. */
+export const SECTION_KEYS = {
+  general: Object.keys(generalSettings.shape),
+  resources: Object.keys(advancedSettings.shape)
+};
+
+/**
+ * Hands the detail page's full-node form to a *Fields component.
+ * Sound at runtime (NodeForm has every key); TS rejects it directly only
+ * because SuperForm is invariant through its onUpdate callback.
+ */
+export const stageForm = <T extends FormRecord>(form: SuperForm<NodeForm>) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- deliberate widening, see above
+  form as unknown as SuperForm<T>;
+
+export const DELETE_DESCRIPTION =
+  'This cannot be undone. Wings on this node is disconnected. A node that still hosts servers cannot be deleted.';
+
+export const deleteError = (status?: number) =>
+  status === 409
+    ? 'Node still hosts servers. Delete or transfer them first.'
+    : 'Failed to delete node';

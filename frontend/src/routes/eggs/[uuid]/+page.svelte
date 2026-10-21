@@ -19,6 +19,7 @@
   import { deleteEgg, editEgg, type UserInfo } from '$lib/client';
   import {
     apiErrorMessage,
+    deleteError,
     eggSettings,
     formatData,
     reformatData,
@@ -117,8 +118,8 @@
     const res = await deleteEgg({ body: { uuid: data.uuid } });
     isLoading = false;
 
-    if (res.error) {
-      return { error: apiErrorMessage(res.error, 'Failed to delete egg') };
+    if (!res.response?.ok) {
+      return { error: deleteError(res.response?.status) };
     }
 
     toast.success(`Egg ${eggName} deleted successfully`);

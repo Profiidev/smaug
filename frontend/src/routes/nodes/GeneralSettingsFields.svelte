@@ -1,7 +1,6 @@
 <script lang="ts">
   import FormInput from '@profidev/pleiades/components/form/form-input.svelte';
   import FormSwitch from '@profidev/pleiades/components/form/form-switch.svelte';
-  import { Label } from '@profidev/pleiades/components/ui/dropdown-menu';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import type {
     FormValue,
@@ -10,41 +9,26 @@
   import type { generalSettings } from './schema.svelte';
 
   interface Props {
-    readonly?: boolean;
     formData: SuperForm<FormValue<typeof generalSettings>>;
     disabled: boolean;
-    secure: boolean;
   }
 
-  let { readonly, secure, ...props }: Props = $props();
+  let props: Props = $props();
+
+  let form = $derived(props.formData.form);
 </script>
 
-<FormInput
-  {...props}
-  key="name"
-  label="Node Name"
-  placeholder="Enter name"
-  {readonly}
-/>
+<FormInput {...props} key="name" label="Node Name" placeholder="Enter name" />
 <FormInput
   {...props}
   key="address"
   label="Node Address (include port if needed)"
   placeholder="Enter address (e.g., IP or domain)"
-  {readonly}
 />
-{#if !secure}
-  <div class="flex items-center">
-    <Label class="p-0 font-medium text-orange-500"
-      >Only use HTTP on private networks!</Label
-    >
-    <TriangleAlert class="ml-auto text-orange-500" />
+{#if !$form.secure}
+  <div class="flex items-center text-sm font-medium text-orange-500">
+    Only use HTTP on private networks!
+    <TriangleAlert class="ml-auto" />
   </div>
 {/if}
-<FormSwitch
-  {...props}
-  key="secure"
-  label="Use Secure Connection (HTTPS)"
-  onCheckedChange={(v) => (secure = v)}
-  disabled={readonly}
-/>
+<FormSwitch {...props} key="secure" label="Use Secure Connection (HTTPS)" />

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SECTION_KEYS,
   advancedSettings,
+  deleteError,
   generalSettings,
+  nodeSettings,
   reformatData,
-  summary,
   undoReformatData,
   units
-} from '$routes/nodes/create/schema.svelte';
+} from '$routes/nodes/schema.svelte';
 import type { NodeInfo } from '$lib/client';
 
 type Form = Parameters<typeof reformatData>[0];
@@ -98,9 +100,31 @@ describe('advancedSettings', () => {
   });
 });
 
-describe('summary', () => {
-  it('only carries a phantom field', () => {
-    expect(summary.parse({})).toEqual({ _phantom_summary: '' });
+describe('nodeSettings', () => {
+  it('combines both stages and the section keys cover every field', () => {
+    const keys = Object.keys(nodeSettings.shape).toSorted();
+    expect(
+      [...SECTION_KEYS.general, ...SECTION_KEYS.resources].toSorted()
+    ).toEqual(keys);
+    expect(SECTION_KEYS.general.toSorted()).toEqual([
+      'address',
+      'name',
+      'secure'
+    ]);
+  });
+
+  it('accepts a full form', () => {
+    expect(nodeSettings.safeParse(form()).success).toBe(true);
+  });
+});
+
+describe('deleteError', () => {
+  it.each([
+    [409, 'Node still hosts servers. Delete or transfer them first.'],
+    [500, 'Failed to delete node'],
+    [undefined, 'Failed to delete node']
+  ])('maps %s', (status, message) => {
+    expect(deleteError(status)).toBe(message);
   });
 });
 

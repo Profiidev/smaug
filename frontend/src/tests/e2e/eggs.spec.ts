@@ -284,11 +284,15 @@ test.describe('eggs list', () => {
     await expect(page.getByText('Update available')).toHaveCount(0);
   });
 
-  test('shows the server error when delete fails', async ({
+  test('shows the in-use error when delete conflicts', async ({
     network,
     page
   }) => {
-    network.use(gen.handleDeleteEgg(() => badRequest('Egg is in use')));
+    network.use(
+      gen.handleDeleteEgg(
+        () => new HttpResponse(null, { status: 409 }) as never
+      )
+    );
     await gotoReady(page, '/eggs');
     await page
       .getByRole('row', { name: /Valheim/ })
@@ -299,7 +303,12 @@ test.describe('eggs list', () => {
       .getByRole('dialog')
       .getByRole('button', { name: 'Delete' })
       .click();
-    await expect(page.getByText('Egg is in use')).toBeVisible();
+    await expect(
+      page.getByText(
+        'Egg is still used by servers. Delete them or change their egg first.'
+      )
+    ).toBeVisible();
+    await expect(page.getByText(/deleted successfully/)).toHaveCount(0);
   });
 
   test('redirects an unknown egg to the list with a toast', async ({

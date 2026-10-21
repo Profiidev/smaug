@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { load as listLoad } from '$routes/nodes/+page';
-import { load as layoutLoad } from '$routes/nodes/[uuid]/+layout';
-import { jsonFetch, runLoad } from '$test_helpers/load';
+import { load as detailLoad } from '$routes/nodes/[uuid]/+page';
+import { load as setupLoad } from '$routes/nodes/[uuid]/setup/+page';
+import { load as settingsLoad } from '$routes/nodes/[uuid]/settings/+page';
+import { catchRedirect, jsonFetch, runLoad } from '$test_helpers/load';
 import type { NodeInfo } from '$lib/client';
 
 const node: NodeInfo = {
@@ -51,23 +53,53 @@ describe('nodes list load', () => {
   });
 });
 
-describe('node [uuid] layout load', () => {
+describe('node [uuid] page load', () => {
+  const detailUrl = (q = '') => new URL(`http://localhost/nodes/n1${q}`);
+
   it('requests the node by uuid and keeps the uuid', async () => {
     const fetch = jsonFetch(node);
-    const result = runLoad(layoutLoad, { fetch, params: { uuid: 'n1' } });
+    const result = runLoad(detailLoad, {
+      fetch,
+      params: { uuid: 'n1' },
+      url: detailUrl()
+    });
     expect(result.uuid).toBe('n1');
+    expect(result.tab).toBeNull();
     expect(result.nodeRes).toBeInstanceOf(Promise);
     expect((await result.nodeRes).data).toEqual(node);
     expect(requested(fetch)).toEqual({ method: 'GET', path: '/api/nodes/n1' });
   });
 
+  it('passes the ?tab= query through', () => {
+    const result = runLoad(detailLoad, {
+      fetch: jsonFetch(node),
+      params: { uuid: 'n1' },
+      url: detailUrl('?tab=general')
+    });
+    expect(result.tab).toBe('general');
+  });
+
   it.each([404, 500])('exposes the %i status for the redirect', async (s) => {
-    const result = runLoad(layoutLoad, {
+    const result = runLoad(detailLoad, {
       fetch: jsonFetch(null, s),
-      params: { uuid: 'nope' }
+      params: { uuid: 'nope' },
+      url: detailUrl()
     });
     const res = await result.nodeRes;
     expect(res.data).toBeUndefined();
     expect(res.response?.status).toBe(s);
+  });
+});
+
+describe('old node sub-routes', () => {
+  it.each([
+    ['setup', setupLoad, '/nodes/n1?tab=setup'],
+    ['settings', settingsLoad, '/nodes/n1?tab=general']
+  ])('%s redirects to %s', async (_name, load, location) => {
+    const redirect = await catchRedirect(() =>
+      (load as (e: unknown) => unknown)({ params: { uuid: 'n1' } })
+    );
+    expect(redirect.status).toBe(307);
+    expect(redirect.location).toBe(location);
   });
 });

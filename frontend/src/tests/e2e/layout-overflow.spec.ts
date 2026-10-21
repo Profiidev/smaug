@@ -17,12 +17,16 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
     ready: (p) => p.getByPlaceholder('Enter name')
   },
   {
-    path: '/nodes/node-1/setup',
-    ready: (p) => p.getByRole('heading', { name: 'Node Setup' })
+    path: '/nodes/node-1',
+    ready: (p) => p.getByRole('heading', { name: /Node:/ })
   },
   {
-    path: '/nodes/node-1/settings',
-    ready: (p) => p.getByRole('heading', { name: 'Settings' })
+    path: '/nodes/node-1?tab=general',
+    ready: (p) => p.getByPlaceholder('Enter name')
+  },
+  {
+    path: '/nodes/node-1?tab=resources',
+    ready: (p) => p.getByRole('switch', { name: 'Unlimited CPU' })
   },
 
   { path: '/eggs', ready: (p) => p.getByRole('heading', { name: 'Eggs' }) },
