@@ -93,7 +93,7 @@ test.describe('server create', () => {
     await expectNoHorizontalOverflow(page);
     await page.getByRole('button', { exact: true, name: 'Create' }).click();
 
-    await expect(page).toHaveURL(/\/servers\/srv-new$/);
+    await expect(page).toHaveURL(/\/servers\/srv-new\/status$/);
     await expect(page.getByText('Server created successfully.')).toBeVisible();
     expect(bodies).toEqual([
       {

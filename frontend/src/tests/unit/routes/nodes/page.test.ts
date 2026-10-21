@@ -72,6 +72,10 @@ describe('nodes list page', () => {
       'href',
       '/nodes/node-1/setup'
     );
+    // NameCell is shared with servers; nodes keep the default Server icon.
+    const row = screen.getByRole('link', { name: 'Node One' }).closest('tr')!;
+    expect(row.querySelector('svg.lucide-server')).not.toBeNull();
+    expect(row.querySelector('svg.lucide-container')).toBeNull();
     expect(screen.getByText('node1.example.com:443')).toBeInTheDocument();
     expect(screen.getByText('10.0.0.2:8000')).toBeInTheDocument();
   });

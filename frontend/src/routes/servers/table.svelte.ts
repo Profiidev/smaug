@@ -1,3 +1,4 @@
+import Container from '@lucide/svelte/icons/container';
 import { renderComponent } from '@tanstack/svelte-table';
 import {
   type TableColumnDef,
@@ -58,7 +59,8 @@ export const columns = ({
     ...createColumnHeader<ServerRow>('name', 'Name'),
     cell: ({ row }) =>
       renderComponent(NameCell, {
-        href: `/servers/${row.original.uuid}`,
+        href: `/servers/${row.original.uuid}/status`,
+        icon: Container,
         name: row.original.name
       })
   },
@@ -80,7 +82,7 @@ export const columns = ({
         delete_disabled:
           !canEdit || !availableActions(row.original.status).delete,
         // Owners and write grantees edit too; the edit page enforces access.
-        edit: `/servers/${row.original.uuid}`,
+        edit: `/servers/${row.original.uuid}/status`,
         edit_disabled: false,
         remove: () => deleteServer(row.original)
       }),

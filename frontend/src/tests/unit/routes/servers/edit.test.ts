@@ -10,9 +10,12 @@ import { toast as sonner } from 'svelte-sonner';
 import { goto } from '$app/navigation';
 import { toast } from '@profidev/pleiades/components/util/general';
 import { type ServerInfo, deleteServer, updateServer } from '$lib/client';
-import EditPage from '$routes/servers/[uuid]/+page.svelte';
+import EditPage from '$routes/servers/[uuid]/[tab=servertab]/+page.svelte';
 import { fromServerInfo, toUpdateBody } from '$routes/servers/schema.svelte';
+import { page } from '$test_helpers/page-state.svelte';
 import { options, serverInfo } from './fixtures';
+
+vi.mock('$app/state', async () => import('$test_helpers/page-state.svelte'));
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
   ...(await orig<object>()),
@@ -34,6 +37,14 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.spyOn(sonner, 'error').mockImplementation(() => 0);
+  page.params = { tab: 'status', uuid: 'srv-1' };
+  // Navigating to a tab URL updates the route param like SvelteKit does.
+  vi.mocked(goto).mockImplementation(async (url) => {
+    const [, root, uuid, tab] = String(url).split('/');
+    if (root === 'servers' && tab) {
+      page.params = { tab, uuid };
+    }
+  });
 });
 
 const tick = async (ms = 0) => new Promise((r) => setTimeout(r, ms));
@@ -311,6 +322,11 @@ describe('server edit page save', () => {
       'data-state',
       'active'
     );
+    expect(goto).toHaveBeenLastCalledWith('/servers/srv-1/variables', {
+      keepFocus: true,
+      noScroll: true,
+      replaceState: false
+    });
     for (const name of ['Variables', 'Resources']) {
       const tab = screen.getByRole('tab', { name: new RegExp(`^${name}`) });
       expect(within(tab).getByLabelText('Has errors')).toBeInTheDocument();
@@ -345,6 +361,11 @@ describe('server edit page save', () => {
       'data-state',
       'active'
     );
+    expect(goto).toHaveBeenLastCalledWith('/servers/srv-1/general', {
+      keepFocus: true,
+      noScroll: true,
+      replaceState: false
+    });
   });
 
   it('shows grant field errors on their row in Permissions', async () => {
@@ -552,6 +573,96 @@ describe('server edit page delete', () => {
       expect(sonner.error).toHaveBeenCalledWith('Failed to delete server')
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(goto).not.toHaveBeenCalled();
+  });
+});
+
+describe('server edit page tabs', () => {
+  const tab = (name: string) =>
+    screen.getByRole('tab', { name: new RegExp(`^${name}`) });
+  const active = () =>
+    screen.getAllByRole('tab').filter((t) => t.dataset.state === 'active');
+
+  it.each([
+    ['status', 'Status'],
+    ['general', 'General'],
+    ['startup', 'Startup'],
+    ['variables', 'Variables'],
+    ['resources', 'Resources'],
+    ['permissions', 'Permissions']
+  ])('opens the /%s param as %s', async (param, name) => {
+    page.params = { tab: param, uuid: 'srv-1' };
+    await mount();
+    expect(tab(name)).toHaveAttribute('data-state', 'active');
+    expect(active()).toHaveLength(1);
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('defaults to Status without a tab param', async () => {
+    page.params = { uuid: 'srv-1' };
+    await mount();
+    expect(tab('Status')).toHaveAttribute('data-state', 'active');
+  });
+
+  it('navigates to the tab URL keeping focus and scroll', async () => {
+    await mount();
+    await openTab('Startup');
+    expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/startup', {
+      keepFocus: true,
+      noScroll: true,
+      replaceState: false
+    });
+    expect(tab('Startup')).toHaveAttribute('data-state', 'active');
+  });
+
+  it('does not navigate when clicking the open tab', async () => {
+    await mount();
+    await openTab('Status');
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('keeps unsaved edits when switching tabs', async () => {
+    page.params = { tab: 'general', uuid: 'srv-1' };
+    await mount();
+    await fireEvent.input(screen.getByLabelText('Name'), {
+      target: { value: 'Draft' }
+    });
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+    await openTab('Status');
+    await openTab('Resources');
+    await openTab('General');
+    expect(screen.getByLabelText('Name')).toHaveValue('Draft');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
+  it.each(['write', 'read'] as const)(
+    'replaces /permissions with /status for %s access',
+    async (access) => {
+      page.params = { tab: 'permissions', uuid: 'srv-1' };
+      await mount(asAccess(access));
+      await vi.waitFor(() =>
+        expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/status', {
+          keepFocus: true,
+          noScroll: true,
+          replaceState: true
+        })
+      );
+      expect(tab('Status')).toHaveAttribute('data-state', 'active');
+    }
+  );
+
+  it('does not redirect /permissions before the server loads', async () => {
+    page.params = { tab: 'permissions', uuid: 'srv-1' };
+    render(EditPage, {
+      props: {
+        data: {
+          options: new Promise(() => {}),
+          serverRes: new Promise(() => {}),
+          uuid: 'srv-1'
+        }
+      } as never
+    });
+    await tick(50);
     expect(goto).not.toHaveBeenCalled();
   });
 });

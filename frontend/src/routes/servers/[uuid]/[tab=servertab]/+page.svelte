@@ -13,6 +13,7 @@
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { z } from 'zod';
   import {
     deleteServer,
@@ -40,15 +41,15 @@
     toUpdateBody,
     variablesEdited,
     type ServerForm
-  } from '../schema.svelte';
-  import { availableActions } from '../status';
-  import StatusBadge from '../StatusBadge.svelte';
-  import GeneralFields from '../GeneralFields.svelte';
-  import StartupFields from '../StartupFields.svelte';
-  import VariablesFields from '../VariablesFields.svelte';
-  import ResourcesFields from '../ResourcesFields.svelte';
-  import PermissionsFields from '../PermissionsFields.svelte';
-  import StatusTab from './StatusTab.svelte';
+  } from '../../schema.svelte';
+  import { availableActions } from '../../status';
+  import StatusBadge from '../../StatusBadge.svelte';
+  import GeneralFields from '../../GeneralFields.svelte';
+  import StartupFields from '../../StartupFields.svelte';
+  import VariablesFields from '../../VariablesFields.svelte';
+  import ResourcesFields from '../../ResourcesFields.svelte';
+  import PermissionsFields from '../../PermissionsFields.svelte';
+  import StatusTab from '../StatusTab.svelte';
 
   const { data } = $props();
 
@@ -62,7 +63,6 @@
   let fieldErrors: Record<string, string> | undefined = $state.raw();
   let deleteOpen = $state(false);
   let isLoading = $state(false);
-  let tab = $state('status');
 
   let admin = $derived(server?.access === 'admin');
   let readonly = $derived(
@@ -79,6 +79,24 @@
     admin && !!server && availableActions(server.status).delete
   );
   let sections = $derived(SECTIONS.filter((s) => s !== 'permissions' || admin));
+  // The route matcher guarantees a valid tab; the component is reused across
+  // tab URLs, so unsaved edits survive switching.
+  let tab = $derived(page.params.tab ?? 'status');
+
+  const setTab = (value: string, replaceState = false) => {
+    if (value !== tab) {
+      goto(`/servers/${data.uuid}/${value}`, {
+        keepFocus: true,
+        noScroll: true,
+        replaceState
+      });
+    }
+  };
+
+  // Permissions is admin-only; anyone else lands on Status.
+  $effect(() => {
+    if (server && !admin && tab === 'permissions') setTab('status', true);
+  });
 
   $effect(() => {
     data.serverRes.then((res) => {
@@ -135,7 +153,7 @@
         };
       }
       saveFailed = false;
-      if (mapped.first) tab = mapped.first;
+      if (mapped.first) setTab(mapped.first);
       const errors = Object.assign({}, ...Object.values(mapped.sections));
       // Applied after BaseForm finished handling this submit.
       setTimeout(() => (fieldErrors = errors));
@@ -237,7 +255,10 @@
             </Alert.Description>
           </Alert.Root>
         {/if}
-        <Tabs.Root bind:value={tab} class="flex min-h-0 grow flex-col gap-4">
+        <Tabs.Root
+          bind:value={() => tab, setTab}
+          class="flex min-h-0 grow flex-col gap-4"
+        >
           <Tabs.List class="w-full shrink-0 overflow-x-auto overflow-y-hidden">
             <Tabs.Trigger value="status" class="cursor-pointer">
               Status

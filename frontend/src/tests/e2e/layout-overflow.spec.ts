@@ -61,8 +61,28 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
     ready: (p) => p.getByLabel('Name', { exact: true })
   },
   {
-    path: '/servers/srv-survival',
+    path: '/servers/srv-survival/status',
     ready: (p) => p.getByRole('heading', { name: /Server:/ })
+  },
+  {
+    path: '/servers/srv-survival/general',
+    ready: (p) => p.getByLabel('Name', { exact: true })
+  },
+  {
+    path: '/servers/srv-survival/startup',
+    ready: (p) => p.getByRole('textbox', { name: 'Command' })
+  },
+  {
+    path: '/servers/srv-survival/variables',
+    ready: (p) => p.getByLabel('Server Jar File')
+  },
+  {
+    path: '/servers/srv-survival/resources',
+    ready: (p) => p.getByLabel('Backup limit')
+  },
+  {
+    path: '/servers/srv-survival/permissions',
+    ready: (p) => p.getByRole('button', { name: 'Add user' })
   },
 
   { path: '/users', ready: (p) => p.getByRole('heading', { name: 'Users' }) },

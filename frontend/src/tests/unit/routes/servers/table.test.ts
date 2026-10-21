@@ -6,6 +6,7 @@ import {
   toRow
 } from '$routes/servers/table.svelte';
 import MutedCell from '$lib/components/table/MutedCell.svelte';
+import Container from '@lucide/svelte/icons/container';
 import NameCell from '$routes/servers/NameCell.svelte';
 import StatusBadge from '$routes/servers/StatusBadge.svelte';
 import { servers } from './fixtures';
@@ -76,7 +77,11 @@ describe('servers table columns', () => {
   it('renders the name as an icon + link to the server', () => {
     expect(cellOf('name').cell).toEqual({
       component: NameCell,
-      props: { href: '/servers/srv-1', name: 'survival' }
+      props: {
+        href: '/servers/srv-1/status',
+        icon: Container,
+        name: 'survival'
+      }
     });
   });
 
@@ -98,7 +103,7 @@ describe('servers table columns', () => {
   // Owners and write grantees may edit without server:edit; the page enforces access.
   it.each([true, false])('always enables edit (canEdit=%s)', (canEdit) => {
     const { props } = cellOf('actions', row, canEdit).cell;
-    expect(props.edit).toBe('/servers/srv-1');
+    expect(props.edit).toBe('/servers/srv-1/status');
     expect(props.edit_disabled).toBe(false);
   });
 

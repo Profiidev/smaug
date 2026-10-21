@@ -2,8 +2,9 @@
   import { Button } from '@profidev/pleiades/components/ui/button';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import Plus from '@lucide/svelte/icons/plus';
-  import Server from '@lucide/svelte/icons/server';
+  import Container from '@lucide/svelte/icons/container';
   import Table from '@profidev/pleiades/components/table/clean-table.svelte';
+  import { Input } from '@profidev/pleiades/components/ui/input';
   import * as Empty from '@profidev/pleiades/components/ui/empty';
   import * as Select from '@profidev/pleiades/components/ui/select';
   import { toast } from '@profidev/pleiades/components/util/general';
@@ -30,13 +31,24 @@
   let servers: ServerRow[] | undefined = $state();
   // 'all' rather than '': bits-ui reads an empty value as "nothing selected".
   let status = $state('all');
+  let search = $state('');
 
   let canEdit = $derived(
     user?.permissions.includes(Permission.SERVER_EDIT) ?? false
   );
-  let filtered = $derived(
-    status === 'all' ? servers : servers?.filter((s) => s.status === status)
-  );
+  // Filtered here rather than via the table's searchColumns, so the search
+  // input can share a row with the status select.
+  let filtered = $derived.by(() => {
+    const term = search.trim().toLowerCase();
+    return servers?.filter(
+      (s) =>
+        (status === 'all' || s.status === status) &&
+        (!term ||
+          [s.name, s.node_name, s.allocation].some((v) =>
+            v.toLowerCase().includes(term)
+          ))
+    );
+  });
 
   $effect(() => {
     data.servers.then((d) => {
@@ -93,7 +105,31 @@
     </div>
     <!-- The empty state carries the same action; avoid duplicate controls. -->
     {#if servers?.length !== 0}
-      <div class="ml-auto flex flex-wrap gap-2">
+      <div class="ml-auto">{@render create()}</div>
+    {/if}
+  </div>
+  {#if servers?.length === 0}
+    <Empty.Root class="border border-dashed">
+      <Empty.Header>
+        <Empty.Media variant="icon"><Container /></Empty.Media>
+        <Empty.Title>No servers yet</Empty.Title>
+        <Empty.Description>
+          Create a server from an egg on one of your nodes.
+        </Empty.Description>
+      </Empty.Header>
+      <Empty.Content class="flex-row justify-center">
+        {@render create()}
+      </Empty.Content>
+    </Empty.Root>
+  {:else}
+    <div class="grid gap-2">
+      <div class="flex flex-wrap gap-2">
+        <Input
+          bind:value={search}
+          class="min-w-48 flex-1"
+          placeholder="Search..."
+          aria-label="Search servers"
+        />
         <Select.Root type="single" bind:value={status} disabled={!servers}>
           <Select.Trigger aria-label="Filter by status" class="cursor-pointer">
             {status === 'all'
@@ -107,30 +143,11 @@
             {/each}
           </Select.Content>
         </Select.Root>
-        {@render create()}
       </div>
-    {/if}
-  </div>
-  {#if servers?.length === 0}
-    <Empty.Root class="border border-dashed">
-      <Empty.Header>
-        <Empty.Media variant="icon"><Server /></Empty.Media>
-        <Empty.Title>No servers yet</Empty.Title>
-        <Empty.Description>
-          Create a server from an egg on one of your nodes.
-        </Empty.Description>
-      </Empty.Header>
-      <Empty.Content class="flex-row justify-center">
-        {@render create()}
-      </Empty.Content>
-    </Empty.Root>
-  {:else}
-    <div class="grid gap-2">
       <Table
         data={filtered}
         {columns}
         columnData={{ canEdit, deleteServer: startDelete }}
-        searchColumns={['name', 'node_name', 'allocation']}
       />
       {#if filtered}
         <span class="text-muted-foreground px-1 text-xs">
