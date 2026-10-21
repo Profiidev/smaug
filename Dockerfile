@@ -37,7 +37,7 @@ COPY backend/migration/Cargo.toml backend/migration/
 COPY shared/Cargo.toml shared/
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration", "shared"]' Cargo.toml
+RUN sed -i -e '/^members = \[/{:a;/\]/!{N;ba}' -e 'c\members = ["backend", "backend/entity", "backend/migration", "shared"]' -e '}' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \
@@ -68,7 +68,7 @@ COPY shared/Cargo.toml shared/
 COPY shared/src shared/src
 COPY ./Cargo.lock ./Cargo.toml ./
 
-RUN sed -i '/^members = /c\members = ["backend", "backend/entity", "backend/migration", "shared"]' Cargo.toml
+RUN sed -i -e '/^members = \[/{:a;/\]/!{N;ba}' -e 'c\members = ["backend", "backend/entity", "backend/migration", "shared"]' -e '}' Cargo.toml
 
 RUN \
   --mount=type=cache,target=/usr/local/cargo/registry \

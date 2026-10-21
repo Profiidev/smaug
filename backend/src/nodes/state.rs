@@ -4,8 +4,8 @@ use aide::OperationIo;
 use axum::{Extension, extract::FromRequestParts};
 use centaurus::{bail, db::init::Connection, error::Result};
 use dashmap::DashMap;
-use reqwest::Method;
-use shared::msg::{Power, Runtime, ServerSpec, ServerState};
+use shared::msg::{Runtime, ServerState};
+use tokio::spawn;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
@@ -51,10 +51,13 @@ impl Wings {
     secure: bool,
     token: &str,
   ) -> Result<()> {
-    if !secure && !self.allow_insecure {
-      bail!(BAD_REQUEST, "Insecure wings connections are disabled");
-    }
+    self.check_secure(secure)?;
 
+    let lock = self
+      .wings
+      .get(&uuid)
+      .map(|conn| conn.lock())
+      .unwrap_or_default();
     let conn = WingsConnection::new(
       uuid,
       addr,
@@ -63,8 +66,17 @@ impl Wings {
       token.to_string(),
       self.db.clone(),
       self.updater.clone(),
+      lock,
     );
     self.wings.insert(uuid, conn);
+    Ok(())
+  }
+
+  /// Fails for a connection `connect` would refuse.
+  pub fn check_secure(&self, secure: bool) -> Result<()> {
+    if !secure && !self.allow_insecure {
+      bail!(BAD_REQUEST, "Insecure wings connections are disabled");
+    }
     Ok(())
   }
 
@@ -83,35 +95,46 @@ impl Wings {
     self.wings.get(&uuid).and_then(|conn| conn.runtime())
   }
 
+  /// Why the node can not be reached or synced.
+  pub fn node_error(&self, uuid: Uuid) -> Option<String> {
+    self.wings.get(&uuid).and_then(|conn| conn.node_error())
+  }
+
   /// Runtime state of `server` on `node`, `None` while unknown.
   pub fn state(&self, node: Uuid, server: Uuid) -> Option<ServerState> {
     self.wings.get(&node).and_then(|conn| conn.state(server))
   }
 
   // Server calls are best-effort: skipped while the node is disconnected and
-  // only logged on failure. The full sync on reconnect fixes any drift.
+  // only logged on failure. The full sync on reconnect, or the one a failure
+  // triggers, fixes any drift. They run in the background, a request never
+  // waits behind a slow sync; the spec is read from the DB when it is sent.
 
-  pub async fn put_server(&self, node: Uuid, spec: &ServerSpec) {
+  /// Sends the server's spec as currently stored in the DB.
+  pub fn put_server(&self, node: Uuid, server: Uuid) {
     if let Some(link) = self.link(node) {
-      let body = serde_json::to_value(spec).ok();
-      link
-        .push(Method::PUT, &format!("/servers/{}", spec.uuid), body)
-        .await;
+      spawn(async move { link.put_server(server).await });
     }
   }
 
-  pub async fn delete_server(&self, node: Uuid, server: Uuid) {
+  /// `keep_files` leaves the server's files on the node, for a transfer.
+  pub fn delete_server(&self, node: Uuid, server: Uuid, keep_files: bool) {
     if let Some(link) = self.link(node) {
-      link
-        .push(Method::DELETE, &format!("/servers/{server}"), None)
-        .await;
+      spawn(async move { link.delete_server(server, keep_files).await });
     }
   }
 
-  pub async fn power(&self, node: Uuid, server: Uuid, action: Power) {
+  /// Sends the spec, which turned the power off, then kills the server so it
+  /// skips the stop steps.
+  pub fn put_and_kill(&self, node: Uuid, server: Uuid) {
     if let Some(link) = self.link(node) {
-      link.power(server, action).await;
+      spawn(async move { link.put_and_kill(server).await });
     }
+  }
+
+  /// Last error wings reported for `server` on `node`.
+  pub fn error(&self, node: Uuid, server: Uuid) -> Option<String> {
+    self.wings.get(&node).and_then(|conn| conn.error(server))
   }
 
   fn link(&self, node: Uuid) -> Option<Link> {

@@ -13,12 +13,17 @@ use dotenvy::dotenv;
 use kube::CustomResourceExt;
 use tracing::info;
 
-use crate::{config::Config, store::Store};
+use shared::msg::Runtime;
+
+use crate::{config::Config, docker::Docker, store::Store};
 
 extern crate centaurus_wings as centaurus;
 
+mod agent;
 mod auth;
 mod config;
+mod docker;
+mod reconcile;
 mod servers;
 mod store;
 mod ws;
@@ -55,6 +60,16 @@ fn router(_limiter: &mut RateLimiter) -> ApiRouter {
 
 async fn state(router: ApiRouter, config: Config) -> ApiRouter {
   let router = auth::state(router.into(), &config);
-  let router = store::state(router, Store::new(&config).await);
+  let store = Store::new(&config).await;
+  let docker = match config.runtime {
+    Runtime::Docker => {
+      let docker = Docker::new(&config).await.expect("Failed to set up docker");
+      tokio::spawn(reconcile::run(store.clone(), docker.clone()));
+      Some(docker)
+    }
+    // TODO(wings): Kubernetes reconciler, until then GameServers are stored but never run
+    Runtime::Kubernetes => None,
+  };
+  let router = store::state(router, store).layer(Extension(docker));
   router.layer(Extension(config)).into()
 }

@@ -90,15 +90,14 @@ async fn create_node(
     .to_string();
   let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 });
 
+  wings.check_secure(data.secure)?;
   let token = gen_token();
   let id = Uuid::now_v7();
-
-  wings.connect(id, &address, port, data.secure, &token)?;
 
   let model = Node {
     id,
     name: data.name,
-    address,
+    address: address.clone(),
     port,
     secure: data.secure,
     disk_limit_mb: data.disk_limit_mb,
@@ -108,6 +107,7 @@ async fn create_node(
   };
 
   db.node().create_node(model).await?;
+  wings.connect(id, &address, port, data.secure, &token)?;
   info!("Created node with ID {}", id);
 
   updater.broadcast(UpdateMessage::Nodes { uuid: id }).await;
@@ -128,6 +128,8 @@ pub struct NodeInfo {
   pub connected: bool,
   /// Reported by wings, `None` while disconnected.
   pub runtime: Option<Runtime>,
+  /// Why the node can not be reached or synced, `None` while it works.
+  pub error: Option<String>,
 }
 
 impl NodeInfo {
@@ -143,6 +145,7 @@ impl NodeInfo {
       cpu_limit: node.cpu_limit,
       connected: wings.is_connected(node.id),
       runtime: wings.runtime(node.id),
+      error: wings.node_error(node.id),
     }
   }
 }
@@ -256,14 +259,12 @@ async fn update_node(
     .to_string();
   let port = url.port_u16().unwrap_or(if data.secure { 443 } else { 80 });
 
-  if read_node.address != address
+  let reconnect = read_node.address != address
     || read_node.port != i32::from(port)
-    || read_node.secure != data.secure
-  {
-    // replaces the existing connection
-    wings.connect(read_node.id, &address, port, data.secure, &read_node.token)?;
-
-    node.address = Set(address);
+    || read_node.secure != data.secure;
+  if reconnect {
+    wings.check_secure(data.secure)?;
+    node.address = Set(address.clone());
     node.port = Set(i32::from(port));
     node.secure = Set(data.secure);
   }
@@ -273,6 +274,10 @@ async fn update_node(
   node.cpu_limit = Set(data.cpu_limit.map(|v| v as i32));
 
   db.node().update_node(node).await?;
+  if reconnect {
+    // replaces the existing connection
+    wings.connect(read_node.id, &address, port, data.secure, &read_node.token)?;
+  }
   info!("Updated node with ID {}", req.uuid);
   updater
     .broadcast(UpdateMessage::Nodes { uuid: req.uuid })

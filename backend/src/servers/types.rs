@@ -162,6 +162,9 @@ pub(super) struct ServerInfo {
   pub(super) uuid: Uuid,
   pub(super) name: String,
   pub(super) status: ServerStatus,
+  /// Why the node could not do what was asked, e.g. start or install the
+  /// server. `None` while there is none or the node is disconnected.
+  pub(super) error: Option<String>,
   /// The caller's access level.
   pub(super) access: Access,
   pub(super) owner: Option<Named>,

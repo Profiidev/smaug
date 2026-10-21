@@ -202,7 +202,7 @@ async fn server_crud_flow() {
   assert_eq!(
     info,
     json!({
-      "uuid": uuid, "name": "survival", "status": "installing", "access": "admin",
+      "uuid": uuid, "name": "survival", "status": "installing", "error": null, "access": "admin",
       "owner": { "uuid": c.admin, "name": "admin" },
       "node": { "uuid": c.node, "name": "node-1" },
       "egg": { "uuid": c.egg, "name": "Paper" },
@@ -305,7 +305,8 @@ async fn create_defaults_and_install_state() {
   let uuid = c.create(body.clone()).await;
   let info = c.info(uuid).await;
   assert_eq!(info["install_state"], "installed");
-  assert_eq!(info["status"], "offline");
+  // no wings connected, the runtime state is unknown
+  assert_eq!(info["status"], "unknown");
   assert_eq!(info["owner"], Value::Null);
   // every variable gets its egg default
   assert_eq!(
@@ -848,7 +849,8 @@ impl Ctx {
       _ => {}
     }
     let expected = match state {
-      State::Offline => "offline",
+      // installed, the runtime state is unknown without a connected wings
+      State::Offline => "unknown",
       State::Installing => "installing",
       State::NotInstalled => "not_installed",
       State::InstallFailed => "install_failed",
@@ -936,6 +938,58 @@ async fn action_matrix() {
     (&info["status"], &info["install_state"]),
     (&json!("suspended"), &json!("installing"))
   );
+}
+
+#[tokio::test]
+async fn power_follows_actions_and_survives_edits() {
+  let c = ctx_with_db().await;
+  let db = Database::connect(c.db_url.as_deref().unwrap())
+    .await
+    .unwrap();
+  let power = async |uuid: Uuid| {
+    let m = server::Entity::find_by_id(uuid)
+      .one(&db)
+      .await
+      .unwrap()
+      .unwrap();
+    (m.desired_running, m.power_generation, m.suspended)
+  };
+
+  // skipped scripts with start on completion run right away
+  let mut body = c.body();
+  body["skip_scripts"] = json!(true);
+  body["start_on_completion"] = json!(true);
+  let uuid = c.create(body.clone()).await;
+  assert_eq!(power(uuid).await, (true, 0, false));
+
+  // not installed turns it off, nothing may run on missing files
+  body["allocations"] = json!([{ "ip": "10.0.0.7", "port": 30001 }]);
+  let other = c.create(body).await;
+  assert_eq!(
+    c.action(other, "install", json!({ "installed": false }))
+      .await,
+    StatusCode::OK
+  );
+  assert_eq!(power(other).await, (false, 1, false));
+
+  // a reinstall turns it off, with a new generation for wings
+  assert_eq!(c.action(uuid, "reinstall", json!({})).await, StatusCode::OK);
+  assert_eq!(power(uuid).await, (false, 1, false));
+
+  // an edit never undoes a suspend
+  assert_eq!(
+    c.action(uuid, "install", json!({ "installed": true }))
+      .await,
+    StatusCode::OK
+  );
+  assert_eq!(
+    c.action(uuid, "suspend", json!({ "suspended": true }))
+      .await,
+    StatusCode::OK
+  );
+  let resp = c.put(uuid, update_body(&c.info(uuid).await)).await;
+  assert_eq!(resp.status(), StatusCode::OK);
+  assert_eq!(power(uuid).await, (false, 2, true));
 }
 
 #[tokio::test]

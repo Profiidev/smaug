@@ -8,14 +8,12 @@ use centaurus::{
 use chrono::Utc;
 use entity::{sea_orm_active_enums::ServerInstallState, server};
 use http::StatusCode;
-use shared::msg::Power;
 use tracing::info;
 use uuid::Uuid;
 
 use super::{
   access::{Access, has_perm, load},
   error::{FieldResult, fail_if, field_err},
-  spec,
   status::{Action, ensure_allowed, status},
   types::{
     Allocation, CreateServer, CreateServerResponse, GrantInfo, GrantsInfo, Limits,
@@ -264,6 +262,7 @@ pub(super) async fn server_info(
   Ok(Json(ServerInfo {
     uuid: server.id,
     status: status(&server, wings.state(server.node_id, server.id)),
+    error: wings.error(server.node_id, server.id),
     access,
     owner: server.owner_id.map(|o| named(&users, o)),
     node: named(&nodes, server.node_id),
@@ -337,6 +336,8 @@ pub(super) async fn create_server(
     backup_limit: 0,
     stop_timeout: 0,
     restart_on_crash: false,
+    desired_running: req.skip_scripts && req.start_on_completion,
+    power_generation: 0,
     created_at: Utc::now().fixed_offset(),
   };
   apply_spec(&mut server, req.spec);
@@ -344,12 +345,9 @@ pub(super) async fn create_server(
   db.server()
     .create(server.clone(), allocations, variables)
     .await?;
-  // a pending install is part of the spec; without one no InstallFinished
-  // comes, so start right away
-  spec::push(&db, &wings, &server).await;
-  if req.skip_scripts && req.start_on_completion {
-    wings.power(req.node, id, Power::Start).await;
-  }
+  // a pending install is part of the spec, its end sets the power; without
+  // one the spec already carries it
+  wings.put_server(server.node_id, server.id);
   info!("Created server with ID {}", id);
 
   updater.broadcast(UpdateMessage::Servers { uuid: id }).await;
@@ -412,10 +410,11 @@ pub(super) async fn update_server(
   .await?;
 
   apply_spec(&mut server, req.spec);
-  db.server()
+  let node = db
+    .server()
     .update(server.clone(), allocations, variables, grants)
     .await?;
-  spec::push(&db, &wings, &server).await;
+  wings.put_server(node, server.id);
   info!("Updated server with ID {}", path.uuid);
 
   updater
@@ -434,7 +433,7 @@ pub(super) async fn delete_server(
   let (server, _) = load(&db, auth.user_id, req.uuid, Access::Admin).await?;
   ensure_allowed(&server, Action::Delete)?;
   db.server().delete(server.id).await?;
-  wings.delete_server(server.node_id, server.id).await;
+  wings.delete_server(server.node_id, server.id, false);
   info!("Deleted server with ID {}", req.uuid);
 
   updater

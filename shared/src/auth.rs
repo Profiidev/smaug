@@ -65,11 +65,30 @@ impl SignData {
     path: &str,
     body: &[u8],
   ) -> Result<Self> {
+    let now = Utc::now().timestamp_millis();
+    Self::validate_header_map_at(headers, token, method, path, body, now)
+  }
+
+  /// Like [`Self::validate_header_map`], with the timestamp checked against
+  /// `now_ms`: when the request arrived, so a slow body upload is no skew.
+  pub fn validate_header_map_at(
+    headers: &HeaderMap,
+    token: &str,
+    method: &str,
+    path: &str,
+    body: &[u8],
+    now_ms: i64,
+  ) -> Result<Self> {
     let timestamp: i64 = get_header_value(headers, TIMESTAMP_HEADER)?
       .parse()
       .status_context(StatusCode::UNAUTHORIZED, "Invalid wings timestamp")?;
-    if (Utc::now().timestamp_millis() - timestamp).abs() > MAX_SKEW_MS {
-      bail!(UNAUTHORIZED, "Expired wings timestamp");
+    let skew = now_ms - timestamp;
+    if skew.abs() > MAX_SKEW_MS {
+      // a request in flight is never this old, the clocks differ
+      bail!(
+        UNAUTHORIZED,
+        "Expired wings timestamp, clocks differ by {skew} ms (check NTP)"
+      );
     }
 
     let data = SignData {
@@ -155,6 +174,12 @@ fn mac(data: &str, key: &str) -> Result<HmacSha3_512> {
 
 fn hmac(data: &str, key: &str) -> Result<String> {
   Ok(hex::encode(mac(data, key)?.finalize().into_bytes()))
+}
+
+/// Bearer token of a server's agent, derived from the wings token so wings
+/// never has to store it.
+pub fn agent_token(secret: &str, server: uuid::Uuid) -> Result<String> {
+  hmac(&format!("agent\n{server}"), secret)
 }
 
 fn verify(data: &str, key: &str, signature: &str) -> Result<()> {

@@ -340,6 +340,8 @@ mod test {
       backup_limit: 0,
       stop_timeout: 60,
       restart_on_crash: true,
+      desired_running: false,
+      power_generation: 0,
       // postgres keeps microseconds
       created_at: chrono::SubsecRound::trunc_subsecs(chrono::Utc::now(), 6).fixed_offset(),
     }
@@ -464,7 +466,10 @@ mod test {
     // list: ordered by name, filtered by id
     let mut renamed = other.clone();
     renamed.name = "a".into();
-    servers.save(renamed).await.unwrap();
+    servers
+      .update(renamed, vec![pair("10.0.0.2", 2001)], vec![], None)
+      .await
+      .unwrap();
     let ids: Vec<_> = servers
       .list(None)
       .await
@@ -482,6 +487,8 @@ mod test {
 
     // update replaces allocations, variables and (when given) grants
     let mut changed = s.clone();
+    changed.name = "z".into();
+    // not a spec column, the update leaves it alone
     changed.install_state = ServerInstallState::Installed;
     servers
       .update(
@@ -503,7 +510,13 @@ mod test {
       )
       .await
       .unwrap();
-    assert_eq!(servers.find_by_id(id).await.unwrap(), changed);
+    assert_eq!(
+      servers.find_by_id(id).await.unwrap(),
+      entity::server::Model {
+        install_state: s.install_state,
+        ..changed.clone()
+      }
+    );
     assert_eq!(servers.allocations(vec![id]).await.unwrap().len(), 1);
     assert_eq!(
       servers.variables(id).await.unwrap(),
@@ -556,7 +569,10 @@ mod test {
     pinned.name = "a".into();
     pinned.startup = "mine".into();
     pinned.startup_overridden = true;
-    servers.save(pinned).await.unwrap();
+    servers
+      .update(pinned, vec![pair("10.0.0.2", 2001)], vec![], None)
+      .await
+      .unwrap();
     let mut new_egg = egg_model("egg");
     new_egg.id = egg_id;
     let mut fresh = var(egg_id, "NEW", None);

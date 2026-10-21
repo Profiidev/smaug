@@ -1,4 +1,4 @@
-import { invalidate } from '$app/navigation';
+import { invalidate, invalidateAll } from '$app/navigation';
 import { createWebsocket } from '@profidev/pleiades/backend';
 
 export enum UpdateType {
@@ -27,9 +27,29 @@ export type UpdateMessage =
 
 const socket = createWebsocket<UpdateMessage>();
 
+// Pleiades reconnects on its own but loses updates sent meanwhile, so reload all
+let opened = false;
+$effect.root(() => {
+  $effect(() => {
+    const ws = socket.updater;
+    if (!ws) {
+      return;
+    }
+    ws.addEventListener('open', () => {
+      if (opened) {
+        invalidateAll().catch(() => {});
+      }
+      opened = true;
+    });
+  });
+});
+
 export const connectWebsocket = (user: string) =>
   socket.connect((msg) => handleMessage(msg, user));
-export const disconnectWebsocket = () => socket.disconnect();
+export const disconnectWebsocket = () => {
+  opened = false;
+  socket.disconnect();
+};
 
 const handleMessage = (msg: UpdateMessage, user: string) => {
   switch (msg.type) {

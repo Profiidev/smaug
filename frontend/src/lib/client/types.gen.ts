@@ -450,6 +450,10 @@ export type NodeInfo = {
   connected: boolean;
   cpu_limit?: number | null;
   disk_limit_mb?: number | null;
+  /**
+   * Why the node can not be reached or synced, `None` while it works.
+   */
+  error?: string | null;
   id: string;
   memory_limit_mb?: number | null;
   name: string;
@@ -541,6 +545,11 @@ export type ServerInfo = {
   created_at: Date;
   egg: Named;
   /**
+   * Why the node could not do what was asked, e.g. start or install the
+   * server. `None` while there is none or the node is disconnected.
+   */
+  error?: string | null;
+  /**
    * Only returned to admins.
    */
   grants?: GrantsInfo | null;
@@ -599,6 +608,7 @@ export const ServerStatus = {
   STOPPING: 'stopping',
   CRASHED: 'crashed',
   OFFLINE: 'offline',
+  UNKNOWN: 'unknown',
   NOT_INSTALLED: 'not_installed',
   INSTALLING: 'installing',
   INSTALL_FAILED: 'install_failed',

@@ -66,7 +66,8 @@ const STATES: Record<
   running: { install_state: 'installed', suspended: false },
   starting: { install_state: 'installed', suspended: false },
   stopping: { install_state: 'installed', suspended: false },
-  suspended: { install_state: 'installed', suspended: true }
+  suspended: { install_state: 'installed', suspended: true },
+  unknown: { install_state: 'installed', suspended: false }
 };
 
 const server = (
@@ -149,6 +150,13 @@ describe('StatusTab cards', () => {
   it('shows a destructive alert when the install failed', () => {
     mount(server('install_failed'));
     expect(screen.getByRole('alert')).toHaveTextContent('Install failed');
+  });
+
+  it('shows the error the node reported', () => {
+    mount({ ...server('offline'), error: 'Failed to start: no such image' });
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Node reported an error');
+    expect(alert).toHaveTextContent('Failed to start: no such image');
   });
 
   it('shows an alert when suspended', () => {

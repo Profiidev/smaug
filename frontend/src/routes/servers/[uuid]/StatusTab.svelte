@@ -169,6 +169,15 @@
           </Alert.Description>
         </Alert.Root>
       {/if}
+      {#if server.error}
+        <Alert.Root variant="destructive">
+          <CircleAlert />
+          <Alert.Title>Node reported an error</Alert.Title>
+          <Alert.Description>
+            <p class="font-mono text-xs break-all">{server.error}</p>
+          </Alert.Description>
+        </Alert.Root>
+      {/if}
     </Card.Content>
   </Card.Root>
 

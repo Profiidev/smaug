@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use centaurus::{
   Config,
   backend::{
@@ -31,6 +33,15 @@ pub struct Config {
   pub token: String,
   pub runtime: Runtime,
   pub k8s_namespace: String,
+  pub docker_network: String,
+  /// Image of the per-server file helper (`smaug-agent`).
+  pub agent_image: String,
+  /// Internal network wings talks to the agents on; game containers are not on it.
+  pub agent_network: String,
+  /// Local to wings, never mounted into a container.
+  pub install_log_dir: PathBuf,
+  /// `TZ` of every server container.
+  pub timezone: String,
 }
 
 impl Default for Config {
@@ -47,6 +58,11 @@ impl Default for Config {
       token: "test-token".to_string(),
       runtime: Runtime::Docker,
       k8s_namespace: "smaug-servers".to_string(),
+      docker_network: "smaug".to_string(),
+      agent_image: "ghcr.io/profiidev/smaug/smaug-agent:main".to_string(),
+      agent_network: "smaug_agents".to_string(),
+      install_log_dir: "/var/lib/smaug/install-logs".into(),
+      timezone: "UTC".to_string(),
       auth: AuthConfig::default(),
     }
   }

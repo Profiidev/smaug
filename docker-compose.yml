@@ -37,12 +37,13 @@ services:
 
   wings:
     image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b03ecb064002e849d0f65dfa3690053241b0bfe4b893926f527d70655ff8bedc
-    user: '${HOST_UID:-0}:${HOST_GID:-0}'
     restart: unless-stopped
     volumes:
       - ./wings:/app
       - ./shared:/shared
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AGENT_IMAGE=smaug-agent:dev
     networks:
       - nginx
     tty: true
@@ -50,6 +51,27 @@ services:
       - '8123:8000'
     entrypoint: ['tini', '--']
     command: ['cargo', 'watch', '-x', 'run']
+
+  # does not run the agent, rebuilds the `smaug-agent:dev` image wings starts per server
+  agent:
+    image: ghcr.io/profiidev/images/rust-docker-watch:main@sha256:ce7f56f96de855f0d6a46609a1424397ed445f99938f74b984a95570adaddb37
+    restart: unless-stopped
+    volumes:
+      - ./agent:/app
+      - ./shared:/shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    tty: true
+    entrypoint: ['tini', '--']
+    command:
+      - cargo
+      - watch
+      - -i
+      - target
+      - -s
+      - >-
+        RUSTFLAGS="-C target-feature=+crt-static" cargo build --target x86_64-unknown-linux-gnu
+        && mkdir -p target/image && cp target/x86_64-unknown-linux-gnu/debug/smaug-agent target/image/
+        && docker build -q -f Dockerfile.dev -t smaug-agent:dev target/image
 
   postgres:
     image: postgres:18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280

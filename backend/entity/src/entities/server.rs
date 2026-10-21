@@ -30,6 +30,10 @@ pub struct Model {
   pub backup_limit: i32,
   pub stop_timeout: i32,
   pub restart_on_crash: bool,
+  /// Whether the server should run, sent to wings with `power_generation`.
+  pub desired_running: bool,
+  /// Bumped on every `desired_running` change by the panel.
+  pub power_generation: i64,
   pub created_at: DateTimeWithTimeZone,
   #[sea_orm(
     belongs_to,

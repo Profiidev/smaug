@@ -1,4 +1,5 @@
 use std::{
+  collections::{HashMap, HashSet},
   sync::{
     Arc, RwLock,
     atomic::{AtomicBool, Ordering},
@@ -8,9 +9,8 @@ use std::{
 
 use centaurus::{bail, db::init::Connection, error::Result, eyre::Context};
 use dashmap::DashMap;
-use entity::{sea_orm_active_enums::ServerInstallState, server};
-use futures_util::{SinkExt, StreamExt};
-use reqwest::Method;
+use futures_util::{FutureExt, SinkExt, StreamExt, future::BoxFuture};
+use reqwest::{Method, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use serde_json::Value;
 use shared::msg::{
@@ -19,9 +19,9 @@ use shared::msg::{
 };
 use tokio::{
   spawn,
-  sync::mpsc,
+  sync::{Mutex, Notify, mpsc},
   task::JoinHandle,
-  time::{Instant, interval, sleep},
+  time::{Instant, interval, sleep, sleep_until, timeout},
 };
 use tokio_tungstenite::tungstenite;
 use tracing::{debug, info, warn};
@@ -38,6 +38,14 @@ const RECONNECT_DELAY: Duration = Duration::from_secs(5);
 const PING_INTERVAL: Duration = Duration::from_secs(15);
 /// Connection counts as dead if nothing (not even a pong) arrived for this long.
 const LIVENESS_TIMEOUT: Duration = Duration::from_secs(45);
+/// A request (or the websocket handshake) that takes longer than this failed.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// The full sync sends every server, wings may need a while for it.
+const SYNC_TIMEOUT: Duration = Duration::from_secs(300);
+/// Full sync while connected, catches drift no failed request reported.
+const RESYNC_INTERVAL: Duration = Duration::from_secs(300);
+/// Earliest full sync after a failed one or after a failed request.
+const RESYNC_RETRY: Duration = Duration::from_secs(30);
 
 /// Handle to the task that owns the websocket to one wings node. Dropping it
 /// closes the connection.
@@ -56,12 +64,24 @@ pub struct Link {
   client: ClientWithMiddleware,
   /// Runtime state per server, as last reported. Empty while disconnected.
   states: Arc<DashMap<Uuid, ServerState>>,
+  /// Last error per server, as last reported. Empty while disconnected.
+  errors: Arc<DashMap<Uuid, String>>,
+  /// Whether `states` holds a full sync. Servers missing from it are offline then.
+  synced: Arc<AtomicBool>,
+  /// Held by every request and the whole sync, so a request never lands in
+  /// the middle of a sync and the sync never sends a spec older than a request.
+  lock: Arc<Mutex<()>>,
+  /// Asks the connection for a full sync, after a failed request.
+  resync: Arc<Notify>,
+  /// Why the node can not be reached or synced, `None` while it works.
+  error: Arc<RwLock<Option<String>>>,
   runtime: Arc<RwLock<Option<Runtime>>>,
   db: Connection,
   updater: Updater,
 }
 
 impl WingsConnection {
+  #[allow(clippy::too_many_arguments)]
   pub fn new(
     uuid: Uuid,
     addr: &str,
@@ -70,6 +90,7 @@ impl WingsConnection {
     token: String,
     db: Connection,
     updater: Updater,
+    lock: Arc<Mutex<()>>,
   ) -> Self {
     let ws_addr = format!(
       "{}://{}:{}/api",
@@ -91,6 +112,11 @@ impl WingsConnection {
         .with(WingsAuth::new(token.clone()))
         .build(),
       states: Default::default(),
+      errors: Default::default(),
+      synced: Default::default(),
+      lock,
+      resync: Default::default(),
+      error: Default::default(),
       runtime: Default::default(),
       db,
       updater,
@@ -123,12 +149,44 @@ impl WingsConnection {
     self.is_connected().then(|| self.link.clone())
   }
 
+  /// `None` while unknown: disconnected, or neither reported nor synced yet.
   pub fn state(&self, server: Uuid) -> Option<ServerState> {
-    self.link.states.get(&server).map(|s| *s)
+    if !self.is_connected() {
+      return None;
+    }
+    let reported = self.link.states.get(&server).map(|s| *s);
+    // after a sync, a server wings did not report is not stored there yet
+    reported.or_else(|| {
+      self
+        .link
+        .synced
+        .load(Ordering::Relaxed)
+        .then(ServerState::default)
+    })
+  }
+
+  /// Why wings could not do what was asked, `None` while there is no error or
+  /// it is unknown.
+  pub fn error(&self, server: Uuid) -> Option<String> {
+    if !self.is_connected() {
+      return None;
+    }
+    self.link.errors.get(&server).map(|e| e.clone())
   }
 
   pub fn runtime(&self) -> Option<Runtime> {
     *self.link.runtime.read().unwrap()
+  }
+
+  /// Why the node can not be reached or synced.
+  pub fn node_error(&self) -> Option<String> {
+    self.link.error.read().unwrap().clone()
+  }
+
+  /// Shared with a replacing connection, so requests to the old and the new
+  /// address stay serialized.
+  pub fn lock(&self) -> Arc<Mutex<()>> {
+    self.link.lock.clone()
   }
 
   #[allow(unused)]
@@ -147,19 +205,103 @@ impl Drop for WingsConnection {
 }
 
 impl Link {
-  /// Best-effort request: failures are only logged, the full sync on the next
-  /// (re)connect brings the node back in line with the DB.
-  pub async fn push(&self, method: Method, path: &str, body: Option<Value>) {
-    if let Err(err) = self.request(method, path, body).await {
-      warn!("Wings request {} to {} failed: {:?}", path, self.uuid, err);
+  /// Best-effort request, the caller holds the lock. A failure is logged and
+  /// triggers a full sync, which brings the node back in line with the DB.
+  async fn send(&self, method: Method, path: &str, body: Option<Value>) {
+    let failure = match self.build(method, path, body, REQUEST_TIMEOUT).send().await {
+      Ok(res) if res.status().is_success() => return,
+      // wings rejects the request itself, a sync would send the same again
+      Ok(res) if res.status().is_client_error() && res.status() != StatusCode::NOT_FOUND => {
+        warn!(
+          "Wings {} rejected request {}: {}",
+          self.uuid,
+          path,
+          res.status()
+        );
+        return;
+      }
+      Ok(res) => format!("status {}", res.status()),
+      Err(err) => format!("{err:?}"),
+    };
+    warn!(
+      "Wings request {} to {} failed: {}",
+      path, self.uuid, failure
+    );
+    self.resync.notify_one();
+  }
+
+  /// Sends the server's current spec. Read from the DB under the lock, so
+  /// concurrent updates reach wings in the order they were saved.
+  pub async fn put_server(&self, server: Uuid) {
+    let _lock = self.lock.lock().await;
+    self.send_put(server).await;
+  }
+
+  async fn send_put(&self, server: Uuid) {
+    let spec = match self.db.server().find_by_id(server).await {
+      // moved away since the caller read it, the new node gets it instead
+      Ok(model) if model.node_id != self.uuid => {
+        debug!(
+          "Server {} is no longer on wings {}, skipping",
+          server, self.uuid
+        );
+        return;
+      }
+      Ok(model) => spec::load(&self.db, &model).await,
+      Err(err) => Err(err),
+    };
+    match spec {
+      Ok(spec) => {
+        let body = serde_json::to_value(&spec).ok();
+        self
+          .send(Method::PUT, &format!("/servers/{server}"), body)
+          .await;
+      }
+      Err(err) => warn!("Failed to build spec for server {}: {:?}", server, err),
     }
   }
 
-  pub async fn power(&self, server: Uuid, action: Power) {
+  /// `keep_files` leaves the server's files on the node, for a transfer.
+  pub async fn delete_server(&self, server: Uuid, keep_files: bool) {
+    let _lock = self.lock.lock().await;
+    self.send_delete(server, keep_files).await;
+  }
+
+  async fn send_delete(&self, server: Uuid, keep_files: bool) {
+    let path = format!("/servers/{server}?keep_files={keep_files}");
+    self.send(Method::DELETE, &path, None).await;
+  }
+
+  /// Sends the spec, then the kill. In this order the spec has turned the
+  /// power off, a kill before it would restart the server instead.
+  pub async fn put_and_kill(&self, server: Uuid) {
+    let _lock = self.lock.lock().await;
+    self.send_put(server).await;
+    self.send_power(server, Power::Kill).await;
+  }
+
+  async fn send_power(&self, server: Uuid, action: Power) {
     let body = serde_json::to_value(PowerRequest { action }).ok();
     self
-      .push(Method::POST, &format!("/servers/{server}/power"), body)
+      .send(Method::POST, &format!("/servers/{server}/power"), body)
       .await;
+  }
+
+  fn build(
+    &self,
+    method: Method,
+    path: &str,
+    body: Option<Value>,
+    timeout: Duration,
+  ) -> reqwest_middleware::RequestBuilder {
+    let req = self
+      .client
+      .request(method, format!("{}{}", self.base, path))
+      .timeout(timeout);
+    match body {
+      Some(body) => req.json(&body),
+      None => req,
+    }
   }
 
   async fn request(
@@ -167,15 +309,11 @@ impl Link {
     method: Method,
     path: &str,
     body: Option<Value>,
+    timeout: Duration,
   ) -> Result<reqwest::Response> {
-    let mut req = self
-      .client
-      .request(method, format!("{}{}", self.base, path));
-    if let Some(body) = body {
-      req = req.json(&body);
-    }
     Ok(
-      req
+      self
+        .build(method, path, body, timeout)
         .send()
         .await
         .context("Failed to reach wings")?
@@ -184,79 +322,137 @@ impl Link {
     )
   }
 
+  /// Records why the node can not be reached or synced, the UI shows it.
+  async fn set_error(&self, error: Option<String>) {
+    let changed = {
+      let mut current = self.error.write().unwrap();
+      let changed = *current != error;
+      *current = error;
+      changed
+    };
+    if changed {
+      self
+        .updater
+        .broadcast(UpdateMessage::Nodes { uuid: self.uuid })
+        .await;
+    }
+  }
+
   /// Sends every server of this node to wings and fixes what drifted while
   /// the node was unreachable.
   async fn sync(&self) -> Result<()> {
+    let _lock = self.lock.lock().await;
     let servers = self.db.server().list_by_node(self.uuid).await?;
     let mut specs = Vec::with_capacity(servers.len());
     // ponytail: two queries per server, batch once nodes hold many servers
     for server in &servers {
-      specs.push(spec::load(&self.db, server).await?);
+      match spec::load(&self.db, server).await {
+        Ok(spec) => specs.push(spec),
+        // wings keeps the last spec it got, one broken server must not stop the sync
+        Err(err) => warn!("Failed to build spec for server {}: {:?}", server.id, err),
+      }
     }
     let body = serde_json::to_value(SyncRequest { servers: specs }).ok();
     let res: SyncResponse = self
-      .request(Method::PUT, "/servers", body)
+      .request(Method::PUT, "/servers", body, SYNC_TIMEOUT)
       .await?
       .json()
       .await
       .context("Invalid sync response from wings")?;
 
     // the DB is the source of truth, servers it does not know are deleted
-    for orphan in &res.orphans {
+    let known: HashSet<Uuid> = servers.iter().map(|s| s.id).collect();
+    for orphan in res.orphans.iter().filter(|o| !known.contains(o)) {
+      // still in the DB means moved to another node, its files stay for the transfer
+      let keep_files = match self.db.server().find_by_id(*orphan).await {
+        Ok(_) => true,
+        Err(err) if err.status == StatusCode::NOT_FOUND => false,
+        // unsure whether it was moved, a wrong guess would delete its only files
+        Err(err) => {
+          warn!("Failed to look up orphan {}, keeping it: {:?}", orphan, err);
+          continue;
+        }
+      };
       info!(
         "Deleting server {} unknown to the panel from wings {}",
         orphan, self.uuid
       );
-      self
-        .push(Method::DELETE, &format!("/servers/{orphan}"), None)
-        .await;
+      self.send_delete(*orphan, keep_files).await;
     }
+    let previous: HashMap<Uuid, (ServerState, Option<String>)> = self
+      .states
+      .iter()
+      .map(|e| (*e.key(), (*e, self.errors.get(e.key()).map(|e| e.clone()))))
+      .collect();
     self.states.clear();
+    self.errors.clear();
     for (uuid, observed) in &res.servers {
-      if !res.orphans.contains(uuid) {
+      if known.contains(uuid) {
         self.states.insert(*uuid, observed.state);
+        if let Some(error) = &observed.error {
+          self.errors.insert(*uuid, error.clone());
+        }
       }
     }
+    self.synced.store(true, Ordering::Relaxed);
 
     for server in servers {
       let uuid = server.id;
-      let observed = res.servers.get(&uuid).copied().unwrap_or_default();
+      let observed = res.servers.get(&uuid).cloned().unwrap_or_default();
+      let mut changed = previous.get(&uuid) != Some(&(observed.state, observed.error.clone()));
       if server.suspended && is_up(observed.state) {
-        self.power(uuid, Power::Kill).await;
+        self.send_power(uuid, Power::Kill).await;
       }
+      // both catch up on events missed while disconnected
       if let Some(result) = observed.last_install {
-        // catches up on an InstallFinished missed while disconnected
-        self.apply_install(server, result).await?;
+        match self.apply_install(uuid, result).await {
+          Ok(true) => {
+            self.send_put(uuid).await;
+            changed = true;
+          }
+          Ok(false) => (),
+          Err(err) => warn!("Failed to apply install of server {}: {:?}", uuid, err),
+        }
       }
-      self
-        .updater
-        .broadcast(UpdateMessage::Servers { uuid })
-        .await;
+      if let Some(generation) = observed.stopped_generation {
+        match self.apply_stopped(uuid, generation).await {
+          Ok(applied) => changed |= applied,
+          Err(err) => warn!("Failed to apply stop of server {}: {:?}", uuid, err),
+        }
+      }
+      if changed {
+        self
+          .updater
+          .broadcast(UpdateMessage::Servers { uuid })
+          .await;
+      }
     }
     Ok(())
   }
 
-  /// Applies a finished install if it is the one the panel waits for. A
-  /// pending install that has not finished is (re)started by the sync itself.
-  async fn apply_install(&self, mut server: server::Model, result: InstallResult) -> Result<()> {
-    let waiting = server.node_id == self.uuid
-      && server.install_state == ServerInstallState::Installing
-      && server.install_generation as u64 == result.generation;
-    if !waiting {
-      return Ok(());
-    }
-    let uuid = server.id;
-    server.install_state = if result.ok {
-      ServerInstallState::Installed
-    } else {
-      ServerInstallState::InstallFailed
-    };
-    let start = result.ok && server.start_on_completion && !server.suspended;
-    self.db.server().save(server).await?;
-    if start {
-      self.power(uuid, Power::Start).await;
-    }
-    Ok(())
+  /// Applies a finished install if it is the one the panel waits for; then
+  /// the spec carries the power the install left. A pending install that has
+  /// not finished is (re)started by the sync itself. Returns whether it applied.
+  async fn apply_install(&self, server: Uuid, result: InstallResult) -> Result<bool> {
+    Ok(
+      self
+        .db
+        .server()
+        .finish_install(server, self.uuid, result.generation, result.ok)
+        .await?,
+    )
+  }
+
+  /// Wings stopped the server itself, its power goes off unless the panel
+  /// changed it since. Returns whether it applied.
+  async fn apply_stopped(&self, server: Uuid, generation: u64) -> Result<bool> {
+    Ok(
+      self
+        .db
+        .server()
+        .stopped_by_wings(server, self.uuid, generation)
+        .await?,
+    )
   }
 
   async fn handle(&self, event: Event) -> Result<()> {
@@ -273,9 +469,23 @@ impl Link {
         self.states.insert(uuid, state);
         uuid
       }
+      Event::Error { uuid, error } => {
+        match error {
+          Some(error) => self.errors.insert(uuid, error),
+          None => self.errors.remove(&uuid).map(|(_, e)| e),
+        };
+        uuid
+      }
       Event::InstallFinished { uuid, result } => {
-        let server = self.db.server().find_by_id(uuid).await?;
-        self.apply_install(server, result).await?;
+        if self.apply_install(uuid, result).await? {
+          // in the background, the event loop must not wait for the lock
+          let link = self.clone();
+          spawn(async move { link.put_server(uuid).await });
+        }
+        uuid
+      }
+      Event::Stopped { uuid, generation } => {
+        self.apply_stopped(uuid, generation).await?;
         uuid
       }
     };
@@ -289,8 +499,10 @@ impl Link {
   /// Forgets everything the node reported, it is unknown while disconnected.
   async fn reset(&self) {
     *self.runtime.write().unwrap() = None;
+    self.synced.store(false, Ordering::Relaxed);
     let servers: Vec<Uuid> = self.states.iter().map(|e| *e.key()).collect();
     self.states.clear();
+    self.errors.clear();
     for uuid in servers {
       self
         .updater
@@ -317,16 +529,15 @@ async fn connection_task(
 ) {
   let uuid = link.uuid;
   loop {
-    match WingsAuth::connect_websocket(&addr, &token).await {
+    let stream = timeout(REQUEST_TIMEOUT, WingsAuth::connect_websocket(&addr, &token))
+      .await
+      .unwrap_or_else(|_| Err(centaurus::anyhow!("Timed out")));
+    match stream {
       Ok(stream) => {
         connected.store(true, Ordering::Relaxed);
         link.updater.broadcast(UpdateMessage::Nodes { uuid }).await;
         debug!("Wings connection to {} established", uuid);
 
-        // events wait in the socket until the sync is done
-        if let Err(err) = link.sync().await {
-          warn!("Failed to sync wings {}: {:?}", uuid, err);
-        }
         run_connection(&link, stream, &mut rx).await;
 
         connected.store(false, Ordering::Relaxed);
@@ -334,13 +545,38 @@ async fn connection_task(
         link.updater.broadcast(UpdateMessage::Nodes { uuid }).await;
         warn!("Wings connection to {} lost, reconnecting", uuid);
       }
-      Err(err) => warn!(
-        "Failed to connect to wings websocket for {}: {:?}",
-        uuid, err
-      ),
+      Err(err) => {
+        warn!(
+          "Failed to connect to wings websocket for {}: {:?}",
+          uuid, err
+        );
+        link.set_error(Some(format!("{err:#}"))).await;
+      }
     }
 
     sleep(RECONNECT_DELAY).await;
+  }
+}
+
+async fn handle(link: &Link, event: Event) {
+  debug!("Wings event from {}: {:?}", link.uuid, event);
+  if let Err(err) = link.handle(event).await {
+    warn!("Failed to handle wings event from {}: {:?}", link.uuid, err);
+  }
+}
+
+/// Full sync, returns when the next one is due.
+async fn sync(link: &Link) -> Instant {
+  match link.sync().await {
+    Ok(()) => {
+      link.set_error(None).await;
+      Instant::now() + RESYNC_INTERVAL
+    }
+    Err(err) => {
+      warn!("Failed to sync wings {}: {:?}", link.uuid, err);
+      link.set_error(Some(format!("Sync failed: {err:#}"))).await;
+      Instant::now() + RESYNC_RETRY
+    }
   }
 }
 
@@ -349,10 +585,33 @@ async fn run_connection(link: &Link, stream: WsStream, rx: &mut mpsc::Receiver<W
   let uuid = link.uuid;
   let (mut sink, mut stream) = stream.split();
   let mut ping = interval(PING_INTERVAL);
+  let mut last_sync = Instant::now();
+  let mut sync_at = Instant::now();
   let mut last_seen = Instant::now();
+  // pings and reads go on while a sync runs, so neither side times out. Events
+  // read meanwhile may be older than the sync's snapshot, they are applied
+  // after it in the order wings sent them.
+  let mut syncing: Option<BoxFuture<'_, Instant>> = None;
+  let mut queued: Vec<Event> = Vec::new();
 
   loop {
     tokio::select! {
+      _ = sleep_until(sync_at), if syncing.is_none() => {
+        last_sync = Instant::now();
+        syncing = Some(sync(link).boxed());
+      }
+      next = async { syncing.as_mut().expect("guarded").await }, if syncing.is_some() => {
+        syncing = None;
+        sync_at = next;
+        for event in queued.drain(..) {
+          handle(link, event).await;
+        }
+      }
+      // not while syncing: the notify keeps its permit, a failure during the
+      // sync then moves the next one up instead of being overwritten by it
+      _ = link.resync.notified(), if syncing.is_none() => {
+        sync_at = sync_at.min(last_sync + RESYNC_RETRY);
+      }
       msg = stream.next() => {
         let Some(Ok(msg)) = msg else {
           return;
@@ -362,12 +621,8 @@ async fn run_connection(link: &Link, stream: WsStream, rx: &mut mpsc::Receiver<W
         match msg {
           tungstenite::Message::Binary(raw_msg) => {
             match serde_json::from_slice::<Event>(&raw_msg) {
-              Ok(event) => {
-                debug!("Wings event from {}: {:?}", uuid, event);
-                if let Err(err) = link.handle(event).await {
-                  warn!("Failed to handle wings event from {}: {:?}", uuid, err);
-                }
-              }
+              Ok(event) if syncing.is_some() => queued.push(event),
+              Ok(event) => handle(link, event).await,
               Err(err) => info!("Failed to parse wings message for {}: {}", uuid, err),
             }
           }

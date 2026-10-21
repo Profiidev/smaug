@@ -10,9 +10,12 @@ pub enum ServerStatus {
   Running,
   Starting,
   Stopping,
-  /// Exited on its own; `restart_on_crash` may start it again.
+  // exited on its own; `restart_on_crash` may start it again
+  // (plain comments: variant docs turn the schema into `oneOf`, not an enum)
   Crashed,
   Offline,
+  // the node is disconnected or not synced yet
+  Unknown,
   NotInstalled,
   Installing,
   InstallFailed,
@@ -33,7 +36,8 @@ pub(super) fn status(server: &server::Model, runtime: Option<ServerState>) -> Se
       Some(ServerState::Running) => ServerStatus::Running,
       Some(ServerState::Stopping) => ServerStatus::Stopping,
       Some(ServerState::Crashed) => ServerStatus::Crashed,
-      _ => ServerStatus::Offline,
+      Some(ServerState::Offline | ServerState::Installing) => ServerStatus::Offline,
+      None => ServerStatus::Unknown,
     },
   }
 }
@@ -57,6 +61,7 @@ fn allowed(status: ServerStatus, action: Action) -> bool {
     | ServerStatus::Stopping
     | ServerStatus::Crashed
     | ServerStatus::Offline
+    | ServerStatus::Unknown
     | ServerStatus::InstallFailed
     | ServerStatus::NotInstalled => action != A::Unsuspend,
     ServerStatus::Installing => matches!(action, A::Install | A::Suspend),
@@ -65,7 +70,7 @@ fn allowed(status: ServerStatus, action: Action) -> bool {
 }
 
 pub(super) fn ensure_allowed(server: &server::Model, action: Action) -> Result<()> {
-  // running, starting and stopping allow the same actions as offline
+  // every runtime state allows the same actions, so it is left unknown
   if !allowed(status(server, None), action) {
     bail!(CONFLICT, "Action is not available in the current state");
   }
@@ -99,6 +104,8 @@ pub(super) mod test {
       backup_limit: 2,
       stop_timeout: 60,
       restart_on_crash: true,
+      desired_running: false,
+      power_generation: 0,
       created_at: Utc::now().fixed_offset(),
     }
   }
@@ -107,7 +114,7 @@ pub(super) mod test {
   fn status_derivation() {
     let mut s = model();
     for (state, expected) in [
-      (ServerInstallState::Installed, ServerStatus::Offline),
+      (ServerInstallState::Installed, ServerStatus::Unknown),
       (ServerInstallState::NotInstalled, ServerStatus::NotInstalled),
       (ServerInstallState::Installing, ServerStatus::Installing),
       (
@@ -160,6 +167,7 @@ pub(super) mod test {
       ),
       (ServerStatus::Crashed, [true, true, true, false, true, true]),
       (ServerStatus::Offline, [true, true, true, false, true, true]),
+      (ServerStatus::Unknown, [true, true, true, false, true, true]),
       (
         ServerStatus::InstallFailed,
         [true, true, true, false, true, true],
