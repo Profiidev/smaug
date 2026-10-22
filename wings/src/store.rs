@@ -19,7 +19,7 @@ use shared::msg::{Event, InstallResult, Observed, Runtime, ServerSpec, ServerSta
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::config::Config;
+use crate::{config::Config, docker::Stdin};
 
 const FIELD_MANAGER: &str = "wings";
 
@@ -79,8 +79,35 @@ impl Desired {
 pub struct Store {
   backend: Backend,
   events: broadcast::Sender<Event>,
+  /// Logs and metrics, lossy so a flooding console cannot push state and op
+  /// events out of `events`.
+  live: broadcast::Sender<Event>,
   /// Uuids whose desired state changed, for the reconciler.
   changes: broadcast::Sender<Uuid>,
+  /// Stdin of every attached server, written by commands and the stop command.
+  consoles: Arc<DashMap<Uuid, Console>>,
+  /// Servers an operation (restore) holds, see [`Store::lock`].
+  locks: Arc<DashMap<Uuid, ()>>,
+  /// Held while the op lock is taken, and by checks that must not see it
+  /// taken in between, see [`Store::unlocked`].
+  // ponytail: one gate for all servers, per-server if power requests queue up
+  gate: Arc<tokio::sync::Mutex<()>>,
+}
+
+pub type Console = Arc<tokio::sync::Mutex<Stdin>>;
+
+/// Held while an operation owns the server, the reconciler keeps it stopped.
+/// Dropping it releases the server and wakes its worker.
+pub struct OpGuard {
+  store: Store,
+  uuid: Uuid,
+}
+
+impl Drop for OpGuard {
+  fn drop(&mut self) {
+    self.store.locks.remove(&self.uuid);
+    self.store.touch(self.uuid);
+  }
 }
 
 #[derive(Clone)]
@@ -109,8 +136,64 @@ impl Store {
       backend,
       // a full buffer drops the panel connection, which costs a full sync
       events: broadcast::channel(4096).0,
+      // a full buffer only skips lines and metrics
+      live: broadcast::channel(4096).0,
       changes: broadcast::channel(256).0,
+      consoles: Default::default(),
+      locks: Default::default(),
+      gate: Default::default(),
     }
+  }
+
+  /// Reports to the panel; nobody listening means no panel is connected.
+  pub fn send(&self, event: Event) {
+    let _ = match event {
+      Event::Logs { .. } | Event::Metrics { .. } => self.live.send(event),
+      _ => self.events.send(event),
+    };
+  }
+
+  /// Wakes the server's reconcile worker.
+  pub fn touch(&self, uuid: Uuid) {
+    let _ = self.changes.send(uuid);
+  }
+
+  pub fn set_console(&self, uuid: Uuid, console: Option<Console>) {
+    match console {
+      Some(console) => self.consoles.insert(uuid, console),
+      None => self.consoles.remove(&uuid).map(|e| e.1),
+    };
+  }
+
+  pub fn console(&self, uuid: Uuid) -> Option<Console> {
+    self.consoles.get(&uuid).map(|c| c.clone())
+  }
+
+  /// Takes the server's op lock, `None` when an operation already holds it.
+  pub async fn lock(&self, uuid: Uuid) -> Option<OpGuard> {
+    let _gate = self.gate.lock().await;
+    match self.locks.entry(uuid) {
+      dashmap::Entry::Occupied(_) => None,
+      dashmap::Entry::Vacant(e) => {
+        e.insert(());
+        self.touch(uuid);
+        Some(OpGuard {
+          store: self.clone(),
+          uuid,
+        })
+      }
+    }
+  }
+
+  pub fn locked(&self, uuid: Uuid) -> bool {
+    self.locks.contains_key(&uuid)
+  }
+
+  /// `None` while the server is locked, else holds off [`Store::lock`]
+  /// until dropped, so a check and the change after it are atomic.
+  pub async fn unlocked(&self, uuid: Uuid) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+    let gate = self.gate.lock().await;
+    (!self.locked(uuid)).then_some(gate)
   }
 
   pub fn runtime(&self) -> Runtime {
@@ -122,6 +205,11 @@ impl Store {
 
   pub fn subscribe(&self) -> broadcast::Receiver<Event> {
     self.events.subscribe()
+  }
+
+  /// Logs and metrics, see [`Store::send`].
+  pub fn subscribe_live(&self) -> broadcast::Receiver<Event> {
+    self.live.subscribe()
   }
 
   pub fn subscribe_changes(&self) -> broadcast::Receiver<Uuid> {
@@ -406,8 +494,12 @@ pub(crate) mod test {
   pub(crate) fn memory() -> Store {
     Store {
       backend: Backend::Memory(Default::default()),
+      live: broadcast::channel(16).0,
       events: broadcast::channel(16).0,
       changes: broadcast::channel(16).0,
+      consoles: Default::default(),
+      locks: Default::default(),
+      gate: Default::default(),
     }
   }
 

@@ -2,9 +2,16 @@ use std::sync::Arc;
 
 use aide::OperationIo;
 use axum::{Extension, extract::FromRequestParts};
-use centaurus::{bail, db::init::Connection, error::Result};
+use centaurus::{
+  bail,
+  db::init::Connection,
+  error::{ErrorReport, Result},
+  eyre::eyre,
+};
 use dashmap::DashMap;
-use shared::msg::{Runtime, ServerState};
+use http::{Method, StatusCode};
+use reqwest_middleware::RequestBuilder;
+use shared::msg::{ErrorBody, ErrorCode, Power, Runtime, ServerState};
 use tokio::spawn;
 use tracing::{debug, warn};
 use uuid::Uuid;
@@ -12,6 +19,7 @@ use uuid::Uuid;
 use crate::{
   db::DBTrait,
   nodes::connection::{Link, WingsConnection},
+  servers::live::Live,
   utils::Updater,
 };
 
@@ -22,6 +30,7 @@ pub struct Wings {
   updater: Updater,
   db: Connection,
   allow_insecure: bool,
+  live: Live,
 }
 
 impl Wings {
@@ -31,6 +40,7 @@ impl Wings {
       updater,
       db: db.clone(),
       allow_insecure,
+      live: Live::default(),
     };
 
     for node in db.node().list_nodes().await? {
@@ -67,6 +77,7 @@ impl Wings {
       self.db.clone(),
       self.updater.clone(),
       lock,
+      self.live.clone(),
     );
     self.wings.insert(uuid, conn);
     Ok(())
@@ -132,6 +143,36 @@ impl Wings {
     }
   }
 
+  /// Restart or kill, after any spec push sent before.
+  pub fn power(&self, node: Uuid, server: Uuid, action: Power) {
+    if let Some(link) = self.link(node) {
+      spawn(async move { link.power(server, action).await });
+    }
+  }
+
+  /// Browsers watching servers, fed by every node's events.
+  pub fn live(&self) -> Live {
+    self.live.clone()
+  }
+
+  /// A request to `path` under the server's wings routes, sent with [`call`].
+  /// `503` while the node is disconnected.
+  pub fn server_request(
+    &self,
+    node: Uuid,
+    server: Uuid,
+    method: Method,
+    path: &str,
+  ) -> Result<RequestBuilder> {
+    match self.link(node) {
+      Some(link) => Ok(link.server_request(method, server, path)),
+      None => Err(centaurus::anyhow!(
+        SERVICE_UNAVAILABLE,
+        "Node is not connected"
+      )),
+    }
+  }
+
   /// Last error wings reported for `server` on `node`.
   pub fn error(&self, node: Uuid, server: Uuid) -> Option<String> {
     self.wings.get(&node).and_then(|conn| conn.error(server))
@@ -143,5 +184,61 @@ impl Wings {
       debug!("Wings {} is not connected, skipping request", node);
     }
     link
+  }
+}
+
+/// Sends a request built by [`Wings::server_request`], wings errors become
+/// panel errors with the same meaning and message.
+pub async fn call(req: RequestBuilder) -> Result<reqwest::Response> {
+  let res = match req.send().await {
+    Ok(res) => res,
+    Err(err) => {
+      warn!("Wings request failed: {:?}", err);
+      bail!(BAD_GATEWAY, "Failed to reach the node");
+    }
+  };
+  if res.status().is_success() {
+    return Ok(res);
+  }
+  let status = res.status();
+  Err(match res.json::<ErrorBody>().await {
+    Ok(body) => ErrorReport::new(eyre!(body.message), error_status(body.code)),
+    Err(_) => ErrorReport::new(eyre!("Node answered {status}"), StatusCode::BAD_GATEWAY),
+  })
+}
+
+fn error_status(code: ErrorCode) -> StatusCode {
+  match code {
+    ErrorCode::BadRequest => StatusCode::BAD_REQUEST,
+    ErrorCode::Denied => StatusCode::FORBIDDEN,
+    ErrorCode::NotFound => StatusCode::NOT_FOUND,
+    ErrorCode::Conflict | ErrorCode::Busy => StatusCode::CONFLICT,
+    ErrorCode::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+    ErrorCode::Unsupported => StatusCode::NOT_IMPLEMENTED,
+    ErrorCode::Quota => StatusCode::INSUFFICIENT_STORAGE,
+    // the node failed, not the panel
+    ErrorCode::Internal => StatusCode::BAD_GATEWAY,
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn wings_error_codes_map_to_statuses() {
+    for (code, status) in [
+      (ErrorCode::BadRequest, 400),
+      (ErrorCode::Denied, 403),
+      (ErrorCode::NotFound, 404),
+      (ErrorCode::Conflict, 409),
+      (ErrorCode::Busy, 409),
+      (ErrorCode::TooLarge, 413),
+      (ErrorCode::Unsupported, 501),
+      (ErrorCode::Quota, 507),
+      (ErrorCode::Internal, 502),
+    ] {
+      assert_eq!(error_status(code).as_u16(), status, "{code:?}");
+    }
   }
 }

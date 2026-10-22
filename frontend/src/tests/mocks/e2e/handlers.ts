@@ -19,6 +19,11 @@ const client: Client = createClient(createConfig<ClientOptions>()),
    */
   appLoginWs = ws.link('*/api/auth/app/device_login'),
   /**
+   * Per-server live channel (console, status, stats). Accepts and stays
+   * silent; specs push frames with their own `liveWs` listener.
+   */
+  liveWs = ws.link('*/api/servers/:uuid/ws'),
+  /**
    * Reuses the generated `handle*` factories (the same mock api the unit
    * tests use). The factories build their URL from the client's `baseUrl`; in the
    * preview server every `/api/*` request is host-rewritten to the backend by
@@ -34,6 +39,7 @@ const j = (d: unknown) => HttpResponse.json(d as never) as never,
 
 export const handlers = [
   updaterWs.addEventListener('connection', () => {}),
+  liveWs.addEventListener('connection', () => {}),
   // oxlint-disable-next-line no-shadow
   appLoginWs.addEventListener('connection', ({ client }) => {
     client.send('device-login-code');
@@ -111,6 +117,8 @@ export const handlers = [
   gen.handleSetServerInstalled(ok),
   gen.handleSetServerSuspended(ok),
   gen.handleTransferServer(ok),
+  gen.handleServerPower(ok),
+  gen.handleServerCommand(ok),
 
   // Mutations return a generic success so submit flows resolve.
   gen.handleCreateGroup(() => j({ uuid: 'group-new' })),

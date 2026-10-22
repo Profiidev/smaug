@@ -126,7 +126,7 @@
     />
     <p class="text-muted-foreground text-xs">
       {mode === 'edit'
-        ? 'Use Transfer on the Status tab.'
+        ? 'Use Transfer on the Actions tab.'
         : 'Where the server runs. The IPs you type must belong to this node.'}
     </p>
   </div>

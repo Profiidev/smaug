@@ -34,11 +34,8 @@ test.describe('server edit with write access', () => {
         return HttpResponse.json(serverOptions.default) as never;
       })
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
-    await expect(
-      page.getByText('Some settings need an administrator')
-    ).toBeVisible();
     await expect(tab(page, 'Permissions')).toHaveCount(0);
     await expect(action(page, 'Delete')).toBeDisabled();
     await expect(action(page, 'Reinstall')).toBeEnabled();
@@ -53,6 +50,10 @@ test.describe('server edit with write access', () => {
     }
 
     await openTab(page, 'General');
+    // Settings alerts show on settings tabs only.
+    await expect(
+      page.getByText('Some settings need an administrator')
+    ).toBeVisible();
     await expect(page.getByLabel('Name', { exact: true })).toBeEnabled();
     await expect(combo(page, 'Owner')).toBeDisabled();
     await expect(combo(page, 'Egg')).toBeDisabled();
@@ -106,11 +107,8 @@ test.describe('server edit with read access', () => {
         return HttpResponse.json(serverOptions.default) as never;
       })
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
-    await expect(
-      page.getByText('You have view-only access', { exact: true })
-    ).toBeVisible();
     await expect(
       page.getByText('Actions need write access to this server.')
     ).toBeVisible();
@@ -128,6 +126,10 @@ test.describe('server edit with read access', () => {
     }
 
     await openTab(page, 'General');
+    // Settings alerts show on settings tabs only.
+    await expect(
+      page.getByText('You have view-only access', { exact: true })
+    ).toBeVisible();
     await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Save Changes' })
@@ -145,13 +147,13 @@ test.describe('server edit /permissions without admin access', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
   for (const access of ['write', 'read'] as const) {
-    test(`${access} access lands on Status`, async ({ network, page }) => {
+    test(`${access} access lands on Console`, async ({ network, page }) => {
       network.use(asAccess(access));
       await gotoReady(page, '/servers');
       await gotoReady(page, '/servers/srv-survival/permissions');
 
-      await expect(page).toHaveURL(/\/servers\/srv-survival\/status$/);
-      await expect(tab(page, 'Status')).toHaveAttribute(
+      await expect(page).toHaveURL(/\/servers\/srv-survival\/console$/);
+      await expect(tab(page, 'Console')).toHaveAttribute(
         'aria-selected',
         'true'
       );
@@ -185,7 +187,7 @@ test.describe('server edit edge cases', () => {
     }) => {
       const update = recordUpdate();
       network.use(ownerless(access), update.handler);
-      await gotoReady(page, '/servers/srv-survival/status');
+      await gotoReady(page, '/servers/srv-survival/actions');
       await openTab(page, 'General');
       await page.getByLabel('Name', { exact: true }).fill('Orphan');
       await save(page);
@@ -203,7 +205,7 @@ test.describe('server edit edge cases', () => {
       () => new HttpResponse(null, { status: 403 }) as never
     );
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'General');
     await page.getByLabel('Name', { exact: true }).fill('Nope');
     await save(page);
@@ -235,10 +237,10 @@ test.describe('server edit edge cases', () => {
             }) as never)
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'General');
     await page.getByLabel('Name', { exact: true }).fill('Draft name');
-    await openTab(page, 'Status');
+    await openTab(page, 'Actions');
     await action(page, 'Mark as not installed').click();
     // The refreshed server info is shown...
     await expect(action(page, 'Mark as installed')).toBeVisible();

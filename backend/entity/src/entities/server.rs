@@ -54,6 +54,10 @@ pub struct Model {
   #[sea_orm(has_many)]
   pub server_allocations: HasMany<super::server_allocation::Entity>,
   #[sea_orm(has_many)]
+  pub server_backups: HasMany<super::server_backup::Entity>,
+  #[sea_orm(has_many)]
+  pub server_schedules: HasMany<super::server_schedule::Entity>,
+  #[sea_orm(has_many)]
   pub server_variables: HasMany<super::server_variable::Entity>,
   #[sea_orm(has_many, via = "server_group_access")]
   pub groups: HasMany<super::group::Entity>,

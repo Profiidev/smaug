@@ -13,33 +13,55 @@ import type {
   AuthConfigResponses,
   AuthenticateData,
   AvatarByIdResponses,
+  CancelUploadResponses,
   ChangeUserEmailData,
   ChangeUserEmailResponses,
   ClientOptions,
   CompleteSetupData,
+  CompleteUploadData,
+  CompleteUploadResponses,
   ConfirmEmailChangeData,
   ConfirmEmailChangeResponses,
   ConvertOidcUserData,
   ConvertOidcUserResponses,
+  CopyFileData,
+  CopyFileResponses,
+  CreateBackupData,
+  CreateBackupResponses,
   CreateEggData,
   CreateEggResponses,
+  CreateFileData,
+  CreateFileResponses,
+  CreateFolderData,
+  CreateFolderResponses,
   CreateGroupData,
   CreateGroupResponses,
   CreateNodeData,
   CreateNodeResponses,
+  CreateScheduleData,
+  CreateScheduleResponses,
+  CreateScheduleTaskData,
+  CreateScheduleTaskResponses,
   CreateServerData,
   CreateServerResponses,
   CreateUserData,
   CreateUserResponses,
+  DeleteBackupResponses,
   DeleteEggData,
   DeleteEggResponses,
+  DeleteFilesData,
+  DeleteFilesResponses,
   DeleteGroupData,
   DeleteGroupResponses,
   DeleteNodeData,
   DeleteNodeResponses,
+  DeleteScheduleResponses,
+  DeleteScheduleTaskResponses,
   DeleteServerResponses,
   DeleteUserData,
   DeleteUserResponses,
+  DownloadBackupResponses,
+  DownloadFileResponses,
   EditEggData,
   EditEggResponses,
   EditGroupData,
@@ -48,6 +70,7 @@ import type {
   EditUserResponses,
   EggInfoResponses,
   EggSourceResponses,
+  FileContentResponses,
   GetGeneralSettingsResponses,
   GetMailSettingsResponses,
   GetOidcSettingsResponses,
@@ -58,37 +81,54 @@ import type {
   InitOidcResponses,
   IsSetupResponses,
   KeyResponses,
+  ListBackupsResponses,
   ListEggsResponses,
+  ListFilesResponses,
   ListGroupsResponses,
   ListGroupsSimpleResponses,
   ListNodesResponses,
+  ListSchedulesResponses,
   ListServersResponses,
   ListUsersResponses,
   ListUsersSimpleResponses,
+  LockBackupData,
+  LockBackupResponses,
   MailActiveResponses,
   NodeInfoResponses,
   NodeTokenRegenerateResponses,
   ReinstallServerResponses,
+  RenameFileData,
+  RenameFileResponses,
   ResetPasswordData,
   ResetPasswordResponses,
   ResetUserAvatarData,
   ResetUserAvatarResponses,
   ResetUserPasswordData,
   ResetUserPasswordResponses,
+  RestoreBackupData,
+  RestoreBackupResponses,
+  RunScheduleResponses,
   SaveMailSettingsData,
   SaveMailSettingsResponses,
   SaveUserSettingsData,
   SaveUserSettingsResponses,
+  ScheduleInfoResponses,
   SendResetLinkData,
   SendResetLinkResponses,
+  ServerCommandData,
+  ServerCommandResponses,
   ServerInfoResponses,
   ServerOptionsResponses,
+  ServerPowerData,
+  ServerPowerResponses,
   SetServerInstalledData,
   SetServerInstalledResponses,
   SetServerSuspendedData,
   SetServerSuspendedResponses,
   StartEmailChangeData,
   StartEmailChangeResponses,
+  StartUploadData,
+  StartUploadResponses,
   TestMailResponses,
   TransferServerData,
   TransferServerResponses,
@@ -100,9 +140,15 @@ import type {
   UpdateNodeResponses,
   UpdatePasswordData,
   UpdatePasswordResponses,
+  UpdateScheduleData,
+  UpdateScheduleResponses,
+  UpdateScheduleTaskData,
+  UpdateScheduleTaskResponses,
   UpdateServerData,
   UpdateServerResponses,
-  UserInfoResponses
+  UploadChunkResponses,
+  UserInfoResponses,
+  WriteFileContentResponses
 } from './types.gen';
 
 export type RequestHandlerOptions = RequestHandlerOptions2 & {
@@ -2492,6 +2538,1466 @@ export function handleTransferServer(
   );
 }
 
+export type HandleServerPowerResponse = {
+  body: ServerPowerResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/power` operation.
+ */
+export function handleServerPower(
+  response?:
+    | HandleServerPowerResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        ServerPowerData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    ServerPowerData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/power`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleServerCommandResponse = {
+  body: ServerCommandResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/command` operation.
+ */
+export function handleServerCommand(
+  response?:
+    | HandleServerCommandResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        ServerCommandData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    ServerCommandData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/command`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleServerWsResponse = {
+  body: DefaultBodyType;
+  status?: number;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/ws` operation.
+ */
+export function handleServerWs(
+  response?:
+    | HandleServerWsResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/ws`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleListFilesResponse = {
+  body: ListFilesResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/files` operation.
+ */
+export function handleListFiles(
+  response?:
+    | HandleListFilesResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleFileContentResponse = {
+  body: FileContentResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/files/content` operation.
+ */
+export function handleFileContent(
+  response?:
+    | HandleFileContentResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/content`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleWriteFileContentResponse = {
+  body: WriteFileContentResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `PUT /api/servers/{uuid}/files/content` operation.
+ */
+export function handleWriteFileContent(
+  response?:
+    | HandleWriteFileContentResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        DefaultBodyType
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.put<
+    {
+      uuid: string;
+    },
+    DefaultBodyType
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/content`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateFolderResponse = {
+  body: CreateFolderResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/folder` operation.
+ */
+export function handleCreateFolder(
+  response?:
+    | HandleCreateFolderResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        CreateFolderData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    CreateFolderData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/folder`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateFileResponse = {
+  body: CreateFileResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/file` operation.
+ */
+export function handleCreateFile(
+  response?:
+    | HandleCreateFileResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        CreateFileData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    CreateFileData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/file`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleRenameFileResponse = {
+  body: RenameFileResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/rename` operation.
+ */
+export function handleRenameFile(
+  response?:
+    | HandleRenameFileResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        RenameFileData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    RenameFileData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/rename`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCopyFileResponse = {
+  body: CopyFileResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/copy` operation.
+ */
+export function handleCopyFile(
+  response?:
+    | HandleCopyFileResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        CopyFileData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    CopyFileData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/copy`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDeleteFilesResponse = {
+  body: DeleteFilesResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/delete` operation.
+ */
+export function handleDeleteFiles(
+  response?:
+    | HandleDeleteFilesResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        DeleteFilesData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    DeleteFilesData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/delete`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDownloadFileResponse = {
+  body: DownloadFileResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/files/download` operation.
+ */
+export function handleDownloadFile(
+  response?:
+    | HandleDownloadFileResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/download`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleStartUploadResponse = {
+  body: StartUploadResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/upload` operation.
+ */
+export function handleStartUpload(
+  response?:
+    | HandleStartUploadResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        StartUploadData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    StartUploadData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/upload`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCancelUploadResponse = {
+  body: CancelUploadResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `DELETE /api/servers/{uuid}/files/upload/{stream}` operation.
+ */
+export function handleCancelUpload(
+  response?:
+    | HandleCancelUploadResponse
+    | HttpResponseResolver<
+        {
+          stream: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<
+    {
+      stream: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/upload/:stream`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCompleteUploadResponse = {
+  body: CompleteUploadResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/files/upload/{stream}/complete` operation.
+ */
+export function handleCompleteUpload(
+  response?:
+    | HandleCompleteUploadResponse
+    | HttpResponseResolver<
+        {
+          stream: string;
+          uuid: string;
+        },
+        CompleteUploadData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      stream: string;
+      uuid: string;
+    },
+    CompleteUploadData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/upload/:stream/complete`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleUploadChunkResponse = {
+  body: UploadChunkResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `PUT /api/servers/{uuid}/files/upload/{stream}/{index}` operation.
+ */
+export function handleUploadChunk(
+  response?:
+    | HandleUploadChunkResponse
+    | HttpResponseResolver<
+        {
+          index: string;
+          stream: string;
+          uuid: string;
+        },
+        DefaultBodyType
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.put<
+    {
+      index: string;
+      stream: string;
+      uuid: string;
+    },
+    DefaultBodyType
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/files/upload/:stream/:index`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleListBackupsResponse = {
+  body: ListBackupsResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/backups` operation.
+ */
+export function handleListBackups(
+  response?:
+    | HandleListBackupsResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/backups`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateBackupResponse = {
+  body: CreateBackupResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/backups` operation.
+ */
+export function handleCreateBackup(
+  response?:
+    | HandleCreateBackupResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        CreateBackupData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    CreateBackupData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/backups`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDeleteBackupResponse = {
+  body: DeleteBackupResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `DELETE /api/servers/{uuid}/backups/{backup}` operation.
+ */
+export function handleDeleteBackup(
+  response?:
+    | HandleDeleteBackupResponse
+    | HttpResponseResolver<
+        {
+          backup: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<
+    {
+      backup: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/backups/:backup`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleLockBackupResponse = {
+  body: LockBackupResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/backups/{backup}/lock` operation.
+ */
+export function handleLockBackup(
+  response?:
+    | HandleLockBackupResponse
+    | HttpResponseResolver<
+        {
+          backup: string;
+          uuid: string;
+        },
+        LockBackupData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      backup: string;
+      uuid: string;
+    },
+    LockBackupData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/backups/:backup/lock`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleRestoreBackupResponse = {
+  body: RestoreBackupResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/backups/{backup}/restore` operation.
+ */
+export function handleRestoreBackup(
+  response?:
+    | HandleRestoreBackupResponse
+    | HttpResponseResolver<
+        {
+          backup: string;
+          uuid: string;
+        },
+        RestoreBackupData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      backup: string;
+      uuid: string;
+    },
+    RestoreBackupData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/backups/:backup/restore`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDownloadBackupResponse = {
+  body: DownloadBackupResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/backups/{backup}/download` operation.
+ */
+export function handleDownloadBackup(
+  response?:
+    | HandleDownloadBackupResponse
+    | HttpResponseResolver<
+        {
+          backup: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      backup: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/backups/:backup/download`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleListSchedulesResponse = {
+  body: ListSchedulesResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/schedules` operation.
+ */
+export function handleListSchedules(
+  response?:
+    | HandleListSchedulesResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateScheduleResponse = {
+  body: CreateScheduleResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/schedules` operation.
+ */
+export function handleCreateSchedule(
+  response?:
+    | HandleCreateScheduleResponse
+    | HttpResponseResolver<
+        {
+          uuid: string;
+        },
+        CreateScheduleData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      uuid: string;
+    },
+    CreateScheduleData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDeleteScheduleResponse = {
+  body: DeleteScheduleResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `DELETE /api/servers/{uuid}/schedules/{schedule}` operation.
+ */
+export function handleDeleteSchedule(
+  response?:
+    | HandleDeleteScheduleResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<
+    {
+      schedule: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleScheduleInfoResponse = {
+  body: ScheduleInfoResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `GET /api/servers/{uuid}/schedules/{schedule}` operation.
+ */
+export function handleScheduleInfo(
+  response?:
+    | HandleScheduleInfoResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.get<
+    {
+      schedule: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleUpdateScheduleResponse = {
+  body: UpdateScheduleResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `PATCH /api/servers/{uuid}/schedules/{schedule}` operation.
+ */
+export function handleUpdateSchedule(
+  response?:
+    | HandleUpdateScheduleResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          uuid: string;
+        },
+        UpdateScheduleData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.patch<
+    {
+      schedule: string;
+      uuid: string;
+    },
+    UpdateScheduleData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleRunScheduleResponse = {
+  body: RunScheduleResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/schedules/{schedule}/run` operation.
+ */
+export function handleRunSchedule(
+  response?:
+    | HandleRunScheduleResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      schedule: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule/run`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleCreateScheduleTaskResponse = {
+  body: CreateScheduleTaskResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `POST /api/servers/{uuid}/schedules/{schedule}/tasks` operation.
+ */
+export function handleCreateScheduleTask(
+  response?:
+    | HandleCreateScheduleTaskResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          uuid: string;
+        },
+        CreateScheduleTaskData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.post<
+    {
+      schedule: string;
+      uuid: string;
+    },
+    CreateScheduleTaskData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule/tasks`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleDeleteScheduleTaskResponse = {
+  body: DeleteScheduleTaskResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `DELETE /api/servers/{uuid}/schedules/{schedule}/tasks/{task}` operation.
+ */
+export function handleDeleteScheduleTask(
+  response?:
+    | HandleDeleteScheduleTaskResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          task: string;
+          uuid: string;
+        },
+        never
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.delete<
+    {
+      schedule: string;
+      task: string;
+      uuid: string;
+    },
+    never
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule/tasks/:task`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return new HttpResponse(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
+export type HandleUpdateScheduleTaskResponse = {
+  body: UpdateScheduleTaskResponses[200];
+  status?: 200;
+};
+
+/**
+ * Handler for the `PATCH /api/servers/{uuid}/schedules/{schedule}/tasks/{task}` operation.
+ */
+export function handleUpdateScheduleTask(
+  response?:
+    | HandleUpdateScheduleTaskResponse
+    | HttpResponseResolver<
+        {
+          schedule: string;
+          task: string;
+          uuid: string;
+        },
+        UpdateScheduleTaskData['body']
+      >,
+  options?: RequestHandlerOptions
+): HttpHandler {
+  return http.patch<
+    {
+      schedule: string;
+      task: string;
+      uuid: string;
+    },
+    UpdateScheduleTaskData['body']
+  >(
+    `${options?.baseUrl ?? '*'}/api/servers/:uuid/schedules/:schedule/tasks/:task`,
+    (info) => {
+      if (typeof response === 'function') {
+        return response(info);
+      }
+      const body = response?.body;
+      if (body !== undefined) {
+        return HttpResponse.json(body, { status: response?.status ?? 200 });
+      }
+      if (options?.responseFallback === 'passthrough') {
+        return;
+      }
+      return new Response('Not Implemented', {
+        status: 501,
+        statusText: 'Not Implemented'
+      });
+    },
+    options
+  );
+}
+
 export type MswHandlerFactories = {
   /**
    * Handler for the `GET /api/setup` operation.
@@ -2745,6 +4251,130 @@ export type MswHandlerFactories = {
    * Handler for the `POST /api/servers/{uuid}/transfer` operation.
    */
   transferServer: typeof handleTransferServer;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/power` operation.
+   */
+  serverPower: typeof handleServerPower;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/command` operation.
+   */
+  serverCommand: typeof handleServerCommand;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/ws` operation.
+   */
+  serverWs: typeof handleServerWs;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/files` operation.
+   */
+  listFiles: typeof handleListFiles;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/files/content` operation.
+   */
+  fileContent: typeof handleFileContent;
+  /**
+   * Handler for the `PUT /api/servers/{uuid}/files/content` operation.
+   */
+  writeFileContent: typeof handleWriteFileContent;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/folder` operation.
+   */
+  createFolder: typeof handleCreateFolder;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/file` operation.
+   */
+  createFile: typeof handleCreateFile;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/rename` operation.
+   */
+  renameFile: typeof handleRenameFile;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/copy` operation.
+   */
+  copyFile: typeof handleCopyFile;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/delete` operation.
+   */
+  deleteFiles: typeof handleDeleteFiles;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/files/download` operation.
+   */
+  downloadFile: typeof handleDownloadFile;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/upload` operation.
+   */
+  startUpload: typeof handleStartUpload;
+  /**
+   * Handler for the `DELETE /api/servers/{uuid}/files/upload/{stream}` operation.
+   */
+  cancelUpload: typeof handleCancelUpload;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/files/upload/{stream}/complete` operation.
+   */
+  completeUpload: typeof handleCompleteUpload;
+  /**
+   * Handler for the `PUT /api/servers/{uuid}/files/upload/{stream}/{index}` operation.
+   */
+  uploadChunk: typeof handleUploadChunk;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/backups` operation.
+   */
+  listBackups: typeof handleListBackups;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/backups` operation.
+   */
+  createBackup: typeof handleCreateBackup;
+  /**
+   * Handler for the `DELETE /api/servers/{uuid}/backups/{backup}` operation.
+   */
+  deleteBackup: typeof handleDeleteBackup;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/backups/{backup}/lock` operation.
+   */
+  lockBackup: typeof handleLockBackup;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/backups/{backup}/restore` operation.
+   */
+  restoreBackup: typeof handleRestoreBackup;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/backups/{backup}/download` operation.
+   */
+  downloadBackup: typeof handleDownloadBackup;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/schedules` operation.
+   */
+  listSchedules: typeof handleListSchedules;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/schedules` operation.
+   */
+  createSchedule: typeof handleCreateSchedule;
+  /**
+   * Handler for the `DELETE /api/servers/{uuid}/schedules/{schedule}` operation.
+   */
+  deleteSchedule: typeof handleDeleteSchedule;
+  /**
+   * Handler for the `GET /api/servers/{uuid}/schedules/{schedule}` operation.
+   */
+  scheduleInfo: typeof handleScheduleInfo;
+  /**
+   * Handler for the `PATCH /api/servers/{uuid}/schedules/{schedule}` operation.
+   */
+  updateSchedule: typeof handleUpdateSchedule;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/schedules/{schedule}/run` operation.
+   */
+  runSchedule: typeof handleRunSchedule;
+  /**
+   * Handler for the `POST /api/servers/{uuid}/schedules/{schedule}/tasks` operation.
+   */
+  createScheduleTask: typeof handleCreateScheduleTask;
+  /**
+   * Handler for the `DELETE /api/servers/{uuid}/schedules/{schedule}/tasks/{task}` operation.
+   */
+  deleteScheduleTask: typeof handleDeleteScheduleTask;
+  /**
+   * Handler for the `PATCH /api/servers/{uuid}/schedules/{schedule}/tasks/{task}` operation.
+   */
+  updateScheduleTask: typeof handleUpdateScheduleTask;
 };
 
 export type CreateMswHandlersResult = {
@@ -2831,7 +4461,38 @@ export function createMswHandlers(
     reinstallServer: wrap(handleReinstallServer),
     setServerInstalled: wrap(handleSetServerInstalled),
     setServerSuspended: wrap(handleSetServerSuspended),
-    transferServer: wrap(handleTransferServer)
+    transferServer: wrap(handleTransferServer),
+    serverPower: wrap(handleServerPower),
+    serverCommand: wrap(handleServerCommand),
+    serverWs: wrap(handleServerWs),
+    listFiles: wrap(handleListFiles),
+    fileContent: wrap(handleFileContent),
+    writeFileContent: wrap(handleWriteFileContent),
+    createFolder: wrap(handleCreateFolder),
+    createFile: wrap(handleCreateFile),
+    renameFile: wrap(handleRenameFile),
+    copyFile: wrap(handleCopyFile),
+    deleteFiles: wrap(handleDeleteFiles),
+    downloadFile: wrap(handleDownloadFile),
+    startUpload: wrap(handleStartUpload),
+    cancelUpload: wrap(handleCancelUpload),
+    completeUpload: wrap(handleCompleteUpload),
+    uploadChunk: wrap(handleUploadChunk),
+    listBackups: wrap(handleListBackups),
+    createBackup: wrap(handleCreateBackup),
+    deleteBackup: wrap(handleDeleteBackup),
+    lockBackup: wrap(handleLockBackup),
+    restoreBackup: wrap(handleRestoreBackup),
+    downloadBackup: wrap(handleDownloadBackup),
+    listSchedules: wrap(handleListSchedules),
+    createSchedule: wrap(handleCreateSchedule),
+    deleteSchedule: wrap(handleDeleteSchedule),
+    scheduleInfo: wrap(handleScheduleInfo),
+    updateSchedule: wrap(handleUpdateSchedule),
+    runSchedule: wrap(handleRunSchedule),
+    createScheduleTask: wrap(handleCreateScheduleTask),
+    deleteScheduleTask: wrap(handleDeleteScheduleTask),
+    updateScheduleTask: wrap(handleUpdateScheduleTask)
   };
   const all: CreateMswHandlersResult['all'] = (options = {}) => {
     type OverrideValue<R> = R | [response?: R, options?: RequestHandlerOptions];
@@ -2843,7 +4504,30 @@ export function createMswHandlers(
     }
     const overrides = options.pick ?? {};
     return [
+      invoke(pick.completeUpload, overrides.completeUpload),
+      invoke(pick.uploadChunk, overrides.uploadChunk),
+      invoke(pick.deleteScheduleTask, overrides.deleteScheduleTask),
+      invoke(pick.updateScheduleTask, overrides.updateScheduleTask),
+      invoke(pick.cancelUpload, overrides.cancelUpload),
+      invoke(pick.lockBackup, overrides.lockBackup),
+      invoke(pick.restoreBackup, overrides.restoreBackup),
+      invoke(pick.downloadBackup, overrides.downloadBackup),
+      invoke(pick.runSchedule, overrides.runSchedule),
+      invoke(pick.createScheduleTask, overrides.createScheduleTask),
       invoke(pick.avatarById, overrides.avatarById),
+      invoke(pick.fileContent, overrides.fileContent),
+      invoke(pick.writeFileContent, overrides.writeFileContent),
+      invoke(pick.createFolder, overrides.createFolder),
+      invoke(pick.createFile, overrides.createFile),
+      invoke(pick.renameFile, overrides.renameFile),
+      invoke(pick.copyFile, overrides.copyFile),
+      invoke(pick.deleteFiles, overrides.deleteFiles),
+      invoke(pick.downloadFile, overrides.downloadFile),
+      invoke(pick.startUpload, overrides.startUpload),
+      invoke(pick.deleteBackup, overrides.deleteBackup),
+      invoke(pick.deleteSchedule, overrides.deleteSchedule),
+      invoke(pick.scheduleInfo, overrides.scheduleInfo),
+      invoke(pick.updateSchedule, overrides.updateSchedule),
       invoke(pick.updatePassword, overrides.updatePassword),
       invoke(pick.startEmailChange, overrides.startEmailChange),
       invoke(pick.updateAccount, overrides.updateAccount),
@@ -2864,6 +4548,14 @@ export function createMswHandlers(
       invoke(pick.setServerInstalled, overrides.setServerInstalled),
       invoke(pick.setServerSuspended, overrides.setServerSuspended),
       invoke(pick.transferServer, overrides.transferServer),
+      invoke(pick.serverPower, overrides.serverPower),
+      invoke(pick.serverCommand, overrides.serverCommand),
+      invoke(pick.serverWs, overrides.serverWs),
+      invoke(pick.listFiles, overrides.listFiles),
+      invoke(pick.listBackups, overrides.listBackups),
+      invoke(pick.createBackup, overrides.createBackup),
+      invoke(pick.listSchedules, overrides.listSchedules),
+      invoke(pick.createSchedule, overrides.createSchedule),
       invoke(pick.getOidcSettings, overrides.getOidcSettings),
       invoke(pick.initOidc, overrides.initOidc),
       invoke(pick.key, overrides.key),

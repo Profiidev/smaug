@@ -4,14 +4,16 @@
   interface Props {
     text?: string | null;
     class?: string;
+    /** Tooltip, defaults to `text`. */
+    title?: string;
   }
 
-  let { text, class: className }: Props = $props();
+  let { text, class: className, title }: Props = $props();
 </script>
 
 <span
   class={cn('text-muted-foreground ml-4', className)}
-  title={text ?? undefined}
+  title={title ?? text ?? undefined}
 >
   {text ?? ''}
 </span>

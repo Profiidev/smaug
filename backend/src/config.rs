@@ -8,6 +8,7 @@ use centaurus::{
   },
   db::config::DBConfig,
   mail::MailSettings,
+  storage::StorageConfig,
 };
 use figment::{
   Figment,
@@ -39,6 +40,9 @@ pub struct Config {
   #[oidc]
   #[serde(flatten)]
   pub oidc: UserSettings,
+  /// Backups, `STORAGE_PATH` or `S3_*`.
+  #[serde(flatten)]
+  pub storage: StorageConfig,
 
   pub db_url: String,
   pub admin_group: String,
@@ -55,6 +59,10 @@ impl Default for Config {
       site: SiteConfig::default(),
       mail: MailSettings::default(),
       oidc: UserSettings::default(),
+      storage: StorageConfig {
+        storage_path: "data/storage".to_string(),
+        ..Default::default()
+      },
       db_url: "".to_string(),
       admin_group: "Admin".to_string(),
       allow_insecure_wings: cfg!(debug_assertions),
@@ -84,6 +92,8 @@ impl Config {
       panic!("Database URL is not set");
     }
 
+    config.storage.validate();
+
     if config.db_url.starts_with("sqlite") {
       config.db.validate_sqlite();
     }
@@ -104,6 +114,7 @@ mod test {
     assert_eq!(config.metrics.metrics_name, "smaug");
     assert_eq!(config.auth.auth_pepper, "__smaug_PEPPER__");
     assert_eq!(config.auth.auth_jwt_expiration, 60 * 60 * 24);
+    assert_eq!(config.storage.storage_path, "data/storage");
   }
 
   #[test]

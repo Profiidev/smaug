@@ -49,7 +49,13 @@
   import VariablesFields from '../../VariablesFields.svelte';
   import ResourcesFields from '../../ResourcesFields.svelte';
   import PermissionsFields from '../../PermissionsFields.svelte';
-  import StatusTab from '../StatusTab.svelte';
+  import { formatAllocation } from '../../format';
+  import ActionsTab from '../ActionsTab.svelte';
+  import BackupsTab from '../BackupsTab.svelte';
+  import ConsoleTab from '../ConsoleTab.svelte';
+  import FilesTab from '../FilesTab.svelte';
+  import SchedulesTab from '../SchedulesTab.svelte';
+  import { ServerLive } from '../live.svelte';
 
   const { data } = $props();
 
@@ -66,7 +72,7 @@
 
   let admin = $derived(server?.access === 'admin');
   let readonly = $derived(
-    server?.access !== 'admin' && server?.access !== 'write'
+    !(admin || (server?.access === 'write' && !server?.suspended))
   );
   // Non-admins cannot load the option lists; the server's own references keep the selects filled.
   let fieldOptions = $derived(
@@ -75,13 +81,44 @@
         ? optionsFromInfo(server)
         : { eggs: [], groups: [], nodes: [], users: [] })
   );
-  let canDelete = $derived(
-    admin && !!server && availableActions(server.status).delete
-  );
   let sections = $derived(SECTIONS.filter((s) => s !== 'permissions' || admin));
   // The route matcher guarantees a valid tab; the component is reused across
   // tab URLs, so unsaved edits survive switching.
-  let tab = $derived(page.params.tab ?? 'status');
+  let tab = $derived(page.params.tab ?? 'console');
+  let settingsTab = $derived((SECTIONS as readonly string[]).includes(tab));
+  let hasBackups = $derived((server?.backup_limit ?? 0) > 0);
+  let runtimeTabs = $derived([
+    { id: 'console', title: 'Console' },
+    { id: 'files', title: 'Files' },
+    ...(hasBackups ? [{ id: 'backups', title: 'Backups' }] : []),
+    { id: 'schedules', title: 'Schedules' }
+  ]);
+
+  // One socket per server, open only while a tab shows live data.
+  // Via a string derived: a reload hands a new `data` with the same uuid,
+  // which must not replace the socket.
+  let uuid = $derived(data.uuid);
+  let live = $derived(new ServerLive(uuid));
+  let liveTab = $derived(['console', 'backups', 'schedules'].includes(tab));
+  $effect(() => {
+    if (!liveTab) return;
+    // teardown runs after `live` already is the next server's
+    const l = live;
+    l.connect();
+    return () => l.disconnect();
+  });
+  // The pushed status is newer than the last load until the reload lands.
+  let shown = $derived(
+    server && live.connected && live.status
+      ? { ...server, status: live.status }
+      : server
+  );
+  let canDelete = $derived(
+    admin && !!shown && availableActions(shown.status).delete
+  );
+  let address = $derived(
+    server?.allocations[0] ? formatAllocation(server.allocations[0]) : undefined
+  );
 
   const setTab = (value: string, replaceState = false) => {
     if (value !== tab) {
@@ -93,9 +130,13 @@
     }
   };
 
-  // Permissions is admin-only; anyone else lands on Status.
+  // Permissions is admin-only, Backups needs a backup limit; else Console.
   $effect(() => {
-    if (server && !admin && tab === 'permissions') setTab('status', true);
+    if (
+      server &&
+      ((!admin && tab === 'permissions') || (!hasBackups && tab === 'backups'))
+    )
+      setTab('console', true);
   });
 
   $effect(() => {
@@ -210,11 +251,14 @@
         {server.name}
       {/if}
     </h3>
-    {#if server}
-      <StatusBadge status={server.status} />
+    {#if shown}
+      <StatusBadge status={shown.status} />
     {/if}
+    <span class="text-muted-foreground ml-auto font-mono text-sm">
+      {address}
+    </span>
     <Button
-      class="ml-auto cursor-pointer"
+      class="cursor-pointer"
       onclick={() => (deleteOpen = true)}
       variant="destructive"
       disabled={!canDelete}
@@ -224,45 +268,62 @@
     </Button>
   </div>
   <Separator class="my-4" />
-  <BaseForm
+  <!-- Settings live in the form; runtime tabs render after it so their
+       inputs never submit the settings. -->
+  <Tabs.Root
+    bind:value={() => tab, setTab}
     class="flex min-h-0 grow flex-col gap-4"
-    schema={serverSettings}
-    {onsubmit}
-    bind:this={form}
-    bind:isLoading={saving}
   >
-    {#snippet children({ props })}
-      {@const values = fromStore(props.formData.form)}
-      {@const disabled = props.disabled || readonly}
-      <ApplyErrors formData={props.formData} errors={fieldErrors} />
-      <div class="mx-auto flex min-h-0 w-full max-w-4xl grow flex-col gap-4">
-        {#if server && readonly}
-          <Alert.Root>
-            <Info />
-            <Alert.Title>You have view-only access</Alert.Title>
-            <Alert.Description>
-              Fields are read-only. Ask an administrator for write access to
-              make changes.
-            </Alert.Description>
-          </Alert.Root>
-        {:else if server && !admin}
-          <Alert.Root>
-            <Info />
-            <Alert.Title>Some settings need an administrator</Alert.Title>
-            <Alert.Description>
-              You can change the name, startup command and variables. Owner,
-              egg, allocations, image and resources are read-only.
-            </Alert.Description>
-          </Alert.Root>
-        {/if}
-        <Tabs.Root
-          bind:value={() => tab, setTab}
-          class="flex min-h-0 grow flex-col gap-4"
+    <BaseForm
+      class={`flex min-h-0 flex-col gap-4 ${settingsTab ? 'grow' : ''}`}
+      schema={serverSettings}
+      {onsubmit}
+      bind:this={form}
+      bind:isLoading={saving}
+    >
+      {#snippet children({ props })}
+        {@const values = fromStore(props.formData.form)}
+        {@const disabled = props.disabled || readonly}
+        <ApplyErrors formData={props.formData} errors={fieldErrors} />
+        <div
+          class={[
+            'mx-auto flex min-h-0 w-full max-w-7xl flex-col gap-4',
+            settingsTab && 'grow'
+          ]}
         >
+          {#if settingsTab && server?.suspended && readonly}
+            <Alert.Root>
+              <Info />
+              <Alert.Title>The server is suspended</Alert.Title>
+              <Alert.Description>
+                Only an admin can change it until it is unsuspended.
+              </Alert.Description>
+            </Alert.Root>
+          {:else if settingsTab && server && readonly}
+            <Alert.Root>
+              <Info />
+              <Alert.Title>You have view-only access</Alert.Title>
+              <Alert.Description>
+                Fields are read-only. Ask an administrator for write access to
+                make changes.
+              </Alert.Description>
+            </Alert.Root>
+          {:else if settingsTab && server && !admin}
+            <Alert.Root>
+              <Info />
+              <Alert.Title>Some settings need an administrator</Alert.Title>
+              <Alert.Description>
+                You can change the name, startup command and variables. Owner,
+                egg, allocations, image and resources are read-only.
+              </Alert.Description>
+            </Alert.Root>
+          {/if}
           <Tabs.List class="w-full shrink-0 overflow-x-auto overflow-y-hidden">
-            <Tabs.Trigger value="status" class="cursor-pointer">
-              Status
-            </Tabs.Trigger>
+            {#each runtimeTabs as t (t.id)}
+              <Tabs.Trigger value={t.id} class="cursor-pointer">
+                {t.title}
+              </Tabs.Trigger>
+            {/each}
             {#each sections as section (section)}
               <Tabs.Trigger value={section} class="cursor-pointer">
                 {SECTION_TITLES[section]}
@@ -272,29 +333,10 @@
                 />
               </Tabs.Trigger>
             {/each}
+            <Tabs.Trigger value="actions" class="cursor-pointer">
+              Actions
+            </Tabs.Trigger>
           </Tabs.List>
-          <Tabs.Content
-            value="status"
-            class="min-h-0 overflow-y-auto data-[state=inactive]:hidden"
-          >
-            {#if server}
-              <StatusTab
-                {server}
-                nodes={options?.nodes ?? []}
-                ondelete={() => (deleteOpen = true)}
-              />
-            {:else}
-              <Card.Root>
-                <Card.Header>
-                  <Card.Title>Status</Card.Title>
-                  <Skeleton class="h-4 w-64 max-w-full" />
-                </Card.Header>
-                <Card.Content>
-                  <Skeleton class="h-6 w-24" />
-                </Card.Content>
-              </Card.Root>
-            {/if}
-          </Tabs.Content>
           {#each sections as section (section)}
             <Tabs.Content
               value={section}
@@ -352,22 +394,56 @@
               </Card.Root>
             </Tabs.Content>
           {/each}
-        </Tabs.Root>
+        </div>
+        <!-- Hidden, not unmounted: remounting would reset unsaved edits. -->
+        <div class={settingsTab ? 'contents' : 'hidden'}>
+          <SaveBar
+            formData={props.formData}
+            {saved}
+            isLoading={saving}
+            isError={saveFailed}
+            {readonly}
+            bind:dirty
+          />
+        </div>
+      {/snippet}
+      {#snippet footer()}{/snippet}
+    </BaseForm>
+    {#if !settingsTab}
+      <div class="mx-auto min-h-0 w-full max-w-7xl grow overflow-y-auto">
+        {#if shown}
+          <!-- Only the open tab mounts, so hidden tabs load nothing. -->
+          <Tabs.Content value={tab}>
+            {#if tab === 'console'}
+              <ConsoleTab server={shown} {live} />
+            {:else if tab === 'files'}
+              <FilesTab server={shown} {live} />
+            {:else if tab === 'backups'}
+              {#if hasBackups}<BackupsTab server={shown} {live} />{/if}
+            {:else if tab === 'schedules'}
+              <SchedulesTab server={shown} {live} />
+            {:else}
+              <ActionsTab
+                server={shown}
+                nodes={options?.nodes ?? []}
+                ondelete={() => (deleteOpen = true)}
+              />
+            {/if}
+          </Tabs.Content>
+        {:else}
+          <Card.Root>
+            <Card.Header>
+              <Skeleton class="h-5 w-32" />
+              <Skeleton class="h-4 w-64 max-w-full" />
+            </Card.Header>
+            <Card.Content>
+              <Skeleton class="h-40 w-full" />
+            </Card.Content>
+          </Card.Root>
+        {/if}
       </div>
-      <!-- Hidden, not unmounted: remounting would reset unsaved edits. -->
-      <div class={tab === 'status' ? 'hidden' : 'contents'}>
-        <SaveBar
-          formData={props.formData}
-          {saved}
-          isLoading={saving}
-          isError={saveFailed}
-          {readonly}
-          bind:dirty
-        />
-      </div>
-    {/snippet}
-    {#snippet footer()}{/snippet}
-  </BaseForm>
+    {/if}
+  </Tabs.Root>
 </div>
 
 <FormDialog

@@ -13,12 +13,18 @@ use centaurus::{
   },
   db::init::init_db,
   logging::init_logging,
+  storage::FileStorage,
   version_header,
 };
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, spawn};
 use tracing::info;
 
-use crate::{config::Config, utils::UpdateMessage};
+use crate::{
+  config::Config,
+  db::DBTrait,
+  servers::{backups::Backups, schedules::Scheduler},
+  utils::UpdateMessage,
+};
 
 mod config;
 mod db;
@@ -100,9 +106,26 @@ async fn state(mut router: ApiRouter, config: Config) -> ApiRouter {
   router = endpoints::user::state(router);
   router = auth::state(router, &config, &db).await;
   router = mail::state(router, &db, &config).await;
-  router = nodes::state(router, &db, updater.clone(), config.allow_insecure_wings).await;
+  let wings = nodes::state(&db, updater.clone(), config.allow_insecure_wings).await;
+  let storage = FileStorage::init(&config.storage)
+    .await
+    .expect("Failed to initialize file storage");
+  db.backup()
+    .reset_unfinished()
+    .await
+    .expect("Failed to reset unfinished backups");
+  let scheduler = Scheduler::new(Backups {
+    db: db.clone(),
+    wings: wings.clone(),
+    storage: storage.clone(),
+    updater: updater.clone(),
+  });
+  spawn(scheduler.clone().run());
 
   router
+    .layer(Extension(wings))
+    .layer(Extension(storage))
+    .layer(Extension(scheduler))
     .layer(Extension(db))
     .layer(Extension(state))
     .layer(Extension(updater))

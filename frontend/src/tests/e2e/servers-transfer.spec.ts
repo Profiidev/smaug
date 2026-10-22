@@ -18,7 +18,7 @@ test.describe('server transfer and delete', () => {
         return ok();
       })
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await action(page, 'Transfer…').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Transfer Survival SMP')).toBeVisible();
@@ -85,7 +85,7 @@ test.describe('server transfer and delete', () => {
               : new HttpResponse(null, { status })) as never
         )
       );
-      await gotoReady(page, '/servers/srv-survival/status');
+      await gotoReady(page, '/servers/srv-survival/actions');
       await action(page, 'Transfer…').click();
       const dialog = page.getByRole('dialog');
       await combo(dialog, 'Target node').click();
@@ -112,7 +112,7 @@ test.describe('server transfer and delete', () => {
           }) as never
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await expect(action(page, 'Reinstall')).toBeEnabled();
     await expect(action(page, 'Transfer…')).toBeDisabled();
   });
@@ -129,7 +129,7 @@ test.describe('server transfer and delete', () => {
           return ok();
         })
       );
-      await gotoReady(page, '/servers/srv-survival/status');
+      await gotoReady(page, '/servers/srv-survival/actions');
       await action(page, button).click();
       const dialog = page.getByRole('dialog');
       await expect(
@@ -151,7 +151,7 @@ test.describe('server transfer and delete', () => {
         () => new HttpResponse(null, { status: 500 }) as never
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await action(page, 'Delete server').click();
     await page
       .getByRole('dialog')
@@ -159,6 +159,6 @@ test.describe('server transfer and delete', () => {
       .click();
 
     await expect(page.getByText('Failed to delete server')).toBeVisible();
-    await expect(page).toHaveURL(/\/servers\/srv-survival\/status$/);
+    await expect(page).toHaveURL(/\/servers\/srv-survival\/actions$/);
   });
 });

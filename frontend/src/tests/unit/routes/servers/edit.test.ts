@@ -13,6 +13,7 @@ import { type ServerInfo, deleteServer, updateServer } from '$lib/client';
 import EditPage from '$routes/servers/[uuid]/[tab=servertab]/+page.svelte';
 import { fromServerInfo, toUpdateBody } from '$routes/servers/schema.svelte';
 import { page } from '$test_helpers/page-state.svelte';
+import { FakeWebSocket, stubWebSocket } from '$test_helpers/fake-websocket';
 import { options, serverInfo } from './fixtures';
 
 vi.mock('$app/state', async () => import('$test_helpers/page-state.svelte'));
@@ -33,11 +34,15 @@ vi.mock('$lib/client', async (orig) => ({
   updateServer: vi.fn()
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
   vi.spyOn(sonner, 'error').mockImplementation(() => 0);
-  page.params = { tab: 'status', uuid: 'srv-1' };
+  page.params = { tab: 'actions', uuid: 'srv-1' };
+  stubWebSocket();
   // Navigating to a tab URL updates the route param like SvelteKit does.
   vi.mocked(goto).mockImplementation(async (url) => {
     const [, root, uuid, tab] = String(url).split('/');
@@ -115,7 +120,16 @@ describe('server edit page loading', () => {
     expect(document.querySelector('[aria-busy=true]')).toBeNull();
     expect(
       screen.getAllByRole('tab').map((t) => t.textContent?.trim())
-    ).toEqual(['Status', 'General', 'Startup', 'Variables', 'Resources']);
+    ).toEqual([
+      'Console',
+      'Files',
+      'Schedules',
+      'General',
+      'Startup',
+      'Variables',
+      'Resources',
+      'Actions'
+    ]);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Save Changes/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
@@ -145,14 +159,18 @@ describe('server edit page access', () => {
     expect(
       screen.getAllByRole('tab').map((t) => t.textContent?.trim())
     ).toEqual([
-      'Status',
+      'Console',
+      'Files',
+      'Backups',
+      'Schedules',
       'General',
       'Startup',
       'Variables',
       'Resources',
-      'Permissions'
+      'Permissions',
+      'Actions'
     ]);
-    expect(screen.getByRole('tab', { name: 'Status' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Actions' })).toHaveAttribute(
       'data-state',
       'active'
     );
@@ -189,7 +207,25 @@ describe('server edit page access', () => {
     );
   });
 
-  it('hides the save bar on the Status tab only', async () => {
+  it('shows the address in the header', async () => {
+    page.params = { tab: 'general', uuid: 'srv-1' };
+    await mount();
+    expect(screen.getByText('10.0.0.5:25565')).toHaveClass('font-mono');
+  });
+
+  it.each(['actions', 'console', 'schedules'])(
+    'hides the save bar on the %s tab',
+    async (tab) => {
+      page.params = { tab, uuid: 'srv-1' };
+      await mount();
+      expect(
+        screen.getByRole('button', { name: 'Save Changes' }).parentElement!
+          .parentElement!
+      ).toHaveClass('hidden');
+    }
+  );
+
+  it('shows the save bar on settings tabs', async () => {
     await mount();
     const bar = () =>
       screen.getByRole('button', { name: 'Save Changes' }).parentElement!
@@ -200,6 +236,7 @@ describe('server edit page access', () => {
   });
 
   it('write: limited alert, no Permissions tab, admin fields locked', async () => {
+    page.params = { tab: 'general', uuid: 'srv-1' };
     await mount(asAccess('write'));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Some settings need an administrator'
@@ -226,11 +263,14 @@ describe('server edit page access', () => {
     ]);
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    await openTab('Actions');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reinstall' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Transfer…' })).toBeDisabled();
   });
 
   it('read: view-only alert and everything disabled', async () => {
+    page.params = { tab: 'general', uuid: 'srv-1' };
     await mount(asAccess('read'));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'You have view-only access'
@@ -243,7 +283,20 @@ describe('server edit page access', () => {
     }
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    await openTab('Actions');
     expect(screen.getByRole('button', { name: 'Reinstall' })).toBeDisabled();
+  });
+
+  it('write on a suspended server: suspended alert and everything disabled', async () => {
+    page.params = { tab: 'general', uuid: 'srv-1' };
+    await mount(info({ access: 'write', grants: null, suspended: true }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The server is suspended'
+    );
+    for (const label of ['Name', 'Command', 'Server Jar File']) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    }
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
   });
 
   it('disables Delete while installing', async () => {
@@ -577,6 +630,62 @@ describe('server edit page delete', () => {
   });
 });
 
+describe('server edit page live socket', () => {
+  it.each(['console', 'backups', 'schedules'])(
+    'connects on %s and closes on settings tabs',
+    async (param) => {
+      page.params = { tab: param, uuid: 'srv-1' };
+      await mount();
+      expect(FakeWebSocket.all).toHaveLength(1);
+      expect(FakeWebSocket.last!.url).toMatch(/\/api\/servers\/srv-1\/ws$/);
+      await openTab('General');
+      expect(FakeWebSocket.last!.closed).toBe(true);
+    }
+  );
+
+  it.each(['general', 'actions', 'files'])(
+    'stays closed on %s',
+    async (param) => {
+      page.params = { tab: param, uuid: 'srv-1' };
+      await mount();
+      expect(FakeWebSocket.all).toHaveLength(0);
+    }
+  );
+
+  it('keeps the socket when the server info reloads', async () => {
+    page.params = { tab: 'console', uuid: 'srv-1' };
+    const { rerender } = render(EditPage, {
+      props: { data: pageData(info()) } as never
+    });
+    await tick(50);
+    await rerender({ data: pageData(info({ name: 'other' })) } as never);
+    await tick(50);
+    expect(FakeWebSocket.all).toHaveLength(1);
+    expect(FakeWebSocket.last!.closed).toBe(false);
+  });
+
+  it('keeps one socket across live tabs', async () => {
+    page.params = { tab: 'console', uuid: 'srv-1' };
+    await mount();
+    await openTab('Schedules');
+    expect(FakeWebSocket.all).toHaveLength(1);
+    expect(FakeWebSocket.last!.closed).toBe(false);
+  });
+
+  it('shows the pushed status in the header while connected', async () => {
+    page.params = { tab: 'console', uuid: 'srv-1' };
+    await mount();
+    FakeWebSocket.last!.open();
+    FakeWebSocket.last!.send({ status: 'running', type: 'state' });
+    await tick();
+    expect(screen.getAllByText('Running').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Restart' })).toBeEnabled();
+    FakeWebSocket.last!.close();
+    await tick();
+    expect(screen.queryByText('Running')).not.toBeInTheDocument();
+  });
+});
+
 describe('server edit page tabs', () => {
   const tab = (name: string) =>
     screen.getByRole('tab', { name: new RegExp(`^${name}`) });
@@ -584,12 +693,15 @@ describe('server edit page tabs', () => {
     screen.getAllByRole('tab').filter((t) => t.dataset.state === 'active');
 
   it.each([
-    ['status', 'Status'],
+    ['console', 'Console'],
+    ['backups', 'Backups'],
+    ['schedules', 'Schedules'],
     ['general', 'General'],
     ['startup', 'Startup'],
     ['variables', 'Variables'],
     ['resources', 'Resources'],
-    ['permissions', 'Permissions']
+    ['permissions', 'Permissions'],
+    ['actions', 'Actions']
   ])('opens the /%s param as %s', async (param, name) => {
     page.params = { tab: param, uuid: 'srv-1' };
     await mount();
@@ -598,10 +710,10 @@ describe('server edit page tabs', () => {
     expect(goto).not.toHaveBeenCalled();
   });
 
-  it('defaults to Status without a tab param', async () => {
+  it('defaults to Console without a tab param', async () => {
     page.params = { uuid: 'srv-1' };
     await mount();
-    expect(tab('Status')).toHaveAttribute('data-state', 'active');
+    expect(tab('Console')).toHaveAttribute('data-state', 'active');
   });
 
   it('navigates to the tab URL keeping focus and scroll', async () => {
@@ -617,7 +729,7 @@ describe('server edit page tabs', () => {
 
   it('does not navigate when clicking the open tab', async () => {
     await mount();
-    await openTab('Status');
+    await openTab('Actions');
     expect(goto).not.toHaveBeenCalled();
   });
 
@@ -628,7 +740,7 @@ describe('server edit page tabs', () => {
       target: { value: 'Draft' }
     });
     expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
-    await openTab('Status');
+    await openTab('Console');
     await openTab('Resources');
     await openTab('General');
     expect(screen.getByLabelText('Name')).toHaveValue('Draft');
@@ -636,20 +748,35 @@ describe('server edit page tabs', () => {
   });
 
   it.each(['write', 'read'] as const)(
-    'replaces /permissions with /status for %s access',
+    'replaces /permissions with /console for %s access',
     async (access) => {
       page.params = { tab: 'permissions', uuid: 'srv-1' };
       await mount(asAccess(access));
       await vi.waitFor(() =>
-        expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/status', {
+        expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/console', {
           keepFocus: true,
           noScroll: true,
           replaceState: true
         })
       );
-      expect(tab('Status')).toHaveAttribute('data-state', 'active');
+      expect(tab('Console')).toHaveAttribute('data-state', 'active');
     }
   );
+
+  it('hides Backups and leaves it without a backup limit', async () => {
+    page.params = { tab: 'backups', uuid: 'srv-1' };
+    await mount(info({ backup_limit: 0 }));
+    await vi.waitFor(() =>
+      expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/console', {
+        keepFocus: true,
+        noScroll: true,
+        replaceState: true
+      })
+    );
+    expect(
+      screen.queryByRole('tab', { name: 'Backups' })
+    ).not.toBeInTheDocument();
+  });
 
   it('does not redirect /permissions before the server loads', async () => {
     page.params = { tab: 'permissions', uuid: 'srv-1' };

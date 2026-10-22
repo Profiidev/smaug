@@ -9,15 +9,15 @@ use bollard::{
   container::LogOutput,
   errors::Error as DockerError,
   models::{
-    ContainerCreateBody, HostConfig, HostConfigLogConfig, Mount, MountTypeEnum, MountVolumeOptions,
-    NetworkConnectRequest, NetworkCreateRequest, PortBinding, RestartPolicy, RestartPolicyNameEnum,
-    VolumeCreateRequest,
+    ContainerCreateBody, ContainerStatsResponse, HostConfig, HostConfigLogConfig, Mount,
+    MountTypeEnum, MountVolumeOptions, NetworkConnectRequest, NetworkCreateRequest, PortBinding,
+    RestartPolicy, RestartPolicyNameEnum, VolumeCreateRequest,
   },
   query_parameters::{
     AttachContainerOptionsBuilder, CreateContainerOptionsBuilder, CreateImageOptionsBuilder,
     EventsOptionsBuilder, KillContainerOptionsBuilder, ListContainersOptionsBuilder,
     ListVolumesOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
-    RemoveVolumeOptionsBuilder, UploadToContainerOptionsBuilder,
+    RemoveVolumeOptionsBuilder, StatsOptionsBuilder, UploadToContainerOptionsBuilder,
   },
 };
 use centaurus::{error::Result, eyre::Context};
@@ -25,13 +25,13 @@ use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, TryStreamExt};
 use shared::{
   auth::agent_token,
-  msg::{InstallResult, ServerSpec, Signal},
+  msg::{InstallResult, LogStream, ServerSpec, Signal},
 };
 use tokio::{io::AsyncWrite, sync::mpsc, time::timeout};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::config::Config;
+use crate::{config::Config, logs::Logs};
 
 const LABEL: &str = "smaug.server";
 /// On the installer: the install generation it runs.
@@ -72,6 +72,7 @@ pub struct Container {
 }
 
 /// A running agent: where to reach it and how to authenticate.
+#[derive(Clone)]
 pub struct Agent {
   pub url: String,
   pub token: String,
@@ -255,6 +256,10 @@ impl Docker {
       url: format!("http://{ip}:8000"),
       token: self.agent_token(uuid)?,
     })
+  }
+
+  pub async fn has_volume(&self, uuid: Uuid) -> bool {
+    self.client.inspect_volume(&name(uuid)).await.is_ok()
   }
 
   fn agent_token(&self, uuid: Uuid) -> Result<String> {
@@ -536,7 +541,8 @@ impl Docker {
   /// Runs the install script like Wings: `install.image` as root, `files` at
   /// `/mnt/server`, the script at `/mnt/install/install.sh`. Like Wings, the
   /// script's exit code does not fail the install, only errors running it do.
-  pub async fn install(&self, spec: &ServerSpec, script: &str) -> Result<()> {
+  /// The output goes to `logs` live as `Install` lines.
+  pub async fn install(&self, spec: &ServerSpec, script: &str, logs: &Logs) -> Result<()> {
     let name = installer_name(spec.uuid);
     let generation = spec.install_generation.unwrap_or_default().to_string();
     let env = self.env(spec);
@@ -544,14 +550,17 @@ impl Docker {
       // left by a wings restart: wait for that run instead of running the script again
       Some(image) => {
         info!("Waiting for the running install of {}", spec.uuid);
-        (image, self.wait_installer(&name).await)
+        let follow = self.follow_installer(&name, logs);
+        let res = self.wait_installer(&name).await;
+        let _ = timeout(Duration::from_secs(5), follow).await;
+        (image, res)
       }
       None => {
         let image = self
           .create_installer(spec, &name, &generation, &env)
           .await?;
         let res = match self.upload_script(&name, script).await {
-          Ok(()) => self.run_installer(&name).await,
+          Ok(()) => self.run_installer(&name, logs).await,
           Err(err) => Err(err),
         };
         (image, res)
@@ -689,13 +698,45 @@ impl Docker {
     Ok(())
   }
 
-  async fn run_installer(&self, name: &str) -> Result<i64> {
+  async fn run_installer(&self, name: &str, logs: &Logs) -> Result<i64> {
     self
       .client
       .start_container(name, None)
       .await
       .context("Failed to start install container")?;
-    self.wait_installer(name).await
+    let follow = self.follow_installer(name, logs);
+    let res = self.wait_installer(name).await;
+    // the last lines may still be on their way
+    let _ = timeout(Duration::from_secs(5), follow).await;
+    res
+  }
+
+  /// Streams the installer's output until it exits.
+  fn follow_installer(&self, name: &str, logs: &Logs) -> tokio::task::JoinHandle<()> {
+    let (client, name, logs) = (self.client.clone(), name.to_string(), logs.clone());
+    tokio::spawn(async move {
+      let options = LogsOptionsBuilder::default()
+        .follow(true)
+        .stdout(true)
+        .stderr(true)
+        .build();
+      let output = Box::pin(client.logs(&name, Some(options)));
+      crate::logs::follow(output, &logs, LogStream::Install).await;
+    })
+  }
+
+  /// One sample of a running container, `None` when it is gone.
+  pub async fn stats(&self, uuid: Uuid) -> Result<Option<ContainerStatsResponse>> {
+    let options = StatsOptionsBuilder::default()
+      .stream(false)
+      .one_shot(true)
+      .build();
+    match self.client.stats(&name(uuid), Some(options)).next().await {
+      Some(Ok(stats)) => Ok(Some(stats)),
+      Some(Err(err)) if not_found(&err) => Ok(None),
+      Some(Err(err)) => Err(err).context("Failed to get container stats")?,
+      None => Ok(None),
+    }
   }
 
   /// Exit code of the installer, right away when it already exited.
@@ -919,10 +960,6 @@ impl Docker {
     let mut content = String::new();
     entry.read_to_string(&mut content).unwrap();
     content
-  }
-
-  pub async fn volume_exists(&self, uuid: Uuid) -> bool {
-    self.client.inspect_volume(&name(uuid)).await.is_ok()
   }
 }
 

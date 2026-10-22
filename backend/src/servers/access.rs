@@ -62,7 +62,21 @@ async fn access(db: &Connection, user: Uuid, server: &server::Model) -> Result<A
   ))
 }
 
-/// 404 without any access (no existence leak), 403 below `need`.
+/// 404 without any access (no existence leak), 403 below `need`, 409 for a
+/// change to a suspended server by a non-admin.
+fn check(access: Access, need: Access, suspended: bool) -> Result<()> {
+  if access == Access::None {
+    bail!(NOT_FOUND, "Server not found");
+  }
+  if access < need {
+    bail!(FORBIDDEN, "insufficient permissions");
+  }
+  if suspended && need >= Access::Write && access < Access::Admin {
+    bail!(CONFLICT, "The server is suspended");
+  }
+  Ok(())
+}
+
 pub(super) async fn load(
   db: &Connection,
   user: Uuid,
@@ -71,14 +85,10 @@ pub(super) async fn load(
 ) -> Result<(server::Model, Access)> {
   let server = db.server().find_by_id(uuid).await?;
   let access = access(db, user, &server).await?;
-  if access == Access::None {
-    bail!(NOT_FOUND, "Server not found");
-  }
-  if access < need {
-    bail!(FORBIDDEN, "insufficient permissions");
-  }
+  check(access, need, server.suspended)?;
   Ok((server, access))
 }
+
 #[cfg(test)]
 mod test {
   use super::*;
@@ -108,5 +118,18 @@ mod test {
       );
     }
     assert!(None < Read && Read < Write && Write < Admin);
+  }
+
+  #[test]
+  fn suspended_is_read_only_below_admin() {
+    use Access::*;
+    assert!(check(Write, Write, false).is_ok());
+    assert!(check(Write, Write, true).is_err());
+    assert!(check(Admin, Write, true).is_ok());
+    assert!(check(Admin, Admin, true).is_ok());
+    assert!(check(Read, Read, true).is_ok());
+    assert!(check(Write, Read, true).is_ok());
+    assert!(check(Read, Write, false).is_err());
+    assert!(check(None, Read, false).is_err());
   }
 }

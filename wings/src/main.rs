@@ -23,9 +23,14 @@ mod agent;
 mod auth;
 mod config;
 mod docker;
+mod error;
+mod files;
+mod logs;
+mod metrics;
 mod reconcile;
 mod servers;
 mod store;
+mod streams;
 mod ws;
 
 #[tokio::main]
@@ -55,7 +60,11 @@ async fn main() {
 }
 
 fn router(_limiter: &mut RateLimiter) -> ApiRouter {
-  ws::router().merge(servers::router()).into()
+  ws::router()
+    .merge(servers::router())
+    .merge(files::router())
+    .merge(streams::router())
+    .into()
 }
 
 async fn state(router: ApiRouter, config: Config) -> ApiRouter {
@@ -65,11 +74,15 @@ async fn state(router: ApiRouter, config: Config) -> ApiRouter {
     Runtime::Docker => {
       let docker = Docker::new(&config).await.expect("Failed to set up docker");
       tokio::spawn(reconcile::run(store.clone(), docker.clone()));
+      tokio::spawn(metrics::run(store.clone(), docker.clone()));
       Some(docker)
     }
     // TODO(wings): Kubernetes reconciler, until then GameServers are stored but never run
     Runtime::Kubernetes => None,
   };
-  let router = store::state(router, store).layer(Extension(docker));
+  let streams = streams::Streams::new(store.clone(), &config);
+  let router = store::state(router, store)
+    .layer(Extension(docker))
+    .layer(Extension(streams));
   router.layer(Extension(config)).into()
 }

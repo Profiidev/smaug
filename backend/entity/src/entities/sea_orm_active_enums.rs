@@ -8,6 +8,34 @@ use serde::{Deserialize, Serialize};
   Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
+#[sea_orm(rs_type = "Enum", db_type = "Enum", enum_name = "backup_status")]
+pub enum BackupStatus {
+  #[sea_orm(string_value = "creating")]
+  Creating,
+  #[sea_orm(string_value = "completed")]
+  Completed,
+  #[sea_orm(string_value = "failed")]
+  Failed,
+  #[sea_orm(string_value = "restoring")]
+  Restoring,
+}
+#[derive(
+  Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+#[sea_orm(rs_type = "Enum", db_type = "Enum", enum_name = "schedule_action")]
+pub enum ScheduleAction {
+  #[sea_orm(string_value = "command")]
+  Command,
+  #[sea_orm(string_value = "power")]
+  Power,
+  #[sea_orm(string_value = "backup")]
+  Backup,
+}
+#[derive(
+  Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
 #[sea_orm(rs_type = "Enum", db_type = "Enum", enum_name = "server_access_level")]
 pub enum ServerAccessLevel {
   #[sea_orm(string_value = "read")]

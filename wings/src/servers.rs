@@ -6,18 +6,22 @@ use axum::{
   middleware::from_fn,
   routing::{post, put},
 };
-use centaurus::{bail, error::Result};
+use centaurus::error::Result;
 use chrono::Utc;
+use http::StatusCode;
 use serde::Deserialize;
 use shared::msg::{
-  Observed, Power, PowerRequest, ServerSpec, ServerState, SyncRequest, SyncResponse,
+  CommandRequest, ErrorCode, Observed, Power, PowerRequest, ServerSpec, ServerState, SyncRequest,
+  SyncResponse,
 };
+use tokio::io::AsyncWriteExt;
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
   auth,
   docker::Docker,
+  error::{ApiError, ApiResult},
   store::{Desired, DesiredPower, Store},
 };
 
@@ -31,6 +35,7 @@ pub fn router() -> Router {
     .route("/servers", put(sync))
     .route("/servers/{uuid}", put(put_server).delete(delete_server))
     .route("/servers/{uuid}/power", post(power))
+    .route("/servers/{uuid}/command", post(command))
     .layer(from_fn(auth::verify))
 }
 
@@ -77,11 +82,38 @@ async fn put_server(
   Extension(docker): Runtime,
   Path(uuid): Path<Uuid>,
   Json(spec): Json<ServerSpec>,
-) -> Result<()> {
+) -> ApiResult<()> {
   if spec.uuid != uuid {
-    bail!(BAD_REQUEST, "Server uuid does not match the path");
+    return Err(ApiError::new(
+      ErrorCode::BadRequest,
+      "Server uuid does not match the path",
+    ));
   }
-  upsert(&store, docker.as_ref(), spec).await
+  if store.locked(uuid) {
+    let observed = store.observed(uuid).await?.unwrap_or_default();
+    if needs_install(spec.install_generation, &observed) {
+      return Err(busy());
+    }
+  }
+  Ok(upsert(&store, docker.as_ref(), spec).await?)
+}
+
+pub fn busy() -> ApiError {
+  ApiError::new(
+    ErrorCode::Busy,
+    "Another operation holds the server, try again later",
+  )
+}
+
+pub fn unsupported() -> ApiError {
+  ApiError::new(
+    ErrorCode::Unsupported,
+    "Not supported on the Kubernetes runtime",
+  )
+}
+
+pub fn not_found() -> ApiError {
+  ApiError::new(ErrorCode::NotFound, "Server not found")
 }
 
 #[derive(Deserialize)]
@@ -104,12 +136,46 @@ async fn delete_server(
   store.delete(uuid).await
 }
 
-async fn power(store: Store, Path(uuid): Path<Uuid>, Json(req): Json<PowerRequest>) -> Result<()> {
+async fn power(
+  store: Store,
+  Path(uuid): Path<Uuid>,
+  Json(req): Json<PowerRequest>,
+) -> ApiResult<()> {
+  let _unlocked = store.unlocked(uuid).await.ok_or_else(busy)?;
   if !store.update(uuid, |d| apply_power(d, req.action)).await? {
-    bail!(NOT_FOUND, "Server not found");
+    return Err(not_found());
   }
   // a new request, an error from the last one is no longer current
-  store.set_error(uuid, None).await
+  Ok(store.set_error(uuid, None).await?)
+}
+
+async fn command(
+  store: Store,
+  Extension(docker): Runtime,
+  Path(uuid): Path<Uuid>,
+  Json(req): Json<CommandRequest>,
+) -> ApiResult<StatusCode> {
+  if docker.is_none() {
+    return Err(unsupported());
+  }
+  send_command(&store, uuid, &req.line).await?;
+  Ok(StatusCode::NO_CONTENT)
+}
+
+/// Writes `line` to the console of a starting or running server.
+pub(crate) async fn send_command(store: &Store, uuid: Uuid, line: &str) -> ApiResult<()> {
+  let observed = store.observed(uuid).await?.ok_or_else(not_found)?;
+  let not_running = || ApiError::new(ErrorCode::Conflict, "Server is not running");
+  if !matches!(observed.state, ServerState::Starting | ServerState::Running) {
+    return Err(not_running());
+  }
+  let console = store.console(uuid).ok_or_else(not_running)?;
+  let mut stdin = console.lock().await;
+  let written = async {
+    stdin.write_all(format!("{line}\n").as_bytes()).await?;
+    stdin.flush().await
+  };
+  written.await.map_err(|_| not_running())
 }
 
 /// Sets the spec, taking its power when the panel changed it, and starts a
@@ -222,6 +288,79 @@ mod test {
     apply_power(&mut desired, Power::Restart);
     assert_eq!(desired.power, DesiredPower::Stopped);
     assert!(desired.restarted_at.is_some());
+  }
+
+  #[tokio::test]
+  async fn commands_need_a_running_console() {
+    use tokio::io::AsyncReadExt;
+
+    let store = memory();
+    let uuid = Uuid::new_v4();
+    let code = |res: ApiResult<()>| res.unwrap_err().body.code;
+    assert_eq!(
+      code(send_command(&store, uuid, "x").await),
+      ErrorCode::NotFound
+    );
+    store.put(Desired::new(spec(uuid))).await.unwrap();
+    assert_eq!(
+      code(send_command(&store, uuid, "x").await),
+      ErrorCode::Conflict
+    );
+    store.set_state(uuid, ServerState::Running).await.unwrap();
+    // running but not attached yet
+    assert_eq!(
+      code(send_command(&store, uuid, "x").await),
+      ErrorCode::Conflict
+    );
+
+    let (tx, mut rx) = tokio::io::duplex(64);
+    let console: crate::docker::Stdin = Box::pin(tx);
+    store.set_console(uuid, Some(std::sync::Arc::new(console.into())));
+    send_command(&store, uuid, "say hi").await.unwrap();
+    let mut buf = [0; 7];
+    rx.read_exact(&mut buf).await.unwrap();
+    assert_eq!(&buf, b"say hi\n");
+
+    store.set_state(uuid, ServerState::Stopping).await.unwrap();
+    assert_eq!(
+      code(send_command(&store, uuid, "x").await),
+      ErrorCode::Conflict
+    );
+  }
+
+  #[tokio::test]
+  async fn power_is_busy_while_locked() {
+    let store = memory();
+    let uuid = Uuid::new_v4();
+    store.put(Desired::new(spec(uuid))).await.unwrap();
+    let guard = store.lock(uuid).await.unwrap();
+    assert!(store.lock(uuid).await.is_none());
+    let req = Json(PowerRequest {
+      action: Power::Kill,
+    });
+    let err = power(store.clone(), Path(uuid), req).await.unwrap_err();
+    assert_eq!(err.body.code, ErrorCode::Busy);
+    drop(guard);
+    let req = Json(PowerRequest {
+      action: Power::Kill,
+    });
+    power(store.clone(), Path(uuid), req).await.unwrap();
+  }
+
+  #[tokio::test]
+  async fn lock_waits_for_a_power_check() {
+    let store = memory();
+    let uuid = Uuid::new_v4();
+    let unlocked = store.unlocked(uuid).await.unwrap();
+    let lock = tokio::spawn({
+      let store = store.clone();
+      async move { store.lock(uuid).await }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    assert!(!lock.is_finished());
+    drop(unlocked);
+    let _guard = lock.await.unwrap().unwrap();
+    assert!(store.unlocked(uuid).await.is_none());
   }
 
   #[tokio::test]

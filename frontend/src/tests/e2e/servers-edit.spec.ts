@@ -21,14 +21,18 @@ import {
 test.describe('server edit (admin)', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
-  test('renders the status tab and fits the viewport', async ({ page }) => {
-    await gotoReady(page, '/servers/srv-survival/status');
+  test('renders the actions tab and fits the viewport', async ({ page }) => {
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await expect(page.getByRole('heading', { name: /Server:/ })).toContainText(
       'Survival SMP'
     );
-    await expect(tab(page, 'Status')).toHaveAttribute('aria-selected', 'true');
+    await expect(tab(page, 'Actions')).toHaveAttribute('aria-selected', 'true');
     for (const name of [
+      'Console',
+      'Files',
+      'Backups',
+      'Schedules',
       'General',
       'Startup',
       'Variables',
@@ -39,24 +43,18 @@ test.describe('server edit (admin)', () => {
       await expect(tab(page, name)).toBeVisible();
     }
     await expect(
-      page.getByText('The server is installed and stopped.')
-    ).toBeVisible();
-    await expect(
-      page.getByText('Usage is shown while the server is running.')
-    ).toBeVisible();
-    await expect(
       page.getByText('10.0.0.1:25566, 10.0.0.1:25567')
     ).toBeVisible();
     await expect(page.getByText('srv-survival', { exact: true })).toBeVisible();
     // The SDK transformer turns the created_at string into a Date.
-    await expect(page.getByText(/^Created \d/)).toBeVisible();
+    await expect(page.getByText('Created', { exact: true })).toBeVisible();
     await expect(
       page.getByText('You have view-only access', { exact: true })
     ).toBeHidden();
     await expect(
       page.getByText('Some settings need an administrator')
     ).toBeHidden();
-    // The save bar is hidden on the Status tab.
+    // The save bar is hidden on the Actions tab.
     await expect(
       page.getByRole('button', { name: 'Save Changes' })
     ).toBeHidden();
@@ -90,15 +88,18 @@ test.describe('server edit (admin)', () => {
         return ok();
       })
     );
-    await page.goto('/servers/srv-survival/status');
+    await page.goto('/servers/srv-survival/actions');
 
     await expect(page.locator('[aria-busy=true]')).toHaveCount(0);
     await expect(page.getByRole('tab')).toHaveText([
-      'Status',
+      'Console',
+      'Files',
+      'Schedules',
       'General',
       'Startup',
       'Variables',
-      'Resources'
+      'Resources',
+      'Actions'
     ]);
     await expect(page.getByRole('alert')).toHaveCount(0);
     // Data never arrives, so networkidle can't signal hydration: retry the click.
@@ -117,7 +118,7 @@ test.describe('server edit (admin)', () => {
   });
 
   test('redirects to the list when the server is missing', async ({ page }) => {
-    await gotoReady(page, '/servers/srv-missing/status');
+    await gotoReady(page, '/servers/srv-missing/actions');
 
     await expect(page).toHaveURL(/\/servers$/);
     await expect(page.getByText('Server not found')).toBeVisible();
@@ -132,7 +133,7 @@ test.describe('server edit (admin)', () => {
         () => new HttpResponse(null, { status: 500 }) as never
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await expect(page).toHaveURL(/\/servers$/);
     await expect(page.getByText('Failed to load server')).toBeVisible();
@@ -141,13 +142,13 @@ test.describe('server edit (admin)', () => {
   test('saves the general tab', async ({ network, page }) => {
     const update = recordUpdate();
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'General');
 
     await expect(combo(page, 'Owner')).toHaveText('Ada Admin');
     await expect(combo(page, 'Node')).toBeDisabled();
     await expect(
-      page.getByText('Use Transfer on the Status tab.')
+      page.getByText('Use Transfer on the Actions tab.')
     ).toBeVisible();
     await expect(page.getByLabel('IP address')).toHaveCount(3);
 
@@ -183,7 +184,7 @@ test.describe('server edit (admin)', () => {
   }) => {
     const update = recordUpdate();
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'General');
 
     await page.getByLabel('Name', { exact: true }).fill('');
@@ -212,7 +213,7 @@ test.describe('server edit (admin)', () => {
         ])
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'Resources');
     await save(page);
 
@@ -237,7 +238,7 @@ test.describe('server edit (admin)', () => {
         fieldErrors(400, [{ field: 'limits.disk', message: 'Disk too big.' }])
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'Resources');
     await expect(
       page.getByRole('switch', { name: 'Unlimited Storage' })
@@ -256,7 +257,7 @@ test.describe('server edit (admin)', () => {
         ])
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'Startup');
     await save(page);
 
@@ -278,7 +279,7 @@ test.describe('server edit (admin)', () => {
         fieldErrors(400, [{ field: 'mystery', message: 'Odd failure.' }])
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'Startup');
     await save(page);
 
@@ -293,7 +294,7 @@ test.describe('server edit (admin)', () => {
       fail ? (new HttpResponse(null, { status: 500 }) as never) : ok()
     );
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'General');
     await page.getByLabel('Name', { exact: true }).fill('Survival 3');
     await save(page);
@@ -315,7 +316,7 @@ test.describe('server edit (admin)', () => {
   test('saves startup, variables and resources', async ({ network, page }) => {
     const update = recordUpdate();
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await openTab(page, 'Startup');
     // Edit mode has no install switches.
@@ -356,7 +357,7 @@ test.describe('server edit (admin)', () => {
   test('validates variables and limits on save', async ({ network, page }) => {
     const update = recordUpdate();
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await openTab(page, 'Variables');
     await page.getByLabel('Max Players').fill('0');
@@ -378,7 +379,7 @@ test.describe('server edit (admin)', () => {
   }) => {
     const update = recordUpdate();
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await openTab(page, 'Variables');
     await page.getByLabel('Max Players').fill('30');
@@ -421,7 +422,7 @@ test.describe('server edit (admin)', () => {
   test('edits access grants per section', async ({ network, page }) => {
     const update = recordUpdate();
     network.use(update.handler);
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'Permissions');
 
     const users = page.getByRole('region', { name: 'User grants' });
@@ -502,7 +503,7 @@ test.describe('server edit (admin)', () => {
         ])
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await openTab(page, 'General');
     await save(page);
 
@@ -524,8 +525,12 @@ test.describe('server edit: the URL names the open tab', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
   for (const [path, name, url] of [
-    ['', 'Status', /\/servers\/srv-survival\/status$/],
-    ['/status', 'Status', /\/servers\/srv-survival\/status$/],
+    ['', 'Console', /\/servers\/srv-survival\/console$/],
+    ['/console', 'Console', /\/servers\/srv-survival\/console$/],
+    ['/files', 'Files', /\/servers\/srv-survival\/files$/],
+    ['/backups', 'Backups', /\/servers\/srv-survival\/backups$/],
+    ['/schedules', 'Schedules', /\/servers\/srv-survival\/schedules$/],
+    ['/actions', 'Actions', /\/servers\/srv-survival\/actions$/],
     ['/general', 'General', /\/servers\/srv-survival\/general$/],
     ['/startup', 'Startup', /\/servers\/srv-survival\/startup$/],
     ['/variables', 'Variables', /\/servers\/srv-survival\/variables$/],
@@ -540,7 +545,7 @@ test.describe('server edit: the URL names the open tab', () => {
     });
   }
 
-  for (const path of ['bogus', 'settings', 'Status']) {
+  for (const path of ['bogus', 'settings', 'status', 'Console']) {
     test(`/servers/srv-survival/${path} is a 404`, async ({ page }) => {
       const res = await page.goto(`/servers/srv-survival/${path}`);
 
@@ -552,7 +557,7 @@ test.describe('server edit: the URL names the open tab', () => {
   test('clicking tabs pushes history without refetching the server', async ({
     page
   }) => {
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await expect(page.getByRole('heading', { name: /Server:/ })).toContainText(
       'Survival SMP'
     );
@@ -576,8 +581,8 @@ test.describe('server edit: the URL names the open tab', () => {
     await expect(page).toHaveURL(/\/servers\/srv-survival\/general$/);
     await expect(tab(page, 'General')).toHaveAttribute('aria-selected', 'true');
     await page.goBack();
-    await expect(page).toHaveURL(/\/servers\/srv-survival\/status$/);
-    await expect(tab(page, 'Status')).toHaveAttribute('aria-selected', 'true');
+    await expect(page).toHaveURL(/\/servers\/srv-survival\/actions$/);
+    await expect(tab(page, 'Actions')).toHaveAttribute('aria-selected', 'true');
     await page.goForward();
     await expect(tab(page, 'General')).toHaveAttribute('aria-selected', 'true');
     await page.waitForLoadState('networkidle');
@@ -593,8 +598,8 @@ test.describe('server edit: the URL names the open tab', () => {
     await name.fill('Draft Name');
     await expect(page.getByText('Unsaved changes')).toBeVisible();
 
-    await openTab(page, 'Status');
-    await expect(page).toHaveURL(/\/servers\/srv-survival\/status$/);
+    await openTab(page, 'Actions');
+    await expect(page).toHaveURL(/\/servers\/srv-survival\/actions$/);
     await expect(
       page.getByRole('button', { name: 'Save Changes' })
     ).toBeHidden();

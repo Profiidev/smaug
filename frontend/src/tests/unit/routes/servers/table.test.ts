@@ -78,7 +78,7 @@ describe('servers table columns', () => {
     expect(cellOf('name').cell).toEqual({
       component: NameCell,
       props: {
-        href: '/servers/srv-1/status',
+        href: '/servers/srv-1/console',
         icon: Container,
         name: 'survival'
       }
@@ -103,7 +103,7 @@ describe('servers table columns', () => {
   // Owners and write grantees may edit without server:edit; the page enforces access.
   it.each([true, false])('always enables edit (canEdit=%s)', (canEdit) => {
     const { props } = cellOf('actions', row, canEdit).cell;
-    expect(props.edit).toBe('/servers/srv-1/status');
+    expect(props.edit).toBe('/servers/srv-1/console');
     expect(props.edit_disabled).toBe(false);
   });
 

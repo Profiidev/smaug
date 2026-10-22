@@ -1,9 +1,13 @@
 use std::{sync::LazyLock, time::Duration};
 
 use centaurus::{error::Result, eyre::Context};
-use shared::msg::{ConfigFile, PrepareRequest, PrepareResponse};
+use reqwest::{Method, RequestBuilder};
+use shared::msg::{ConfigFile, ErrorBody, PrepareRequest, PrepareResponse, ServerSpec};
 
-use crate::docker::Agent;
+use crate::{
+  docker::Agent,
+  error::{ApiError, ApiResult},
+};
 
 /// Walking a big volume for permissions and disk usage takes a while.
 const PREPARE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
@@ -17,9 +21,8 @@ static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     .expect("valid client")
 });
 
-/// Applies config files and permissions, returns the bytes used. A freshly
-/// created agent gets 10 s to come up.
-pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str) -> Result<u64> {
+/// A freshly created agent gets 10 s to come up, a later request fails when it does not.
+pub async fn wait_up(agent: &Agent) {
   let up = async {
     loop {
       let health = CLIENT
@@ -35,8 +38,12 @@ pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str
       tokio::time::sleep(Duration::from_millis(200)).await;
     }
   };
-  // still down after 10 s: the prepare below fails
   let _ = tokio::time::timeout(Duration::from_secs(10), up).await;
+}
+
+/// Applies config files and permissions, returns the bytes used.
+pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str) -> Result<u64> {
+  wait_up(agent).await;
   let res: PrepareResponse = CLIENT
     .post(format!("{}/prepare", agent.url))
     .bearer_auth(&agent.token)
@@ -54,4 +61,46 @@ pub async fn prepare(agent: &Agent, config_files: &[ConfigFile], interface: &str
     .await
     .context("Invalid agent response")?;
   Ok(res.disk_bytes)
+}
+
+pub fn request(agent: &Agent, method: Method, path: &str) -> RequestBuilder {
+  CLIENT
+    .request(method, format!("{}{path}", agent.url))
+    .bearer_auth(&agent.token)
+}
+
+/// A file route request, carrying the server's denylist and disk limit.
+pub fn files(agent: &Agent, spec: &ServerSpec, method: Method, path: &str) -> RequestBuilder {
+  let denylist = serde_json::to_string(&spec.file_denylist).expect("always serializable");
+  request(agent, method, path)
+    .header("x-denylist", denylist)
+    .header("x-disk-limit", disk_limit(spec).to_string())
+}
+
+/// 0 means unlimited.
+pub fn disk_limit(spec: &ServerSpec) -> u64 {
+  u64::try_from(spec.limits.disk_mb).unwrap_or(0) * 1024 * 1024
+}
+
+/// Passes an agent error on as it is.
+pub async fn ok(res: reqwest::Response) -> ApiResult<reqwest::Response> {
+  let status = res.status();
+  if status.is_success() {
+    return Ok(res);
+  }
+  let body = res.bytes().await.unwrap_or_default();
+  Err(match serde_json::from_slice::<ErrorBody>(&body) {
+    Ok(body) => ApiError { body, status },
+    Err(_) => ApiError::internal(format!("Agent answered {status}")),
+  })
+}
+
+/// `cached` takes the agent's last walk plus the writes since, no full walk.
+pub async fn usage(agent: &Agent, spec: &ServerSpec, cached: bool) -> ApiResult<u64> {
+  let res = files(agent, spec, Method::GET, "/files/usage")
+    .query(&[("cached", cached)])
+    .send()
+    .await?;
+  let usage: shared::msg::UsageResponse = ok(res).await?.json().await?;
+  Ok(usage.bytes)
 }

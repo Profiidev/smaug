@@ -15,7 +15,7 @@ import {
   setServerInstalled,
   setServerSuspended
 } from '$lib/client';
-import StatusTab from '$routes/servers/[uuid]/StatusTab.svelte';
+import ActionsTab from '$routes/servers/[uuid]/ActionsTab.svelte';
 import { availableActions } from '$routes/servers/status';
 import { options, serverInfo } from './fixtures';
 
@@ -84,7 +84,7 @@ const mount = (
   info = server(),
   { nodes = options.nodes, ondelete = vi.fn() } = {}
 ) => {
-  render(StatusTab, { props: { nodes, ondelete, server: info } });
+  render(ActionsTab, { props: { nodes, ondelete, server: info } });
   return { ondelete };
 };
 
@@ -98,17 +98,9 @@ const BUTTONS = {
   transfer: 'Transfer…'
 } as const;
 
-describe('StatusTab cards', () => {
-  it('shows the status, usage placeholder and details', () => {
+describe('ActionsTab details', () => {
+  it('lists the server details', () => {
     mount();
-    expect(
-      screen.getByText('The server is installed and stopped.')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Offline')).toBeInTheDocument();
-    expect(screen.getByText(/^Created /)).toBeInTheDocument();
-    expect(
-      screen.getByText('Usage is shown while the server is running.')
-    ).toBeInTheDocument();
     const details = screen.getByText('Primary allocation').closest('dl')!;
     const value = (label: string) =>
       within(details).getByText(label).nextElementSibling!;
@@ -119,15 +111,11 @@ describe('StatusTab cards', () => {
     expect(value('Egg')).toHaveTextContent('Paper');
     expect(value('Image')).toHaveTextContent('ghcr.io/yolks:java_21');
     expect(value('UUID')).toHaveTextContent('srv-1');
+    expect(value('Created')).toHaveTextContent(
+      serverInfo.created_at.toLocaleDateString()
+    );
     expect(value('UUID')).toHaveClass('font-mono');
     expect(value('Egg')).not.toHaveClass('font-mono');
-  });
-
-  it('shows the creation date', () => {
-    mount(server());
-    expect(screen.getByText(/^Created /)).toHaveTextContent(
-      `Created ${serverInfo.created_at.toLocaleDateString()}`
-    );
   });
 
   it('brackets IPv6 and dashes missing allocations', () => {
@@ -138,42 +126,13 @@ describe('StatusTab cards', () => {
     ).toHaveTextContent('—');
   });
 
-  it('notes that install progress comes from the node', () => {
-    mount(server('installing'));
-    expect(
-      screen.getByText(
-        'Install progress appears here once the node reports it.'
-      )
-    ).toBeInTheDocument();
-  });
-
-  it('shows a destructive alert when the install failed', () => {
+  it('shows no status alerts (they live on the console)', () => {
     mount(server('install_failed'));
-    expect(screen.getByRole('alert')).toHaveTextContent('Install failed');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
-
-  it('shows the error the node reported', () => {
-    mount({ ...server('offline'), error: 'Failed to start: no such image' });
-    const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Node reported an error');
-    expect(alert).toHaveTextContent('Failed to start: no such image');
-  });
-
-  it('shows an alert when suspended', () => {
-    mount(server('suspended'));
-    expect(screen.getByRole('alert')).toHaveTextContent('Suspended');
-  });
-
-  it.each(['offline', 'not_installed'] as const)(
-    'shows no alert while %s',
-    (status) => {
-      mount(server(status));
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    }
-  );
 });
 
-describe('StatusTab action availability', () => {
+describe('ActionsTab action availability', () => {
   it.each(Object.keys(STATES) as Status[])(
     'admin while %s follows the matrix',
     (status) => {
@@ -194,7 +153,8 @@ describe('StatusTab action availability', () => {
     'write access while %s may only reinstall',
     (status) => {
       mount(server(status, 'write'));
-      if (availableActions(status).reinstall) {
+      // A suspended server is read-only below admin
+      if (availableActions(status).reinstall && status !== 'suspended') {
         expect(button('Reinstall')).toBeEnabled();
       } else {
         expect(button('Reinstall')).toBeDisabled();
@@ -208,7 +168,11 @@ describe('StatusTab action availability', () => {
         expect(button(name)).toBeDisabled();
       }
       expect(
-        screen.getByText(/These change the server's state/)
+        screen.getByText(
+          status === 'suspended'
+            ? /Only an admin can change it/
+            : /These change the server's state/
+        )
       ).toBeInTheDocument();
     }
   );
@@ -247,7 +211,7 @@ describe('StatusTab action availability', () => {
   });
 });
 
-describe('StatusTab actions', () => {
+describe('ActionsTab actions', () => {
   const expectRefreshed = () => {
     // Only this server's info: the list and options would reset nothing useful.
     expect(vi.mocked(invalidate).mock.calls).toEqual([['/api/servers/srv-1']]);

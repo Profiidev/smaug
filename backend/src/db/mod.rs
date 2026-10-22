@@ -1,7 +1,9 @@
 use centaurus::db::init::Connection;
 
+pub mod backup;
 pub mod egg;
 pub mod node;
+pub mod schedule;
 pub mod server;
 
 #[allow(unused)]
@@ -9,6 +11,8 @@ pub trait DBTrait {
   fn node(&self) -> node::NodeTable<'_>;
   fn egg(&self) -> egg::EggTable<'_>;
   fn server(&self) -> server::ServerTable<'_>;
+  fn backup(&self) -> backup::BackupTable<'_>;
+  fn schedule(&self) -> schedule::ScheduleTable<'_>;
 }
 
 impl DBTrait for Connection {
@@ -23,6 +27,32 @@ impl DBTrait for Connection {
   fn server(&self) -> server::ServerTable<'_> {
     server::ServerTable::new(&self.0)
   }
+
+  fn backup(&self) -> backup::BackupTable<'_> {
+    backup::BackupTable::new(&self.0)
+  }
+
+  fn schedule(&self) -> schedule::ScheduleTable<'_> {
+    schedule::ScheduleTable::new(&self.0)
+  }
+}
+
+/// In-memory sqlite with every migration, foreign keys off so rows can be
+/// inserted without their parents.
+#[cfg(test)]
+pub(crate) async fn sqlite_db() -> Connection {
+  use migration::{Migrator, MigratorTrait};
+  use sea_orm::{ConnectOptions, ConnectionTrait, Database};
+
+  let mut opts = ConnectOptions::new("sqlite::memory:");
+  opts.max_connections(1);
+  let conn = Database::connect(opts).await.unwrap();
+  Migrator::up(&conn, None).await.unwrap();
+  conn
+    .execute_unprepared("PRAGMA foreign_keys = OFF")
+    .await
+    .unwrap();
+  Connection(conn)
 }
 
 #[cfg(test)]
@@ -106,7 +136,10 @@ mod test {
     }
   }
 
-  const SERVER_TABLES: [&str; 5] = [
+  const SERVER_TABLES: [&str; 8] = [
+    "server_schedule_task",
+    "server_schedule",
+    "server_backup",
     "server",
     "server_allocation",
     "server_variable",

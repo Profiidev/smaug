@@ -282,6 +282,6 @@ test.describe('server create validation', () => {
     await page.getByRole('switch', { name: 'Unlimited Memory' }).click();
     await page.getByLabel('Backup limit').fill('0');
     await page.getByRole('button', { exact: true, name: 'Create' }).click();
-    await expect(page).toHaveURL(/\/servers\/srv-new\/status$/);
+    await expect(page).toHaveURL(/\/servers\/srv-new\/console$/);
   });
 });

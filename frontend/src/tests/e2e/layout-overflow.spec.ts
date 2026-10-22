@@ -61,8 +61,12 @@ const pages: { path: string; ready: (page: Page) => Locator }[] = [
     ready: (p) => p.getByLabel('Name', { exact: true })
   },
   {
-    path: '/servers/srv-survival/status',
-    ready: (p) => p.getByRole('heading', { name: /Server:/ })
+    path: '/servers/srv-survival/console',
+    ready: (p) => p.getByRole('log', { name: 'Console output' })
+  },
+  {
+    path: '/servers/srv-survival/actions',
+    ready: (p) => p.getByRole('button', { name: 'Reinstall' })
   },
   {
     path: '/servers/srv-survival/general',

@@ -9,7 +9,6 @@ import { action, ok } from '$test_helpers/servers-e2e';
 /** Expected enabled state per action for each mock server's status. */
 const ALL = ['Reinstall', 'Mark as installed', 'Suspend', 'Transfer…'];
 const matrix: {
-  alert?: string;
   name: string;
   off: string[];
   on: string[];
@@ -34,7 +33,6 @@ const matrix: {
     uuid: 'srv-creative'
   },
   {
-    alert: 'Install failed',
     name: 'Viking World',
     off: [],
     on: [...ALL, 'Delete server'],
@@ -47,7 +45,6 @@ const matrix: {
     uuid: 'srv-fresh'
   },
   {
-    alert: 'Suspended',
     name: 'Banned Realm',
     off: ['Reinstall', 'Transfer…'],
     on: ['Mark as not installed', 'Unsuspend', 'Delete server'],
@@ -58,9 +55,9 @@ const matrix: {
 test.describe('server status actions', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
 
-  for (const { alert, name, off, on, uuid } of matrix) {
+  for (const { name, off, on, uuid } of matrix) {
     test(`${name} enables the actions its status allows`, async ({ page }) => {
-      await gotoReady(page, `/servers/${uuid}/status`);
+      await gotoReady(page, `/servers/${uuid}/actions`);
       await expect(
         page.getByRole('heading', { name: /Server:/ })
       ).toContainText(name);
@@ -74,11 +71,8 @@ test.describe('server status actions', () => {
       }
       const canDelete = on.includes('Delete server');
       await expect(action(page, 'Delete')).toBeEnabled({ enabled: canDelete });
-      if (alert) {
-        await expect(
-          page.locator('[data-slot=alert-title]', { hasText: alert })
-        ).toBeVisible();
-      }
+      // Status alerts live on the Console tab.
+      await expect(page.getByRole('alert')).toHaveCount(0);
       await expectNoHorizontalOverflow(page);
     });
   }
@@ -91,7 +85,7 @@ test.describe('server status actions', () => {
         return ok();
       })
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await action(page, 'Reinstall').click();
     const dialog = page.getByRole('dialog');
@@ -109,7 +103,7 @@ test.describe('server status actions', () => {
         () => new HttpResponse(null, { status: 409 }) as never
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
 
     await action(page, 'Reinstall').click();
     await page
@@ -130,13 +124,13 @@ test.describe('server status actions', () => {
         return ok();
       })
     );
-    await gotoReady(page, '/servers/srv-fresh/status');
+    await gotoReady(page, '/servers/srv-fresh/actions');
     await action(page, 'Mark as installed').click();
     await expect(
       page.getByText('Fresh Server marked as installed')
     ).toBeVisible();
 
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await action(page, 'Mark as not installed').click();
     await expect(
       page.getByText('Survival SMP marked as not installed')
@@ -150,7 +144,7 @@ test.describe('server status actions', () => {
         () => new HttpResponse(null, { status: 500 }) as never
       )
     );
-    await gotoReady(page, '/servers/srv-fresh/status');
+    await gotoReady(page, '/servers/srv-fresh/actions');
     await action(page, 'Mark as installed').click();
     await expect(
       page.getByText("Couldn't change the install status.")
@@ -168,14 +162,14 @@ test.describe('server status actions', () => {
         return ok();
       })
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await action(page, 'Suspend').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Suspend Survival SMP?')).toBeVisible();
     await dialog.getByRole('button', { name: 'Suspend' }).click();
     await expect(page.getByText('Survival SMP suspended')).toBeVisible();
 
-    await gotoReady(page, '/servers/srv-banned/status');
+    await gotoReady(page, '/servers/srv-banned/actions');
     await action(page, 'Unsuspend').click();
     await expect(page.getByText('Banned Realm unsuspended')).toBeVisible();
     expect(bodies).toEqual([{ suspended: true }, { suspended: false }]);
@@ -187,7 +181,7 @@ test.describe('server status actions', () => {
         () => new HttpResponse(null, { status: 500 }) as never
       )
     );
-    await gotoReady(page, '/servers/srv-survival/status');
+    await gotoReady(page, '/servers/srv-survival/actions');
     await action(page, 'Suspend').click();
     await page
       .getByRole('dialog')
@@ -195,7 +189,7 @@ test.describe('server status actions', () => {
       .click();
     await expect(page.getByText("Couldn't suspend server.")).toBeVisible();
 
-    await gotoReady(page, '/servers/srv-banned/status');
+    await gotoReady(page, '/servers/srv-banned/actions');
     await action(page, 'Unsuspend').click();
     await expect(page.getByText("Couldn't unsuspend server.")).toBeVisible();
   });

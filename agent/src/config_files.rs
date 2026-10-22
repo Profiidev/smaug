@@ -3,7 +3,7 @@
 
 use std::{
   collections::BTreeMap,
-  path::{Component, Path, PathBuf},
+  path::{Path, PathBuf},
   sync::LazyLock,
 };
 
@@ -53,22 +53,13 @@ fn apply_one(root: &Path, file: &ConfigFile, interface: &str) -> Result<()> {
   Ok(())
 }
 
-/// Resolves `file` inside `root`. Rejects `..` and any symlink on the way, so a
-/// server can't point its config at a host file. The container is not running
-/// while this runs, so nothing can swap a component in between.
+/// Resolves `file` inside `root` like user paths, and also refuses a symlink
+/// as the file itself. The container is not running while this runs, so
+/// nothing can swap a component in between.
 fn jail(root: &Path, file: &str) -> Result<PathBuf> {
-  let mut path = root.to_path_buf();
-  for component in Path::new(file).components() {
-    match component {
-      Component::Normal(part) => path.push(part),
-      Component::RootDir | Component::CurDir => (),
-      _ => {
-        bail!("Config file path escapes the server root");
-      }
-    }
-    if std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
-      bail!("Config file path contains a symlink");
-    }
+  let path = crate::files::jail(root, file)?;
+  if std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+    bail!("Config file path contains a symlink");
   }
   Ok(path)
 }

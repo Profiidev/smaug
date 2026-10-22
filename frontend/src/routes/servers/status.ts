@@ -1,3 +1,5 @@
+import type { PowerAction } from '$lib/client';
+
 /** Server lifecycle states, matching the backend's snake_case status. */
 export type ServerStatus =
   | 'running'
@@ -25,24 +27,6 @@ export const STATUS: Record<ServerStatus, { label: string; color: string }> = {
   suspended: { color: 'oklch(0.75 0.16 55)', label: 'Suspended' },
   transferring: { color: 'oklch(0.70 0.14 250)', label: 'Transferring' },
   unknown: { color: 'oklch(0.60 0 0)', label: 'Unknown' }
-};
-
-/** One-line explanation shown on the Status tab. */
-export const STATUS_DESCRIPTIONS: Record<ServerStatus, string> = {
-  crashed:
-    'The server exited without being stopped. With restart on crash it starts again on its own.',
-  install_failed:
-    "The egg's install script failed. Reinstall to run it again, or mark the server as installed if the files are in place.",
-  installing: "The egg's install script is running.",
-  not_installed:
-    'The server has not been installed. Reinstall to run the install script.',
-  offline: 'The server is installed and stopped.',
-  running: 'The server is up and accepting connections.',
-  starting: 'The server is starting.',
-  stopping: 'The server is stopping.',
-  suspended: 'The server is suspended. It cannot be started or opened.',
-  transferring: 'The server is moving to another node.',
-  unknown: "The server's node is unreachable, its current state is unknown."
 };
 
 export interface ServerActions {
@@ -78,4 +62,26 @@ export const availableActions = (status: ServerStatus): ServerActions => {
     suspend: idle || installing || suspended,
     transfer: idle
   };
+};
+
+/** Power actions the status allows (handoff power matrix; the backend answers 409 otherwise). */
+export const powerActions = (status: ServerStatus): PowerAction[] => {
+  switch (status) {
+    case 'running': {
+      return ['restart', 'stop', 'kill'];
+    }
+    case 'starting': {
+      return ['stop', 'kill'];
+    }
+    case 'stopping': {
+      return ['kill'];
+    }
+    case 'offline':
+    case 'crashed': {
+      return ['start'];
+    }
+    default: {
+      return [];
+    }
+  }
 };
