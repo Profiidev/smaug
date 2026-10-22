@@ -330,7 +330,7 @@ describe('backup frames', () => {
     expect(
       restoreFailed({ b1: { bytes: 5, status: 'restoring' } }, failed)
     ).toBe(true);
-    // a failed create stays failed in the list
+    // A failed create stays failed in the list
     expect(
       restoreFailed({ b1: { bytes: 5, status: 'creating' } }, failed)
     ).toBe(false);

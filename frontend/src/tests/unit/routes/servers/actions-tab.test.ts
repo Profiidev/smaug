@@ -153,7 +153,7 @@ describe('ActionsTab action availability', () => {
     'write access while %s may only reinstall',
     (status) => {
       mount(server(status, 'write'));
-      // a suspended server is read-only below admin
+      // A suspended server is read-only below admin
       if (availableActions(status).reinstall && status !== 'suspended') {
         expect(button('Reinstall')).toBeEnabled();
       } else {
