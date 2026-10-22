@@ -289,7 +289,6 @@ describe('ConsoleTab console', () => {
 
   it.each([
     ['installing', 'admin', 'Commands are unavailable during install'],
-    ['starting', 'admin', 'Waiting for the server to start'],
     ['offline', 'admin', 'Server must be running'],
     ['running', 'read', 'Commands need write access']
   ] as const)(
@@ -302,11 +301,14 @@ describe('ConsoleTab console', () => {
     }
   );
 
-  it('enables the input while running with write access', () => {
-    mount(server('running', { access: 'write' }));
-    expect(input()).toBeEnabled();
-    expect(input()).toHaveAttribute('placeholder', 'Type a command');
-  });
+  it.each(['running', 'starting'] as const)(
+    'enables the input while %s with write access',
+    (status) => {
+      mount(server(status, { access: 'write' }));
+      expect(input()).toBeEnabled();
+      expect(input()).toHaveAttribute('placeholder', 'Type a command');
+    }
+  );
 });
 
 describe('ConsoleTab metrics', () => {

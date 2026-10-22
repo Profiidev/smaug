@@ -12,6 +12,8 @@ export const MAX_LINES = 1000;
 export const POINTS = 30;
 const MIN_DELAY = 1000;
 const MAX_DELAY = 30_000;
+/** Open this long before the backoff resets, so a flapping socket backs off. */
+const STABLE = 5000;
 
 export interface ConsoleLine {
   /** Unique per `ServerLive`, for keyed each blocks. */
@@ -57,6 +59,7 @@ export class ServerLive {
   };
   #socket: WebSocket | undefined;
   #timer: ReturnType<typeof setTimeout> | undefined;
+  #stable: ReturnType<typeof setTimeout> | undefined;
   #attempt = 0;
   #wanted = false;
   #nextId = 0;
@@ -78,7 +81,9 @@ export class ServerLive {
     this.#socket = ws;
     ws.addEventListener('open', () => {
       this.connected = true;
-      this.#attempt = 0;
+      this.#stable = setTimeout(() => {
+        this.#attempt = 0;
+      }, STABLE);
     });
     ws.addEventListener('message', (e: MessageEvent<string>) => {
       try {
@@ -94,6 +99,7 @@ export class ServerLive {
       }
       this.#socket = undefined;
       this.connected = false;
+      clearTimeout(this.#stable);
       if (!this.#wanted) {
         return;
       }
@@ -106,6 +112,7 @@ export class ServerLive {
   public disconnect() {
     this.#wanted = false;
     clearTimeout(this.#timer);
+    clearTimeout(this.#stable);
     const ws = this.#socket;
     this.#socket = undefined;
     this.#attempt = 0;

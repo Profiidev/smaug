@@ -23,9 +23,9 @@ use http::{Method, StatusCode};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use shared::msg::{
-  CompleteStream, ErrorCode, Event, OpResult, OpStarted, OpenInStream, OpenOutStream, STREAM_END,
-  STREAM_SHA256, STREAM_SIZE, ServerSpec, ServerState, StreamOpened, StreamSource, StreamStatus,
-  StreamTarget,
+  CompleteStream, DEFAULT_CHUNK_SIZE, ErrorCode, Event, OpResult, OpStarted, OpenInStream,
+  OpenOutStream, STREAM_END, STREAM_SHA256, STREAM_SIZE, ServerSpec, ServerState, StreamOpened,
+  StreamSource, StreamStatus, StreamTarget,
 };
 use tokio::{
   sync::{Notify, mpsc, oneshot},
@@ -63,7 +63,6 @@ pub struct Streams(Arc<Inner>);
 struct Inner {
   map: DashMap<Uuid, Arc<Stream>>,
   store: Store,
-  chunk_size: u64,
   window: u32,
 }
 
@@ -150,7 +149,6 @@ impl Streams {
     let streams = Self(Arc::new(Inner {
       map: DashMap::new(),
       store,
-      chunk_size: config.chunk_size,
       window: config.stream_window,
     }));
     tokio::spawn(streams.clone().reap());
@@ -170,7 +168,7 @@ impl Streams {
   fn opened(&self, stream: Uuid) -> Json<StreamOpened> {
     Json(StreamOpened {
       stream,
-      chunk_size: self.0.chunk_size,
+      chunk_size: DEFAULT_CHUNK_SIZE,
       window: self.0.window,
     })
   }
@@ -416,7 +414,7 @@ async fn produce(
   let Kind::Out(out) = &stream.kind else {
     return;
   };
-  let chunk_size = streams.0.chunk_size as usize;
+  let chunk_size = DEFAULT_CHUNK_SIZE as usize;
   let push = |chunk: Vec<u8>| {
     out.window.lock().unwrap().push(chunk.into());
     out.changed.notify_waiters();
@@ -533,7 +531,7 @@ async fn open_in(
       let size = req
         .size
         .ok_or_else(|| ApiError::new(ErrorCode::BadRequest, "File streams need a size"))?;
-      let count = size.div_ceil(streams.0.chunk_size);
+      let count = size.div_ceil(DEFAULT_CHUNK_SIZE);
       let count =
         u32::try_from(count).map_err(|_| ApiError::new(ErrorCode::TooLarge, "Too many chunks"))?;
       // may exist already
@@ -722,7 +720,7 @@ async fn put_chunk(
   body: Bytes,
 ) -> ApiResult<StatusCode> {
   let stream = streams.get(uuid, id)?;
-  let chunk_size = streams.0.chunk_size;
+  let chunk_size = DEFAULT_CHUNK_SIZE;
   if stream.completing() {
     return Err(completing());
   }
@@ -748,26 +746,37 @@ async fn put_chunk(
       agent::ok(res).await?;
       file.received.lock().unwrap().insert(index);
     }
-    Kind::Restore(restore) => {
+    Kind::Restore(_) => {
       if body.len() as u64 > chunk_size {
         return Err(ApiError::new(ErrorCode::TooLarge, "Larger than one chunk"));
       }
-      let mut reorder = restore.reorder.lock().await;
-      // complete sets it under this lock
-      if stream.completing() {
-        return Err(completing());
-      }
-      let ready = reorder.put(index, body)?;
-      let tx = restore.tx.lock().await;
-      for chunk in ready {
-        let sent = match tx.as_ref() {
-          Some(tx) => tx.send(chunk).await.is_ok(),
-          None => false,
+      // own task: a dropped request must not stop after `put` took chunks
+      // out of the reorder buffer but before they reached the extractor
+      let stream = stream.clone();
+      tokio::spawn(async move {
+        let Kind::Restore(restore) = &stream.kind else {
+          unreachable!()
         };
-        if !sent {
-          return Err(ApiError::internal("Restore failed"));
+        let mut reorder = restore.reorder.lock().await;
+        // complete sets it under this lock
+        if stream.completing() {
+          return Err(completing());
         }
-      }
+        let ready = reorder.put(index, body)?;
+        let tx = restore.tx.lock().await;
+        for chunk in ready {
+          let sent = match tx.as_ref() {
+            Some(tx) => tx.send(chunk).await.is_ok(),
+            None => false,
+          };
+          if !sent {
+            return Err(ApiError::internal("Restore failed"));
+          }
+        }
+        Ok(())
+      })
+      .await
+      .map_err(|e| ApiError::internal(e.to_string()))??;
     }
   }
   Ok(StatusCode::NO_CONTENT)
@@ -828,7 +837,7 @@ async fn complete(
         let Kind::File(file) = &stream.kind else {
           return;
         };
-        let res = finish_file(file, id, streams.0.chunk_size, &req.sha256).await;
+        let res = finish_file(file, id, DEFAULT_CHUNK_SIZE, &req.sha256).await;
         if res.is_err() {
           remove_upload(&file.agent, &file.spec, id).await;
         }
@@ -1023,7 +1032,6 @@ mod test {
     let streams = Streams(Arc::new(Inner {
       map: DashMap::new(),
       store: crate::store::test::memory(),
-      chunk_size: 4,
       window: 2,
     }));
     let uuid = Uuid::new_v4();

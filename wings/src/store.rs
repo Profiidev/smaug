@@ -79,6 +79,9 @@ impl Desired {
 pub struct Store {
   backend: Backend,
   events: broadcast::Sender<Event>,
+  /// Logs and metrics, lossy so a flooding console cannot push state and op
+  /// events out of `events`.
+  live: broadcast::Sender<Event>,
   /// Uuids whose desired state changed, for the reconciler.
   changes: broadcast::Sender<Uuid>,
   /// Stdin of every attached server, written by commands and the stop command.
@@ -133,6 +136,8 @@ impl Store {
       backend,
       // a full buffer drops the panel connection, which costs a full sync
       events: broadcast::channel(4096).0,
+      // a full buffer only skips lines and metrics
+      live: broadcast::channel(4096).0,
       changes: broadcast::channel(256).0,
       consoles: Default::default(),
       locks: Default::default(),
@@ -142,7 +147,10 @@ impl Store {
 
   /// Reports to the panel; nobody listening means no panel is connected.
   pub fn send(&self, event: Event) {
-    let _ = self.events.send(event);
+    let _ = match event {
+      Event::Logs { .. } | Event::Metrics { .. } => self.live.send(event),
+      _ => self.events.send(event),
+    };
   }
 
   /// Wakes the server's reconcile worker.
@@ -197,6 +205,11 @@ impl Store {
 
   pub fn subscribe(&self) -> broadcast::Receiver<Event> {
     self.events.subscribe()
+  }
+
+  /// Logs and metrics, see [`Store::send`].
+  pub fn subscribe_live(&self) -> broadcast::Receiver<Event> {
+    self.live.subscribe()
   }
 
   pub fn subscribe_changes(&self) -> broadcast::Receiver<Uuid> {
@@ -481,6 +494,7 @@ pub(crate) mod test {
   pub(crate) fn memory() -> Store {
     Store {
       backend: Backend::Memory(Default::default()),
+      live: broadcast::channel(16).0,
       events: broadcast::channel(16).0,
       changes: broadcast::channel(16).0,
       consoles: Default::default(),

@@ -31,7 +31,8 @@ use super::{
 };
 use crate::{auth::jwt_auth::JwtAuth, nodes::Wings};
 
-/// Frames buffered per server before a slow browser lags and skips some.
+/// Frames buffered per server before a slow browser lags. Lagging behind on
+/// logs and stats skips some, on events closes the socket.
 const CAPACITY: usize = 256;
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 
@@ -95,33 +96,48 @@ pub struct LiveStats {
 /// wings operations to whoever waits for one.
 #[derive(Clone, Default)]
 pub struct Live {
-  channels: Arc<DashMap<Uuid, broadcast::Sender<Arc<str>>>>,
+  /// `(events, live)`, `live` carries logs and stats only.
+  channels: Arc<DashMap<Uuid, (Sender, Sender)>>,
   ops: Arc<DashMap<Uuid, oneshot::Sender<std::result::Result<(), String>>>>,
 }
 
+type Sender = broadcast::Sender<Arc<str>>;
+type Receiver = broadcast::Receiver<Arc<str>>;
+
 impl Live {
-  pub fn subscribe(&self, server: Uuid) -> broadcast::Receiver<Arc<str>> {
-    self
-      .channels
-      .entry(server)
-      .or_insert_with(|| broadcast::channel(CAPACITY).0)
-      .subscribe()
+  /// Returns `(events, live)`, see [`Live::publish`].
+  pub fn subscribe(&self, server: Uuid) -> (Receiver, Receiver) {
+    let pair = self.channels.entry(server).or_insert_with(|| {
+      (
+        broadcast::channel(CAPACITY).0,
+        broadcast::channel(CAPACITY).0,
+      )
+    });
+    (pair.0.subscribe(), pair.1.subscribe())
   }
 
   /// Call after dropping the receiver.
   pub fn unsubscribe(&self, server: Uuid) {
     self
       .channels
-      .remove_if(&server, |_, tx| tx.receiver_count() == 0);
+      .remove_if(&server, |_, (tx, _)| tx.receiver_count() == 0);
   }
 
   pub fn is_watched(&self, server: Uuid) -> bool {
-    self.channels.contains_key(&server)
+    // an entry left by a failed upgrade has no receiver
+    self
+      .channels
+      .get(&server)
+      .is_some_and(|pair| pair.0.receiver_count() > 0)
   }
 
   pub fn publish(&self, server: Uuid, frame: &LiveFrame) {
-    if let Some(tx) = self.channels.get(&server) {
+    if let Some(pair) = self.channels.get(&server) {
       let text = serde_json::to_string(frame).expect("LiveFrame is always serializable");
+      let tx = match frame {
+        LiveFrame::Logs { .. } | LiveFrame::Stats(_) => &pair.1,
+        _ => &pair.0,
+      };
       // no receiver left is fine, the last one is about to unsubscribe
       let _ = tx.send(text.into());
     }
@@ -165,12 +181,12 @@ pub(super) async fn server_ws(
   let (server, _) = load(&db, auth.user_id, path.uuid, Access::Read).await?;
   let live = wings.live();
   // before reading the state, so no change between the two is missed
-  let rx = live.subscribe(server.id);
+  let (events, live_rx) = live.subscribe(server.id);
   let initial = LiveFrame::State {
     status: status(&server, wings.state(server.node_id, server.id)),
   };
   Ok(ws.on_upgrade(move |socket| async move {
-    run(socket, rx, initial).await;
+    run(socket, events, live_rx, initial).await;
     live.unsubscribe(server.id);
   }))
 }
@@ -198,7 +214,7 @@ fn origin_allowed(headers: &HeaderMap, site_url: &url::Url) -> bool {
     || origin.origin() == site_url.origin()
 }
 
-async fn run(mut socket: WebSocket, mut rx: broadcast::Receiver<Arc<str>>, initial: LiveFrame) {
+async fn run(mut socket: WebSocket, mut events: Receiver, mut live: Receiver, initial: LiveFrame) {
   let initial = serde_json::to_string(&initial).expect("LiveFrame is always serializable");
   if socket.send(Message::Text(initial.into())).await.is_err() {
     return;
@@ -206,15 +222,13 @@ async fn run(mut socket: WebSocket, mut rx: broadcast::Receiver<Arc<str>>, initi
   let mut ping = interval(PING_INTERVAL);
   loop {
     tokio::select! {
-      frame = rx.recv() => match frame {
-        Ok(text) => {
+      frame = next(&mut events, &mut live) => match frame {
+        Some(text) => {
           if socket.send(Message::Text(text.as_ref().into())).await.is_err() {
             return;
           }
         }
-        // a slow browser misses frames, it keeps the newest
-        Err(RecvError::Lagged(_)) => (),
-        Err(RecvError::Closed) => return,
+        None => return,
       },
       msg = socket.recv() => match msg {
         Some(Ok(Message::Close(_)) | Err(_)) | None => return,
@@ -226,6 +240,27 @@ async fn run(mut socket: WebSocket, mut rx: broadcast::Receiver<Arc<str>>, initi
           return;
         }
       }
+    }
+  }
+}
+
+/// The next frame for the browser, `None` once the socket must close.
+/// Cancel safe, like `broadcast::Receiver::recv`.
+async fn next(events: &mut Receiver, live: &mut Receiver) -> Option<Arc<str>> {
+  loop {
+    tokio::select! {
+      biased;
+      frame = events.recv() => match frame {
+        Ok(text) => return Some(text),
+        // a slow browser missed events, closing makes it reconnect and reload
+        Err(RecvError::Lagged(_) | RecvError::Closed) => return None,
+      },
+      frame = live.recv() => match frame {
+        Ok(text) => return Some(text),
+        // logs and stats only, the browser just misses them
+        Err(RecvError::Lagged(_)) => (),
+        Err(RecvError::Closed) => return None,
+      },
     }
   }
 }
@@ -291,7 +326,7 @@ mod test {
     let b = live.subscribe(server);
     live.publish(server, &frame);
     assert_eq!(
-      &*a.recv().await.unwrap(),
+      &*a.0.recv().await.unwrap(),
       r#"{"type":"state","status":"running"}"#
     );
     // still one receiver left
@@ -300,6 +335,9 @@ mod test {
     assert!(live.is_watched(server));
     drop(a);
     live.unsubscribe(server);
+    assert!(!live.is_watched(server));
+    // dropped without unsubscribe, e.g. a failed upgrade
+    drop(live.subscribe(server));
     assert!(!live.is_watched(server));
   }
 
@@ -315,6 +353,31 @@ mod test {
     let rx = live.wait_op(op);
     live.forget_op(op);
     assert!(rx.await.is_err());
+  }
+
+  #[tokio::test]
+  async fn log_lag_keeps_the_connection() {
+    let live = Live::default();
+    let server = Uuid::now_v7();
+    let (mut events, mut logs) = live.subscribe(server);
+    for _ in 0..CAPACITY * 4 {
+      live.publish(server, &LiveFrame::Logs { lines: vec![] });
+    }
+    live.publish(
+      server,
+      &LiveFrame::State {
+        status: ServerStatus::Running,
+      },
+    );
+    // events come first, skipped lines do not close
+    assert_eq!(
+      next(&mut events, &mut logs).await.as_deref(),
+      Some(r#"{"type":"state","status":"running"}"#)
+    );
+    assert_eq!(
+      next(&mut events, &mut logs).await.as_deref(),
+      Some(r#"{"type":"logs","lines":[]}"#)
+    );
   }
 
   #[test]

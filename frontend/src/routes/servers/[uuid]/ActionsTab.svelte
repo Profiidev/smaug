@@ -39,7 +39,9 @@
   let unsuspendBusy = $state(false);
 
   let admin = $derived(server.access === 'admin');
-  let canWrite = $derived(admin || server.access === 'write');
+  let canWrite = $derived(
+    admin || (server.access === 'write' && !server.suspended)
+  );
   let installed = $derived(server.install_state === 'installed');
   let allowed = $derived(availableActions(server.status));
   let can = $derived({
@@ -148,6 +150,9 @@
       <Card.Description>
         {#if canWrite}
           These change the server's state. Most of them stop the server first.
+        {:else if server.suspended}
+          The server is suspended. Only an admin can change it until it is
+          unsuspended.
         {:else}
           You have view-only access. Actions need write access to this server.
         {/if}

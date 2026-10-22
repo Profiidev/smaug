@@ -506,11 +506,10 @@ impl Scheduler {
       if !is_due(&cron, s.last_run_at.map(|at| at.to_utc()), now) {
         continue;
       }
-      if s.only_when_online {
-        let server = self.db().server().find_by_id(s.server_id).await?;
-        if !self.is_online(&server).await {
-          continue;
-        }
+      let server = self.db().server().find_by_id(s.server_id).await?;
+      // a suspended server is read-only, see `access::load`
+      if server.suspended || (s.only_when_online && !self.is_online(&server).await) {
+        continue;
       }
       if self.claim(s.id) {
         self.start(s).await?;
@@ -957,10 +956,21 @@ mod test {
     // the server state is unknown, it is not online
     let offline = insert(&sc, sid, true, true).await;
     let disabled = insert(&sc, sid, false, false).await;
+    let suspended = server::Model {
+      suspended: true,
+      ..model()
+    };
+    let susp_id = suspended.id;
+    server::ActiveModel::from(suspended)
+      .insert(&sc.db().0)
+      .await
+      .unwrap();
+    let on_suspended = insert(&sc, susp_id, true, false).await;
 
     let now = at("2026-01-01T04:30:10Z");
     sc.tick(now).await.unwrap();
     let ran = last_run(&sc, sid, due).await.unwrap();
+    assert!(last_run(&sc, susp_id, on_suspended).await.is_none());
     assert!(last_run(&sc, sid, offline).await.is_none());
     assert!(last_run(&sc, sid, disabled).await.is_none());
 

@@ -61,7 +61,8 @@
 
   let status = $derived(server.status);
   let canWrite = $derived(
-    server.access === 'admin' || server.access === 'write'
+    server.access === 'admin' ||
+      (server.access === 'write' && !server.suspended)
   );
   let allowed = $derived(powerActions(status));
   let running = $derived(status === 'running');
@@ -90,13 +91,11 @@
       ? 'Commands are unavailable during install'
       : !canWrite
         ? 'Commands need write access'
-        : running
+        : running || status === 'starting'
           ? 'Type a command'
-          : status === 'starting'
-            ? 'Waiting for the server to start'
-            : 'Server must be running'
+          : 'Server must be running'
   );
-  let commandOff = $derived(!running || !canWrite);
+  let commandOff = $derived(!(running || status === 'starting') || !canWrite);
 
   let disk = $derived({
     limit: stats?.disk_limit_bytes ?? 0,

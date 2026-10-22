@@ -1,7 +1,7 @@
 //! `/servers/{uuid}/files/*` (`docs/API.md` §3.3), forwarded to the server's agent.
 
 use axum::{
-  Extension, Router,
+  Router,
   body::{Body, Bytes},
   extract::{Path, RawQuery},
   middleware::from_fn,
@@ -9,12 +9,11 @@ use axum::{
   routing::any,
 };
 use http::{HeaderMap, Method, header};
-use shared::msg::{ErrorCode, FileEntry, ServerSpec};
+use shared::msg::{DEFAULT_CHUNK_SIZE, ErrorCode, FileEntry, ServerSpec};
 use uuid::Uuid;
 
 use crate::{
   agent, auth,
-  config::Config,
   docker::Agent,
   error::{ApiError, ApiResult},
   servers::{Runtime, not_found, unsupported},
@@ -42,11 +41,9 @@ pub async fn agent_for(
   Ok((agent, spec))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn forward(
   store: Store,
   docker: Runtime,
-  Extension(config): Extension<Config>,
   Path((uuid, op)): Path<(Uuid, String)>,
   method: Method,
   RawQuery(query): RawQuery,
@@ -63,7 +60,7 @@ async fn forward(
     return Err(ApiError::new(ErrorCode::NotFound, "No such file route"));
   }
   let too_large = || ApiError::new(ErrorCode::TooLarge, "Larger than one chunk");
-  if body.len() as u64 > config.chunk_size {
+  if body.len() as u64 > DEFAULT_CHUNK_SIZE {
     return Err(too_large());
   }
   let (agent, spec) = agent_for(&store, &docker, uuid).await?;
@@ -77,7 +74,7 @@ async fn forward(
     let entry: FileEntry = agent::ok(stat).await?.json().await?;
     let len = range_len(range, entry.size)
       .ok_or_else(|| ApiError::new(ErrorCode::BadRequest, "Invalid range"))?;
-    if len > config.chunk_size {
+    if len > DEFAULT_CHUNK_SIZE {
       return Err(too_large());
     }
   }

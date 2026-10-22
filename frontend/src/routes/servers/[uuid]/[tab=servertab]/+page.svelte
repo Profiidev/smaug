@@ -72,7 +72,7 @@
 
   let admin = $derived(server?.access === 'admin');
   let readonly = $derived(
-    server?.access !== 'admin' && server?.access !== 'write'
+    !(admin || (server?.access === 'write' && !server?.suspended))
   );
   // Non-admins cannot load the option lists; the server's own references keep the selects filled.
   let fieldOptions = $derived(
@@ -102,8 +102,10 @@
   let liveTab = $derived(['console', 'backups', 'schedules'].includes(tab));
   $effect(() => {
     if (!liveTab) return;
-    live.connect();
-    return () => live.disconnect();
+    // teardown runs after `live` already is the next server's
+    const l = live;
+    l.connect();
+    return () => l.disconnect();
   });
   // The pushed status is newer than the last load until the reload lands.
   let shown = $derived(
@@ -289,7 +291,15 @@
             settingsTab && 'grow'
           ]}
         >
-          {#if settingsTab && server && readonly}
+          {#if settingsTab && server?.suspended && readonly}
+            <Alert.Root>
+              <Info />
+              <Alert.Title>The server is suspended</Alert.Title>
+              <Alert.Description>
+                Only an admin can change it until it is unsuspended.
+              </Alert.Description>
+            </Alert.Root>
+          {:else if settingsTab && server && readonly}
             <Alert.Root>
               <Info />
               <Alert.Title>You have view-only access</Alert.Title>

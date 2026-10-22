@@ -171,7 +171,9 @@ impl FromRequestParts<Arc<Agent>> for Files {
           .ok_or_else(|| Error::bad("Invalid disk limit"))?,
       ),
       None => None,
-    };
+    }
+    // 0 is unlimited
+    .filter(|&l: &u64| l > 0);
     Ok(Self {
       agent: agent.clone(),
       deny,
@@ -213,6 +215,25 @@ impl Files {
       .deny
       .matched_path_or_any_parents(path, is_dir)
       .is_ignore()
+  }
+
+  /// Fails when a directory holds a denied path, moving or deleting it would
+  /// touch that path too.
+  fn check_descendants(&self, path: &Path) -> Result<()> {
+    let denied = !self.deny.is_empty()
+      && walkdir::WalkDir::new(path)
+        .follow_root_links(false)
+        .min_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .any(|e| self.denied(e.path(), e.file_type().is_dir()));
+    if denied {
+      return Err(Error(
+        ErrorCode::Denied,
+        "Path holds denylisted files".into(),
+      ));
+    }
+    Ok(())
   }
 
   /// Holds `more` bytes of the quota until settled or dropped, so parallel
@@ -474,6 +495,9 @@ pub async fn write(files: Files, Query(q): Query<PathQuery>, body: Bytes) -> Res
       f.write_all(&body)?;
       f.sync_all()?;
       chown(&tmp);
+      if let Some(m) = fs::symlink_metadata(&path).ok().filter(|m| m.is_file()) {
+        fs::set_permissions(&tmp, m.permissions())?;
+      }
       fs::rename(&tmp, &path)
     })();
     if res.is_err() {
@@ -560,10 +584,19 @@ pub async fn rename(
         return Err(Error::bad("Can't move a directory into itself"));
       }
       fs::symlink_metadata(&from)?;
+      files.check_descendants(&from)?;
+      files.check_descendants(&to)?;
       if !q.overwrite && fs::symlink_metadata(&to).is_ok() {
         return Err(Error(ErrorCode::Conflict, "Target already exists".into()));
       }
       mkdirs(to.parent().unwrap_or(&root))?;
+      // replacing a file keeps its mode, a re-uploaded start.sh stays executable
+      if q.overwrite
+        && let Ok(m) = fs::symlink_metadata(&to)
+        && m.is_file()
+      {
+        fs::set_permissions(&from, m.permissions())?;
+      }
       fs::rename(&from, &to)?;
     }
     Ok(StatusCode::NO_CONTENT)
@@ -594,12 +627,15 @@ fn copy_all(from: &Path, to: &Path, skip: impl Fn(&Path, bool) -> bool) -> io::R
     .follow_root_links(false)
     .into_iter()
     .filter_entry(|e| !skip(e.path(), e.file_type().is_dir()));
+  // dir modes are applied last, a read-only dir must still take its children
+  let mut dirs = Vec::new();
   for e in walk {
     let e = e?;
     let dst = to.join(e.path().strip_prefix(from).unwrap());
     let ft = e.file_type();
     if ft.is_dir() {
       fs::create_dir(&dst)?;
+      dirs.push((dst.clone(), e.metadata()?.permissions()));
     } else if ft.is_symlink() {
       std::os::unix::fs::symlink(fs::read_link(e.path())?, &dst)?;
     } else if ft.is_file() {
@@ -607,8 +643,12 @@ fn copy_all(from: &Path, to: &Path, skip: impl Fn(&Path, bool) -> bool) -> io::R
         &mut File::open(e.path())?,
         &mut open_nofollow().write(true).create_new(true).open(&dst)?,
       )?;
+      fs::set_permissions(&dst, e.metadata()?.permissions())?;
     }
     chown(&dst);
+  }
+  for (dst, perm) in dirs.into_iter().rev() {
+    fs::set_permissions(dst, perm)?;
   }
   Ok(())
 }
@@ -639,6 +679,9 @@ pub async fn delete(files: Files, Json(req): Json<DeleteRequest>) -> Result<Stat
     return Err(Error::bad("Can't delete the root"));
   }
   blocking(move || {
+    for path in &paths {
+      files.check_descendants(path)?;
+    }
     for path in paths {
       let res = match fs::symlink_metadata(&path) {
         Ok(m) if m.is_dir() => fs::remove_dir_all(&path),
@@ -995,6 +1038,24 @@ mod test {
   }
 
   #[test]
+  fn copy_keeps_modes() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tmp();
+    let mode = |p: &str| fs::metadata(root.join(p)).unwrap().permissions().mode() & 0o777;
+    fs::create_dir(root.join("a")).unwrap();
+    fs::write(root.join("a/start.sh"), "").unwrap();
+    fs::set_permissions(root.join("a/start.sh"), fs::Permissions::from_mode(0o755)).unwrap();
+    fs::set_permissions(root.join("a"), fs::Permissions::from_mode(0o555)).unwrap();
+    copy_all(&root.join("a"), &root.join("b"), |_, _| false).unwrap();
+    assert_eq!(mode("b/start.sh"), 0o755);
+    assert_eq!(mode("b"), 0o555);
+    for d in ["a", "b"] {
+      fs::set_permissions(root.join(d), fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    fs::remove_dir_all(root).unwrap();
+  }
+
+  #[test]
   fn ranges() {
     assert_eq!(parse_range("bytes=0-9", 100), Some((0, 9)));
     assert_eq!(parse_range("bytes=90-", 100), Some((90, 99)));
@@ -1015,6 +1076,33 @@ mod test {
     assert!(esc("a/link", "/etc/passwd"));
     // back down after leaving the root still escaped on the way
     assert!(esc("link", "../root/x"));
+  }
+
+  #[test]
+  fn descendants_skip_a_linked_root() {
+    let root = tmp();
+    fs::create_dir(root.join("dir")).unwrap();
+    fs::write(root.join("dir/secret.key"), "").unwrap();
+    std::os::unix::fs::symlink(root.join("dir"), root.join("link")).unwrap();
+    let mut deny = GitignoreBuilder::new(&root);
+    deny.add_line(None, "*.key").unwrap();
+    let files = Files {
+      agent: Arc::new(Agent {
+        token: String::new(),
+        root: root.clone(),
+        prepare: Default::default(),
+        usage: Default::default(),
+      }),
+      deny: deny.build().unwrap(),
+      limit: None,
+    };
+    assert_eq!(
+      files.check_descendants(&root.join("dir")).unwrap_err().0,
+      ErrorCode::Denied
+    );
+    // the link is moved or deleted, not what it points at
+    files.check_descendants(&root.join("link")).unwrap();
+    fs::remove_dir_all(root).unwrap();
   }
 
   #[test]

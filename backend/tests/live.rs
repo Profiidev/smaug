@@ -519,19 +519,29 @@ async fn upload_chunks_are_forwarded() {
     .await;
   assert_eq!(&last.body[..], &[1, 2, 3]);
 
-  let resp = s
-    .post(
-      &c.path(&format!("/files/upload/{stream}/complete")),
-      json!({ "sha256": "ab" }),
-    )
-    .await;
+  // answers once wings finished the op, with its error
+  let c = &c;
+  let complete = |sha256: &'static str, ok: bool| async move {
+    let path = c.path(&format!("/files/upload/{stream}/complete"));
+    let (resp, _) = tokio::join!(s.post(&path, json!({ "sha256": sha256 })), async {
+      c.fake
+        .wait(|r| is(r, Method::POST, "/complete") && r.json() == json!({ "sha256": sha256 }))
+        .await;
+      let error = (!ok).then_some("Checksum mismatch");
+      c.fake.event(json!({
+        "type": "OpFinished", "op": stream, "uuid": c.uuid, "ok": ok, "error": error, "result": null
+      }));
+    });
+    resp
+  };
+  let resp = complete("ab", true).await;
   assert_eq!(resp.status(), StatusCode::OK);
   assert_eq!(
     resp.json::<Value>().await.unwrap(),
     json!({ "op": Uuid::nil() })
   );
-  let complete = c.fake.wait(|r| is(r, Method::POST, "/complete")).await;
-  assert_eq!(complete.json(), json!({ "sha256": "ab" }));
+  let resp = complete("cd", false).await;
+  assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
   let resp = s
     .delete(&c.path(&format!("/files/upload/{stream}")), json!({}))

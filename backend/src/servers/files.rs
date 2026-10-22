@@ -1,5 +1,7 @@
 //! File manager, proxied to the server's wings (which jails every path).
 
+use std::time::Duration;
+
 use aide::axum::{
   ApiRouter,
   routing::{get_with, post_with, put_with},
@@ -10,7 +12,12 @@ use axum::{
   extract::{DefaultBodyLimit, Path, Query},
   response::Response,
 };
-use centaurus::{bail, db::init::Connection, error::Result, eyre::Context};
+use centaurus::{
+  bail,
+  db::init::Connection,
+  error::Result,
+  eyre::{Context, eyre},
+};
 use futures_util::stream::try_unfold;
 use http::{Method, StatusCode, header};
 use reqwest_middleware::RequestBuilder;
@@ -21,6 +28,7 @@ use shared::msg::{
   MkdirRequest, Move, OpStarted, OpenInStream, PathQuery, RenameRequest, StreamOpened,
   StreamTarget,
 };
+use tokio::time::timeout;
 use uuid::Uuid;
 
 use super::{
@@ -36,6 +44,8 @@ use crate::{
 const EDITOR_MAX: u64 = 1024 * 1024;
 /// Room for an upload chunk plus headers of the extractors.
 const BODY_LIMIT: usize = DEFAULT_CHUNK_SIZE as usize + 64 * 1024;
+/// Longest wait for wings to checksum and move a finished upload.
+const COMPLETE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
 pub(super) fn router() -> ApiRouter {
   ApiRouter::new()
@@ -478,7 +488,7 @@ async fn upload_chunk(
   Ok(())
 }
 
-/// The file is in place once the returned op finishes (`op_finished` frame).
+/// Returns once the file is in place, fails when wings' checksum or rename does.
 async fn complete_upload(
   auth: JwtAuth,
   db: Connection,
@@ -488,13 +498,27 @@ async fn complete_upload(
 ) -> Result<Json<OpStarted>> {
   let files = Files::load(&auth, &db, wings, p.uuid, Access::Write).await?;
   let route = format!("/streams/in/{}/complete", p.stream);
-  Ok(Json(
-    call(files.req(Method::POST, &route)?.json(&req))
-      .await?
+  let live = files.wings.live();
+  // op id is the stream id, wings answers before the file is in place
+  let finished = live.wait_op(p.stream);
+  let started = match call(files.req(Method::POST, &route)?.json(&req)).await {
+    Ok(res) => res
       .json()
       .await
       .context("Invalid complete response from the node")?,
-  ))
+    Err(err) => {
+      live.forget_op(p.stream);
+      return Err(err);
+    }
+  };
+  match timeout(COMPLETE_TIMEOUT, finished).await {
+    Ok(Ok(Ok(()))) => Ok(Json(started)),
+    Ok(Ok(Err(err))) => Err(eyre!("Upload failed: {err}").into()),
+    _ => {
+      live.forget_op(p.stream);
+      Err(eyre!("The node never finished the upload").into())
+    }
+  }
 }
 
 async fn cancel_upload(

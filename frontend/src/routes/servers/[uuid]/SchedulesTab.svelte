@@ -18,6 +18,7 @@
   import { toast } from '@profidev/pleiades/components/util/general';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { untrack } from 'svelte';
   import {
     createSchedule,
     deleteSchedule,
@@ -41,6 +42,7 @@
     scheduleForm,
     scheduleSchema,
     STATUS_LABELS,
+    pruneRuns,
     withRun,
     type Runs,
     type ScheduleForm
@@ -64,7 +66,8 @@
 
   let uuid = $derived(server.uuid);
   let canWrite = $derived(
-    server.access === 'admin' || server.access === 'write'
+    server.access === 'admin' ||
+      (server.access === 'write' && !server.suspended)
   );
   let selectedId = $derived(page.url.searchParams.get('id'));
 
@@ -90,7 +93,10 @@
     const res = await listSchedules({ path: { uuid } });
     if (seq !== loadSeq) return;
     failed = !res.data;
-    if (res.data) list = res.data;
+    if (res.data) {
+      list = res.data;
+      runs = pruneRuns(runs, res.data);
+    }
   };
 
   $effect(() => {
@@ -98,6 +104,11 @@
     list = undefined;
     runs = {};
     load();
+  });
+
+  // frames missed while disconnected are caught up by a reload
+  $effect(() => {
+    if (live.connected) untrack(load);
   });
 
   $effect(() =>

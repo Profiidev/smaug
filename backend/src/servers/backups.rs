@@ -54,6 +54,10 @@ const UPLOAD_CONCURRENCY: usize = 4;
 // ponytail: an OpFinished lost to a disconnect fails the restore after this,
 // ask wings for the stream status on reconnect if that gets annoying
 const RESTORE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+/// A restore chunk waits until wings stopped the server, up to its 10 min `STOP_WAIT`.
+const RESTORE_CHUNK_TIMEOUT: Duration = Duration::from_secs(11 * 60);
+/// Wings holds a backup chunk until it is generated, up to its 60s `CHUNK_WAIT`.
+const BACKUP_CHUNK_TIMEOUT: Duration = Duration::from_secs(90);
 const NAME_MAX: usize = 191;
 /// Serializes the backup limit check with the insert.
 // ponytail: one lock for all servers in one panel process, it is only held
@@ -348,22 +352,28 @@ impl Backups {
     }
     .await;
 
-    let saved = match result {
-      Ok((size, sha256)) => {
-        self.progress(server.id, id, BackupStatus::Completed, size);
-        self.db.backup().complete(id, size, sha256).await
-      }
+    // persist before the final frame, it makes the frontend reload the list
+    let (saved, status, size) = match result {
+      Ok((size, sha256)) => (
+        self.db.backup().complete(id, size, sha256).await,
+        BackupStatus::Completed,
+        size,
+      ),
       Err(err) => {
         let err: centaurus::error::ErrorReport = err;
         warn!("Backup {id} failed: {:?}", err.error);
         self.abort_stream(&server, stream).await;
-        self.progress(server.id, id, BackupStatus::Failed, 0);
-        self.db.backup().fail(id, err.error.to_string()).await
+        (
+          self.db.backup().fail(id, err.error.to_string()).await,
+          BackupStatus::Failed,
+          0,
+        )
       }
     };
     if let Err(err) = saved {
       warn!("Failed to save backup {id}: {err:?}");
     }
+    self.progress(server.id, id, status, size);
     self
       .updater
       .broadcast(UpdateMessage::Servers { uuid: server.id })
@@ -386,6 +396,7 @@ impl Backups {
       let res = call(
         self
           .request(server, Method::GET, &route)?
+          .timeout(BACKUP_CHUNK_TIMEOUT)
           .query(&[("ack", index)]),
       )
       .await?;
@@ -503,7 +514,13 @@ impl Backups {
         let end = (start + opened.chunk_size).min(size);
         let data = self.storage.get_range(&path, start..end).await?;
         let route = format!("/streams/in/{}/{index}", opened.stream);
-        call(self.request(&server, Method::PUT, &route)?.body(data)).await?;
+        call(
+          self
+            .request(&server, Method::PUT, &route)?
+            .timeout(RESTORE_CHUNK_TIMEOUT)
+            .body(data),
+        )
+        .await?;
         self.progress(server.id, backup.id, BackupStatus::Restoring, end);
       }
       let route = format!("/streams/in/{}/complete", opened.stream);
@@ -529,8 +546,9 @@ impl Backups {
         BackupStatus::Failed
       }
     };
-    self.progress(server.id, backup.id, status, backup.size_bytes as u64);
+    // persist before the final frame, it makes the frontend reload the list
     self.end_restore(backup.id).await;
+    self.progress(server.id, backup.id, status, backup.size_bytes as u64);
     self
       .updater
       .broadcast(UpdateMessage::Servers { uuid: server.id })

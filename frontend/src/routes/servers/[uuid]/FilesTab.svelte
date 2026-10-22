@@ -77,7 +77,8 @@
 
   let uuid = $derived(server.uuid);
   let canWrite = $derived(
-    server.access === 'admin' || server.access === 'write'
+    server.access === 'admin' ||
+      (server.access === 'write' && !server.suspended)
   );
   let path = $derived(normalize(page.url.searchParams.get('path') ?? '/'));
   let edit = $derived(page.url.searchParams.get('edit'));

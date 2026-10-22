@@ -287,6 +287,18 @@ describe('server edit page access', () => {
     expect(screen.getByRole('button', { name: 'Reinstall' })).toBeDisabled();
   });
 
+  it('write on a suspended server: suspended alert and everything disabled', async () => {
+    page.params = { tab: 'general', uuid: 'srv-1' };
+    await mount(info({ access: 'write', grants: null, suspended: true }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The server is suspended'
+    );
+    for (const label of ['Name', 'Command', 'Server Jar File']) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    }
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+  });
+
   it('disables Delete while installing', async () => {
     await mount(info({ install_state: 'installing', status: 'installing' }));
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();

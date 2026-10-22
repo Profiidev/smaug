@@ -461,10 +461,17 @@ impl Ctx {
         Next::Now
       }
       Action::Start => {
+        // a restore may have locked it since `locked` was read, the next
+        // step then sees the lock
+        let Some(gate) = self.store.unlocked(uuid).await else {
+          return Ok(Next::Now);
+        };
         // before the pull and the prepare, which can take minutes
         self.mark(uuid, &live.logs, ServerState::Starting).await?;
+        drop(gate);
         let wanted = |d: &Desired| {
-          d.power == DesiredPower::Running
+          !self.store.locked(uuid)
+            && d.power == DesiredPower::Running
             && d.server.install_generation == desired.server.install_generation
             && d.killed_at == desired.killed_at
         };
@@ -1201,7 +1208,7 @@ mod test {
       assert_eq!(props, format!("server-ip={}\n", docker.interface));
 
       // commands reach the console, its output arrives as log lines
-      let mut events = store.subscribe();
+      let mut events = store.subscribe_live();
       crate::servers::send_command(&store, uuid, "echo smaug-$((40+2))")
         .await
         .unwrap();

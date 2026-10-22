@@ -142,7 +142,7 @@ mod test {
   #[tokio::test]
   async fn batches_lines() {
     let store = memory();
-    let mut events = store.subscribe();
+    let mut events = store.subscribe_live();
     let uuid = Uuid::new_v4();
     let logs = Logs::spawn(store.clone(), uuid);
     for i in 0..300 {

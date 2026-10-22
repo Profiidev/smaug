@@ -62,6 +62,25 @@ export const applyBackupFrame = (progress: Progress, frame: BackupFrame) => {
   };
 };
 
+/**
+ * A restore that failed: the backend resets the row to completed right after,
+ * so the list alone never shows it.
+ */
+export const restoreFailed = (progress: Progress, frame: BackupFrame) =>
+  frame.status === 'failed' && progress[frame.id]?.status === 'restoring';
+
+/** Drops progress the fetched list no longer has busy, a lost final frame
+ * must not leave a backup stuck on creating/restoring. */
+export const pruneProgress = (
+  progress: Progress,
+  list: BackupInfo[]
+): Progress =>
+  Object.fromEntries(
+    Object.entries(progress).filter(([id]) =>
+      list.some((b) => b.id === id && isBusy(b.status))
+    )
+  );
+
 /** A listed backup with its live progress overlaid. */
 export const withProgress = (b: BackupInfo, progress: Progress) => ({
   ...b,

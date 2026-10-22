@@ -6,6 +6,8 @@ import {
   bytesOf,
   createBackupSchema,
   defaultBackupName,
+  pruneProgress,
+  restoreFailed,
   shortHash,
   withProgress
 } from '$routes/servers/[uuid]/backups';
@@ -16,6 +18,7 @@ import {
   formatRunTime,
   nextRunText,
   offsetText,
+  pruneRuns,
   scheduleBody,
   scheduleForm,
   scheduleSchema,
@@ -120,6 +123,16 @@ describe('schedule frames', () => {
     );
     expect(runs).toEqual({ s1: undefined, s2: 0 });
     expect('s1' in runs).toBe(true);
+  });
+
+  it('prunes runs the fetched list has no longer running', () => {
+    const list = [
+      schedule({ id: 's1', status: 'running' }),
+      schedule({ id: 's2' })
+    ];
+    expect(pruneRuns({ s1: 0, s2: 1, s3: undefined }, list)).toEqual({
+      s1: 0
+    });
   });
 });
 
@@ -281,6 +294,23 @@ describe('backup frames', () => {
     expect(withProgress(backup, done.progress).status).toBe('completed');
   });
 
+  it('prunes progress the list no longer has busy', () => {
+    const list = [
+      { ...backup, id: 'b1', status: 'creating' as const },
+      { ...backup, id: 'b2' }
+    ];
+    expect(
+      pruneProgress(
+        {
+          b1: { bytes: 1, status: 'creating' },
+          b2: { bytes: 2, status: 'restoring' },
+          b3: { bytes: 3, status: 'creating' }
+        },
+        list
+      )
+    ).toEqual({ b1: { bytes: 1, status: 'creating' } });
+  });
+
   it('treats failed as final', () => {
     expect(
       applyBackupFrame(
@@ -288,5 +318,22 @@ describe('backup frames', () => {
         { bytes: 1, id: 'b1', status: 'failed', type: 'backup' }
       )
     ).toEqual({ progress: {}, reload: true });
+  });
+
+  it('flags only a failed restore, the list resets it to completed', () => {
+    const failed = {
+      bytes: 0,
+      id: 'b1',
+      status: 'failed',
+      type: 'backup'
+    } as const;
+    expect(
+      restoreFailed({ b1: { bytes: 5, status: 'restoring' } }, failed)
+    ).toBe(true);
+    // a failed create stays failed in the list
+    expect(
+      restoreFailed({ b1: { bytes: 5, status: 'creating' } }, failed)
+    ).toBe(false);
+    expect(restoreFailed({}, failed)).toBe(false);
   });
 });

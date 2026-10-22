@@ -22,6 +22,7 @@
   import { Skeleton } from '@profidev/pleiades/components/ui/skeleton';
   import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import { toast } from '@profidev/pleiades/components/util/general';
+  import { untrack } from 'svelte';
   import {
     createBackup,
     deleteBackup,
@@ -41,6 +42,8 @@
     defaultBackupName,
     IGNORE_PLACEHOLDER,
     isBusy,
+    pruneProgress,
+    restoreFailed,
     shortHash,
     withProgress,
     type Progress as LiveProgress
@@ -56,7 +59,8 @@
 
   let uuid = $derived(server.uuid);
   let canWrite = $derived(
-    server.access === 'admin' || server.access === 'write'
+    server.access === 'admin' ||
+      (server.access === 'write' && !server.suspended)
   );
 
   /** Undefined while loading. */
@@ -84,7 +88,10 @@
     const res = await listBackups({ path: { uuid } });
     if (seq !== loadSeq) return;
     failed = !res.data;
-    if (res.data) list = res.data;
+    if (res.data) {
+      list = res.data;
+      progress = pruneProgress(progress, res.data.backups);
+    }
   };
 
   $effect(() => {
@@ -95,8 +102,17 @@
     load();
   });
 
+  // frames missed while disconnected are caught up by a reload
+  $effect(() => {
+    if (live.connected) untrack(load);
+  });
+
   $effect(() =>
     live.on('backup', (frame) => {
+      if (restoreFailed(progress, frame)) {
+        const name = list?.backups.find((b) => b.id === frame.id)?.name;
+        toast.error(`Couldn't restore ${name ?? 'the backup'}`);
+      }
       const next = applyBackupFrame(progress, frame);
       progress = next.progress;
       if (next.reload) load();

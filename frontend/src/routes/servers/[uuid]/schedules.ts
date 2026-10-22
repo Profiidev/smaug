@@ -168,6 +168,15 @@ export const applyScheduleFrame = (runs: Runs, frame: ScheduleFrame) => {
     : { reload: true, runs: rest };
 };
 
+/** Drops runs the fetched list no longer has running, a lost idle frame
+ * must not leave a schedule stuck on running. */
+export const pruneRuns = (runs: Runs, list: ScheduleInfo[]): Runs =>
+  Object.fromEntries(
+    Object.entries(runs).filter(([id]) =>
+      list.some((s) => s.id === id && s.status === 'running')
+    )
+  );
+
 /** A schedule with its live run state overlaid. */
 export const withRun = (s: ScheduleInfo, runs: Runs): ScheduleInfo =>
   s.id in runs ? { ...s, running_task: runs[s.id], status: 'running' } : s;

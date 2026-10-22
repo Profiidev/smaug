@@ -241,6 +241,8 @@ impl Link {
       return;
     }
     match self.db.server().find_by_id(server).await {
+      // another node must not write into its live view
+      Ok(model) if model.node_id != self.uuid => (),
       Ok(model) => self.live.publish(
         server,
         &LiveFrame::State {
@@ -263,6 +265,9 @@ impl Link {
         return;
       }
     };
+    if model.node_id != self.uuid {
+      return;
+    }
     let stats = LiveStats {
       cpu_millicores: metrics.cpu_millicores,
       cpu_limit_millicores: model.cpu_limit.max(0) as u64,
@@ -275,6 +280,17 @@ impl Link {
       uptime_ms: metrics.uptime_ms,
     };
     self.live.publish(metrics.uuid, &LiveFrame::Stats(stats));
+  }
+
+  /// Whether the watched server is on this node, so its events may reach the live view.
+  async fn publishes(&self, server: Uuid) -> bool {
+    self.live.is_watched(server)
+      && self
+        .db
+        .server()
+        .find_by_id(server)
+        .await
+        .is_ok_and(|model| model.node_id == self.uuid)
   }
 
   /// Best-effort request, the caller holds the lock. A failure is logged and
@@ -562,7 +578,9 @@ impl Link {
         uuid
       }
       Event::Logs { uuid, lines } => {
-        self.live.publish(uuid, &LiveFrame::Logs { lines });
+        if self.publishes(uuid).await {
+          self.live.publish(uuid, &LiveFrame::Logs { lines });
+        }
         return Ok(());
       }
       Event::Metrics { servers } => {
@@ -586,9 +604,11 @@ impl Link {
             Err(error.clone().unwrap_or_default())
           },
         );
-        self
-          .live
-          .publish(uuid, &LiveFrame::OpFinished { op, ok, error });
+        if self.publishes(uuid).await {
+          self
+            .live
+            .publish(uuid, &LiveFrame::OpFinished { op, ok, error });
+        }
         return Ok(());
       }
     };

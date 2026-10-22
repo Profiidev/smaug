@@ -66,16 +66,31 @@ describe('ServerLive connection', () => {
     }
   });
 
-  it('resets the backoff after a successful open', () => {
+  it('resets the backoff once a socket stayed open for 5 s', () => {
     live.connect();
     socket().close();
     vi.advanceTimersByTime(1000);
     socket().close();
     vi.advanceTimersByTime(2000);
     socket().open();
+    vi.advanceTimersByTime(5000);
     socket().close();
     vi.advanceTimersByTime(1000);
     expect(FakeWebSocket.all).toHaveLength(4);
+  });
+
+  it('keeps backing off when a socket closes right after opening', () => {
+    live.connect();
+    socket().open();
+    socket().close();
+    vi.advanceTimersByTime(1000);
+    socket().open();
+    vi.advanceTimersByTime(4999);
+    socket().close();
+    vi.advanceTimersByTime(1999);
+    expect(FakeWebSocket.all).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(FakeWebSocket.all).toHaveLength(3);
   });
 
   it('closes and stops reconnecting on disconnect', () => {

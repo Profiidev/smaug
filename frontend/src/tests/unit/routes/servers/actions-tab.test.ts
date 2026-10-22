@@ -153,7 +153,8 @@ describe('ActionsTab action availability', () => {
     'write access while %s may only reinstall',
     (status) => {
       mount(server(status, 'write'));
-      if (availableActions(status).reinstall) {
+      // a suspended server is read-only below admin
+      if (availableActions(status).reinstall && status !== 'suspended') {
         expect(button('Reinstall')).toBeEnabled();
       } else {
         expect(button('Reinstall')).toBeDisabled();
@@ -167,7 +168,11 @@ describe('ActionsTab action availability', () => {
         expect(button(name)).toBeDisabled();
       }
       expect(
-        screen.getByText(/These change the server's state/)
+        screen.getByText(
+          status === 'suspended'
+            ? /Only an admin can change it/
+            : /These change the server's state/
+        )
       ).toBeInTheDocument();
     }
   );
