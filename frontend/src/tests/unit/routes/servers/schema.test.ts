@@ -284,6 +284,7 @@ describe('startupStage', () => {
     ['startup', 'Startup command is required.'],
     ['image', 'Image is required.']
   ])('requires %s (whitespace counts as empty)', (key, message) => {
+    // oxlint-disable-next-line sort-keys
     const value = { image: 'img', startup: 'run', [key]: '  ' };
     expect(issues(startupStage, value)[key]).toEqual([message]);
   });
