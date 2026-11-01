@@ -32,7 +32,7 @@ aide = { version = "0.16.0-alpha.4", features = ["axum"] }
 rustls = { version = "0.23.46", features = ["aws-lc-rs"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 dashmap = "6.2.1"
-kube = { version = "4.2.0", default-features = false, features = [
+kube = { version = "5.0.0", default-features = false, features = [
   "client",
   "derive",
   "rustls-tls",
