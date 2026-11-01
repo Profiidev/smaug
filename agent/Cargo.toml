@@ -34,7 +34,7 @@ tokio-util = { version = "0.7.20", features = ["io", "io-util"] }
 
 [dev-dependencies]
 tower = { version = "=0.5.3", features = ["util"] }
-uuid = { version = "=1.28.0", features = ["v4"] }
+uuid = { version = "=1.29.0", features = ["v4"] }
 
 [[bin]]
 name = "smaug-agent"
