@@ -18,7 +18,7 @@ services:
     #command: npm i
 
   backend:
-    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b03ecb064002e849d0f65dfa3690053241b0bfe4b893926f527d70655ff8bedc
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:75520ac615ecee80262bde9954e9c440db9be2d9aecd3769158b43e664c765d0
     user: '${HOST_UID:-0}:${HOST_GID:-0}'
     volumes:
       - ./.cargo:/app/.cargo
@@ -36,7 +36,7 @@ services:
         condition: service_healthy
 
   wings:
-    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:b03ecb064002e849d0f65dfa3690053241b0bfe4b893926f527d70655ff8bedc
+    image: ghcr.io/profiidev/images/rust-musl-watch:main@sha256:75520ac615ecee80262bde9954e9c440db9be2d9aecd3769158b43e664c765d0
     restart: unless-stopped
     volumes:
       - ./wings:/app
@@ -74,7 +74,7 @@ services:
         && docker build -q -f Dockerfile.dev -t smaug-agent:dev target/image
 
   postgres:
-    image: postgres:18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    image: postgres:18@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81
     restart: unless-stopped
     volumes:
       - ./postgres:/var/lib/postgresql
