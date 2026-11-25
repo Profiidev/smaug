@@ -33,7 +33,7 @@ http = "1.5.0"
 jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 migration = { path = "migration" }
 reqwest = { version = "0.13.5", features = ["form", "json"] }
-rsa = "0.9.10"
+rsa = "0.10.0"
 schemars = { version = "1.2.3", features = [
   "chrono04",
   "indexmap2",
@@ -83,6 +83,6 @@ reqwest = { version = "=0.13.5", features = ["form", "json"] }
 # ordered maps straight into `IndexMap` and does not need it
 serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 base64 = "=0.23.1"
-rsa = "=0.9.10"
+rsa = "=0.10.0"
 uuid = { version = "=1.29.0", features = ["v4"] }
 testcontainers-modules = { version = "=0.15.0", features = ["postgres"] }
