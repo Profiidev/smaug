@@ -1,8 +1,8 @@
 import { renderComponent } from '@tanstack/svelte-table';
 import type { TableColumnDef } from '@profidev/pleiades/components/table/helpers.svelte';
 import { Checkbox } from '@profidev/pleiades/components/ui/checkbox';
-import type { FileEntry } from '$lib/client';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
+import type { FileEntry } from '#lib/client/index.ts';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
 import FileActions from './FileActions.svelte';
 import FileNameCell from './FileNameCell.svelte';
 import { formatBytes, relativeTime } from './files';

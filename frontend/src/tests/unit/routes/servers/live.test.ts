@@ -5,8 +5,8 @@ import {
   MAX_LINES,
   POINTS,
   ServerLive
-} from '$routes/servers/[uuid]/live.svelte';
-import { FakeWebSocket, stubWebSocket } from '$test_helpers/fake-websocket';
+} from '#routes/servers/[uuid]/live.svelte.ts';
+import { FakeWebSocket, stubWebSocket } from '#test_helpers/fake-websocket.ts';
 
 const stats = {
   cpu_limit_millicores: 2000,

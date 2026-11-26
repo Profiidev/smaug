@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import { toast } from '@profidev/pleiades/components/util/general';
-import { type ServerInfo, serverCommand, serverPower } from '$lib/client';
-import ConsoleTab from '$routes/servers/[uuid]/ConsoleTab.svelte';
-import { ServerLive } from '$routes/servers/[uuid]/live.svelte';
-import { powerActions } from '$routes/servers/status';
-import { FakeWebSocket, stubWebSocket } from '$test_helpers/fake-websocket';
+import {
+  type ServerInfo,
+  serverCommand,
+  serverPower
+} from '#lib/client/index.ts';
+import ConsoleTab from '#routes/servers/[uuid]/ConsoleTab.svelte';
+import { ServerLive } from '#routes/servers/[uuid]/live.svelte.ts';
+import { powerActions } from '#routes/servers/status.ts';
+import { FakeWebSocket, stubWebSocket } from '#test_helpers/fake-websocket.ts';
 import { serverInfo } from './fixtures';
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
@@ -14,7 +18,7 @@ vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
   toast: { error: vi.fn(), success: vi.fn() }
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   serverCommand: vi.fn(),
   serverPower: vi.fn()

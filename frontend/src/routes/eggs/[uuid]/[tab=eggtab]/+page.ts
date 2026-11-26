@@ -1,4 +1,4 @@
-import { eggInfo } from '$lib/client';
+import { eggInfo } from '#lib/client/index.ts';
 import type { PageLoad } from './$types';
 
 // Only params.uuid: switching tabs must not rerun this.

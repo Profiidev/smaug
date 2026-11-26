@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { toast as sonner } from 'svelte-sonner';
 import { invalidate } from '$app/navigation';
 import { toast } from '@profidev/pleiades/components/util/general';
-import { transferServer } from '$lib/client';
-import TransferDialog from '$routes/servers/[uuid]/TransferDialog.svelte';
+import { transferServer } from '#lib/client/index.ts';
+import TransferDialog from '#routes/servers/[uuid]/TransferDialog.svelte';
 import { options, serverInfo } from './fixtures';
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
@@ -17,7 +17,7 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   transferServer: vi.fn()
 }));

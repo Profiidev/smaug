@@ -14,11 +14,11 @@ import {
   deleteNode,
   nodeTokenRegenerate,
   updateNode
-} from '$lib/client';
-import EditPage from '$routes/nodes/[uuid]/[tab=nodetab]/+page.svelte';
-import { page } from '$test_helpers/page-state.svelte';
-import { adminUser } from '$mocks/e2e/data';
-import { Permission } from '$lib/permissions.svelte';
+} from '#lib/client/index.ts';
+import EditPage from '#routes/nodes/[uuid]/[tab=nodetab]/+page.svelte';
+import { page } from '#test_helpers/page-state.svelte.ts';
+import { adminUser } from '#mocks/e2e/data.ts';
+import { Permission } from '#lib/permissions.svelte.ts';
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
   ...(await orig<object>()),
@@ -30,14 +30,14 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   deleteNode: vi.fn(),
   nodeTokenRegenerate: vi.fn(),
   updateNode: vi.fn()
 }));
 
-vi.mock('$app/state', async () => import('$test_helpers/page-state.svelte'));
+vi.mock('$app/state', async () => import('#test_helpers/page-state.svelte.ts'));
 
 afterEach(cleanup);
 
@@ -194,8 +194,7 @@ describe('node edit page tabs', () => {
     await mount();
     await openTab('Resources');
     expect(goto).toHaveBeenCalledExactlyOnceWith('/nodes/node-1/resources', {
-      keepFocus: true,
-      noScroll: true
+      reset: false
     });
     expect(screen.getByRole('tab', { name: 'Resources' })).toHaveAttribute(
       'data-state',

@@ -28,7 +28,7 @@ import {
   toUpdateBody,
   variablesEdited,
   variablesStage
-} from '$routes/servers/schema.svelte';
+} from '#routes/servers/schema.svelte.ts';
 import { options, serverInfo } from './fixtures';
 
 const clone = <T>(v: T): T => structuredClone(v);

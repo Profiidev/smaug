@@ -32,7 +32,7 @@
     type BackupInfo,
     type BackupList,
     type ServerInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import { formatBytes } from '../format';
   import { relativeTime } from './files';
   import {

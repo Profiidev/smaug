@@ -1,9 +1,9 @@
 import { expect } from '@playwright/test';
 import { HttpResponse, delay } from 'msw';
-import * as gen from '$lib/client/msw.gen';
-import { test } from '$test_helpers/e2e-fixture';
-import { setupSession } from '$test_helpers/session';
-import { expectNoHorizontalOverflow, gotoReady } from '$test_helpers/layout';
+import * as gen from '#lib/client/msw.gen.ts';
+import { test } from '#test_helpers/e2e-fixture.ts';
+import { setupSession } from '#test_helpers/session.ts';
+import { expectNoHorizontalOverflow, gotoReady } from '#test_helpers/layout.ts';
 import {
   choose,
   combo,
@@ -16,7 +16,7 @@ import {
   save,
   survivalBody,
   tab
-} from '$test_helpers/servers-e2e';
+} from '#test_helpers/servers-e2e.ts';
 
 test.describe('server edit (admin)', () => {
   test.beforeEach(async ({ context }) => setupSession(context));
@@ -604,6 +604,7 @@ test.describe('server edit: the URL names the open tab', () => {
       page.getByRole('button', { name: 'Save Changes' })
     ).toBeHidden();
     await openTab(page, 'Resources');
+    await expect(page).toHaveURL(/\/servers\/srv-survival\/resources$/);
     await page.goBack();
     await page.goBack();
     await expect(page).toHaveURL(/\/servers\/srv-survival\/general$/);

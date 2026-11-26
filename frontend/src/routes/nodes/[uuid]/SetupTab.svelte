@@ -10,8 +10,8 @@
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import { toast } from '@profidev/pleiades/components/util/general';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
-  import * as Code from '$lib/components/code';
-  import { nodeTokenRegenerate } from '$lib/client';
+  import * as Code from '#lib/components/code/index.ts';
+  import { nodeTokenRegenerate } from '#lib/client/index.ts';
   import { dockerCompose, dockerRun } from './code.svelte';
 
   interface Props {

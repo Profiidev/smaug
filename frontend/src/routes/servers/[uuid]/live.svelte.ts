@@ -4,7 +4,7 @@ import type {
   LiveStats,
   LogStream,
   ServerStatus
-} from '$lib/client';
+} from '#lib/client/index.ts';
 
 /** Lines kept client-side. */
 export const MAX_LINES = 1000;

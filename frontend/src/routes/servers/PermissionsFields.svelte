@@ -9,7 +9,7 @@
     FormValue,
     SuperForm
   } from '@profidev/pleiades/components/form/types';
-  import type { ServerOptions } from '$lib/client';
+  import type { ServerOptions } from '#lib/client/index.ts';
   import type { permissionsStage } from './schema.svelte';
 
   interface Props {

@@ -5,7 +5,7 @@
   import MultistepForm from '@profidev/pleiades/components/form/multistep-form.svelte';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-  import { createNode } from '$lib/client';
+  import { createNode } from '#lib/client/index.ts';
   import GeneralSettings from '../GeneralSettings.svelte';
   import AdvancedSettings from '../AdvancedSettings.svelte';
   import { reformatData, type NodeForm } from '../schema.svelte';

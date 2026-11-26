@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateVariable } from '$routes/servers/rules';
+import { validateVariable } from '#routes/servers/rules.ts';
 
 const v = (value: string, rules: string[]) =>
   validateVariable(value, rules, 'Max players');

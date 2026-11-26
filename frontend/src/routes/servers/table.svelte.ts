@@ -5,8 +5,8 @@ import {
   createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
-import type { Allocation, ServerListItem } from '$lib/client';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
+import type { Allocation, ServerListItem } from '#lib/client/index.ts';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
 import NameCell from './NameCell.svelte';
 import StatusBadge from './StatusBadge.svelte';
 import { availableActions } from './status';

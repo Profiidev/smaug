@@ -1,10 +1,10 @@
 import { expect } from '@playwright/test';
 import { HttpResponse } from 'msw';
-import * as gen from '$lib/client/msw.gen';
-import { test } from '$test_helpers/e2e-fixture';
-import { setupSession } from '$test_helpers/session';
-import { expectNoHorizontalOverflow, gotoReady } from '$test_helpers/layout';
-import { choose, ok, row } from '$test_helpers/servers-e2e';
+import * as gen from '#lib/client/msw.gen.ts';
+import { test } from '#test_helpers/e2e-fixture.ts';
+import { setupSession } from '#test_helpers/session.ts';
+import { expectNoHorizontalOverflow, gotoReady } from '#test_helpers/layout.ts';
+import { choose, ok, row } from '#test_helpers/servers-e2e.ts';
 
 test.describe('servers list', () => {
   test.beforeEach(async ({ context }) => setupSession(context));

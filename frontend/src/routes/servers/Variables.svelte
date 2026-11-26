@@ -5,7 +5,7 @@
     SubmitHandler
   } from '@profidev/pleiades/components/form/types';
   import type { Snippet } from 'svelte';
-  import ApplyErrors from '$lib/components/form/ApplyErrors.svelte';
+  import ApplyErrors from '#lib/components/form/ApplyErrors.svelte';
   import {
     SECTION_DESCRIPTIONS,
     type WizardData,

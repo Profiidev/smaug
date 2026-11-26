@@ -8,8 +8,12 @@
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { z } from 'zod';
-  import { Permission } from '$lib/permissions.svelte';
-  import { deleteNode, type NodeInfo, type UserInfo } from '$lib/client';
+  import { Permission } from '#lib/permissions.svelte.ts';
+  import {
+    deleteNode,
+    type NodeInfo,
+    type UserInfo
+  } from '#lib/client/index.ts';
   import { columns } from './table.svelte';
   import { DELETE_DESCRIPTION, deleteError } from './schema.svelte';
 

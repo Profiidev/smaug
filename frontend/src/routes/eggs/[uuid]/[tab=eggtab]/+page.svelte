@@ -9,7 +9,7 @@
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import { Spinner } from '@profidev/pleiades/components/ui/spinner';
   import * as DropdownMenu from '@profidev/pleiades/components/ui/dropdown-menu';
-  import { Permission } from '$lib/permissions.svelte';
+  import { Permission } from '#lib/permissions.svelte.ts';
   import FormDialog from '@profidev/pleiades/components/form/form-dialog.svelte';
   import { z } from 'zod';
   import { toast } from '@profidev/pleiades/components/util/general';
@@ -17,7 +17,7 @@
   import { page } from '$app/state';
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import { Skeleton } from '@profidev/pleiades/components/ui/skeleton';
-  import { deleteEgg, editEgg, type UserInfo } from '$lib/client';
+  import { deleteEgg, editEgg, type UserInfo } from '#lib/client/index.ts';
   import {
     apiErrorMessage,
     deleteError,
@@ -37,8 +37,8 @@
   import InstallScriptFields from '../../InstallScriptFields.svelte';
   import RuntimeFields from '../../RuntimeFields.svelte';
   import ConfigFields from '../../ConfigFields.svelte';
-  import SaveBar from '$lib/components/form/SaveBar.svelte';
-  import SectionErrorDot from '$lib/components/form/SectionErrorDot.svelte';
+  import SaveBar from '#lib/components/form/SaveBar.svelte';
+  import SectionErrorDot from '#lib/components/form/SectionErrorDot.svelte';
   import UpdateDialog from '../../UpdateDialog.svelte';
   import { checkEggUpdate, type EggUpdate } from '../../update';
 
@@ -94,7 +94,7 @@
 
   const setTab = (value: string) => {
     if (value !== tab) {
-      goto(`/eggs/${data.uuid}/${value}`, { keepFocus: true, noScroll: true });
+      goto(`/eggs/${data.uuid}/${value}`, { reset: false });
     }
   };
 

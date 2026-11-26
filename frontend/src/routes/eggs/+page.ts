@@ -1,4 +1,4 @@
-import { listEggs } from '$lib/client';
+import { listEggs } from '#lib/client/index.ts';
 import type { PageLoad } from './$types';
 
 export const load = (({ fetch, url }) => ({

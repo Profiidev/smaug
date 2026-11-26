@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BackupInfo, BackupStatus } from '$lib/client';
+import type { BackupInfo, BackupStatus } from '#lib/client/index.ts';
 import { formatBytes } from '../format';
 import type { BackupFrame } from './live.svelte';
 

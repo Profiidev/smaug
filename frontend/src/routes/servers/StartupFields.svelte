@@ -13,7 +13,7 @@
     FormValue,
     SuperForm
   } from '@profidev/pleiades/components/form/types';
-  import type { OptionEgg } from '$lib/client';
+  import type { OptionEgg } from '#lib/client/index.ts';
   import {
     defaultCommand,
     MAX_STOP_TIMEOUT,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { BackupInfo, CronFields, ScheduleInfo } from '$lib/client';
+import type {
+  BackupInfo,
+  CronFields,
+  ScheduleInfo
+} from '#lib/client/index.ts';
 import {
   applyBackupFrame,
   backupProgress,
@@ -10,7 +14,7 @@ import {
   restoreFailed,
   shortHash,
   withProgress
-} from '$routes/servers/[uuid]/backups';
+} from '#routes/servers/[uuid]/backups.ts';
 import {
   applyScheduleFrame,
   cronText,
@@ -24,7 +28,7 @@ import {
   scheduleSchema,
   taskSchema,
   withRun
-} from '$routes/servers/[uuid]/schedules';
+} from '#routes/servers/[uuid]/schedules.ts';
 
 const GiB = 1024 ** 3;
 

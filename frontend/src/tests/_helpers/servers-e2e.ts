@@ -1,6 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { HttpResponse, ws } from 'msw';
-import * as gen from '$lib/client/msw.gen';
+import * as gen from '#lib/client/msw.gen.ts';
 import { serverInfoOf } from '../mocks/e2e/data';
 
 export const ok = () => new HttpResponse(null, { status: 200 }) as never;

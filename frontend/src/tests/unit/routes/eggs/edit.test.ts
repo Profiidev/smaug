@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { goto } from '$app/navigation';
-import EditPage from '$routes/eggs/[uuid]/[tab=eggtab]/+page.svelte';
-import { page } from '$test_helpers/page-state.svelte';
-import { adminUser, eggInfo } from '$mocks/e2e/data';
+import EditPage from '#routes/eggs/[uuid]/[tab=eggtab]/+page.svelte';
+import { page } from '#test_helpers/page-state.svelte.ts';
+import { adminUser, eggInfo } from '#mocks/e2e/data.ts';
 
-vi.mock('$app/state', async () => import('$test_helpers/page-state.svelte'));
+vi.mock('$app/state', async () => import('#test_helpers/page-state.svelte.ts'));
 
 afterEach(cleanup);
 
@@ -76,8 +76,7 @@ describe('egg edit page tabs', () => {
     await mount();
     await openTab('Install script');
     expect(goto).toHaveBeenCalledExactlyOnceWith('/eggs/egg-paper/install', {
-      keepFocus: true,
-      noScroll: true
+      reset: false
     });
     expect(tab('Install script')).toHaveAttribute('data-state', 'active');
   });

@@ -1,4 +1,4 @@
-import type { CreateNode, NodeInfo } from '$lib/client';
+import type { CreateNode, NodeInfo } from '#lib/client/index.ts';
 import type {
   FormRecord,
   FormValue,

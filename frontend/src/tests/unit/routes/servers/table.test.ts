@@ -4,11 +4,11 @@ import {
   columns,
   formatAllocation,
   toRow
-} from '$routes/servers/table.svelte';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
+} from '#routes/servers/table.svelte.ts';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
 import Container from '@lucide/svelte/icons/container';
-import NameCell from '$routes/servers/NameCell.svelte';
-import StatusBadge from '$routes/servers/StatusBadge.svelte';
+import NameCell from '#routes/servers/NameCell.svelte';
+import StatusBadge from '#routes/servers/StatusBadge.svelte';
 import { servers } from './fixtures';
 
 vi.mock('@tanstack/svelte-table', async (orig) => ({

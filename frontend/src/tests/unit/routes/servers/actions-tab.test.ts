@@ -14,9 +14,9 @@ import {
   reinstallServer,
   setServerInstalled,
   setServerSuspended
-} from '$lib/client';
-import ActionsTab from '$routes/servers/[uuid]/ActionsTab.svelte';
-import { availableActions } from '$routes/servers/status';
+} from '#lib/client/index.ts';
+import ActionsTab from '#routes/servers/[uuid]/ActionsTab.svelte';
+import { availableActions } from '#routes/servers/status.ts';
 import { options, serverInfo } from './fixtures';
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
@@ -29,7 +29,7 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   reinstallServer: vi.fn(),
   setServerInstalled: vi.fn(),

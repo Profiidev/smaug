@@ -17,7 +17,7 @@
     setServerSuspended,
     type Named,
     type ServerInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import { availableActions } from '../status';
   import { formatAllocation } from '../format';
   import TransferDialog from './TransferDialog.svelte';

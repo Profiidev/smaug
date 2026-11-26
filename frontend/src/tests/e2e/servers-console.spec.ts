@@ -1,17 +1,17 @@
 import { type Page, expect } from '@playwright/test';
 import { HttpResponse } from 'msw';
-import * as gen from '$lib/client/msw.gen';
-import { serverInfoOf as serverInfo } from '../mocks/e2e/data';
-import { test } from '$test_helpers/e2e-fixture';
-import { setupSession } from '$test_helpers/session';
-import { expectNoHorizontalOverflow, gotoReady } from '$test_helpers/layout';
+import * as gen from '#lib/client/msw.gen.ts';
+import { serverInfoOf as serverInfo, serverOptions } from '../mocks/e2e/data';
+import { test } from '#test_helpers/e2e-fixture.ts';
+import { setupSession } from '#test_helpers/session.ts';
+import { expectNoHorizontalOverflow, gotoReady } from '#test_helpers/layout.ts';
 import {
   action,
   asAccess,
   liveFrames,
   ok,
   stateFrame
-} from '$test_helpers/servers-e2e';
+} from '#test_helpers/servers-e2e.ts';
 
 const POWER = ['Start', 'Restart', 'Stop', 'Kill'];
 const matrix: [string, string[]][] = [
@@ -217,6 +217,10 @@ test.describe('server console', () => {
 
   test('shows the node error', async ({ network, page }) => {
     network.use(
+      // `/api/servers/:uuid` below would also answer `/api/servers/options`.
+      gen.handleServerOptions(
+        () => HttpResponse.json(serverOptions.default) as never
+      ),
       gen.handleServerInfo(
         ({ params }) =>
           HttpResponse.json({

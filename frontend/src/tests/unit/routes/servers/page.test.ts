@@ -9,11 +9,11 @@ import {
 import { toast as sonner } from 'svelte-sonner';
 import { goto, invalidate } from '$app/navigation';
 import { toast } from '@profidev/pleiades/components/util/general';
-import { createServer, deleteServer } from '$lib/client';
-import ListPage from '$routes/servers/+page.svelte';
-import CreatePage from '$routes/servers/create/+page.svelte';
-import { adminUser } from '$mocks/e2e/data';
-import { Permission } from '$lib/permissions.svelte';
+import { createServer, deleteServer } from '#lib/client/index.ts';
+import ListPage from '#routes/servers/+page.svelte';
+import CreatePage from '#routes/servers/create/+page.svelte';
+import { adminUser } from '#mocks/e2e/data.ts';
+import { Permission } from '#lib/permissions.svelte.ts';
 import { options, servers } from './fixtures';
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
@@ -26,7 +26,7 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   createServer: vi.fn(),
   deleteServer: vi.fn()

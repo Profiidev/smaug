@@ -14,7 +14,7 @@
   import Runtime from '../Runtime.svelte';
   import Config from '../Config.svelte';
   import ImportButton from '../ImportButton.svelte';
-  import { createEgg } from '$lib/client';
+  import { createEgg } from '#lib/client/index.ts';
   import {
     apiErrorMessage,
     STAGE_KEYS,

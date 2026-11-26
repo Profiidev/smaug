@@ -6,8 +6,8 @@
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { z } from 'zod';
-  import ApplyErrors from '$lib/components/form/ApplyErrors.svelte';
-  import { transferServer, type Named } from '$lib/client';
+  import ApplyErrors from '#lib/components/form/ApplyErrors.svelte';
+  import { transferServer, type Named } from '#lib/client/index.ts';
   import { allocationRow, isFieldErrors } from '../schema.svelte';
 
   interface Props {

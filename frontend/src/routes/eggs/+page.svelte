@@ -12,8 +12,12 @@
   import * as Empty from '@profidev/pleiades/components/ui/empty';
   import Egg from '@lucide/svelte/icons/egg';
   import ImportButton from './ImportButton.svelte';
-  import { Permission } from '$lib/permissions.svelte';
-  import { deleteEgg, type EggListItem, type UserInfo } from '$lib/client';
+  import { Permission } from '#lib/permissions.svelte.ts';
+  import {
+    deleteEgg,
+    type EggListItem,
+    type UserInfo
+  } from '#lib/client/index.ts';
   import { deleteError, type EggImport } from './schema.svelte';
   import { checkEggUpdate, type EggUpdate } from './update';
   import UpdateDialog from './UpdateDialog.svelte';

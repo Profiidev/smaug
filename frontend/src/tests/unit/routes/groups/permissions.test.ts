@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
-import Harness from '$test_helpers/GroupPermissionsHarness.svelte';
-import { Permission } from '$lib/permissions.svelte';
-import type { UserInfo } from '$lib/client';
+import Harness from '#test_helpers/GroupPermissionsHarness.svelte';
+import { Permission } from '#lib/permissions.svelte.ts';
+import type { UserInfo } from '#lib/client/index.ts';
 
 const allPermissions = Object.values(Permission);
 const userWith = (permissions: string[]) =>

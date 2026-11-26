@@ -10,8 +10,12 @@
   import { toast } from '@profidev/pleiades/components/util/general';
   import { invalidate } from '$app/navigation';
   import { z } from 'zod';
-  import { Permission } from '$lib/permissions.svelte';
-  import { ServerStatus, deleteServer, type UserInfo } from '$lib/client';
+  import { Permission } from '#lib/permissions.svelte.ts';
+  import {
+    ServerStatus,
+    deleteServer,
+    type UserInfo
+  } from '#lib/client/index.ts';
   import { columns, toRow, type ServerRow } from './table.svelte';
   import { STATUS } from './status';
 

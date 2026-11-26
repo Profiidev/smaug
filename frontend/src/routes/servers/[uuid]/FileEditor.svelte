@@ -35,7 +35,7 @@
   import * as Select from '@profidev/pleiades/components/ui/select';
   import { toast } from '@profidev/pleiades/components/util/general';
   import { beforeNavigate } from '$app/navigation';
-  import { fileContent, writeFileContent } from '$lib/client';
+  import { fileContent, writeFileContent } from '#lib/client/index.ts';
   import {
     changedLines,
     formatBytes,
