@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { columns } from '$routes/eggs/table.svelte';
-import type { EggListItem } from '$lib/client';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
-import NameCell from '$routes/eggs/NameCell.svelte';
+import { columns } from '#routes/eggs/table.svelte.ts';
+import type { EggListItem } from '#lib/client/index.ts';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
+import NameCell from '#routes/eggs/NameCell.svelte';
 
 vi.mock('@tanstack/svelte-table', async (orig) => ({
   ...(await orig<object>()),

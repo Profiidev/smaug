@@ -33,7 +33,7 @@
     uploadChunk,
     type FileEntry,
     type ServerInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import FileActions from './FileActions.svelte';
   import FileEditor from './FileEditor.svelte';
   import FileNameCell from './FileNameCell.svelte';
@@ -207,8 +207,7 @@
       if (!res.response?.ok) return exists(res.response?.status);
       promptOpen = false;
       goto(hrefFor(dirOf(target), baseOf(target)), {
-        keepFocus: true,
-        noScroll: true
+        reset: false
       });
       return;
     } else if (renaming) {

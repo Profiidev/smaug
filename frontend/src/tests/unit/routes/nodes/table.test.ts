@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import Lock from '@lucide/svelte/icons/lock';
 import LockOpen from '@lucide/svelte/icons/lock-open';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
-import Status from '$lib/components/table/Status.svelte';
-import NameCell from '$routes/servers/NameCell.svelte';
-import { columns } from '$routes/nodes/table.svelte';
-import type { NodeInfo } from '$lib/client';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
+import Status from '#lib/components/table/Status.svelte';
+import NameCell from '#routes/servers/NameCell.svelte';
+import { columns } from '#routes/nodes/table.svelte.ts';
+import type { NodeInfo } from '#lib/client/index.ts';
 
 vi.mock('@tanstack/svelte-table', async (orig) => ({
   ...(await orig<object>()),

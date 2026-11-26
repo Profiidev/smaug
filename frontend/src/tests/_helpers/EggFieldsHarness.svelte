@@ -7,7 +7,7 @@
     eggSettings,
     stageForm,
     type EggForm
-  } from '$routes/eggs/schema.svelte';
+  } from '#routes/eggs/schema.svelte.ts';
 
   interface Props {
     fields: Component<{ formData: never; disabled: boolean }>;

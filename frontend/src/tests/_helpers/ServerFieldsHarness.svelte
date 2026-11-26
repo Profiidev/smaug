@@ -3,12 +3,12 @@
   // tests can drive the inputs and read the bound form value back.
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
   import type { Component } from 'svelte';
-  import ApplyErrors from '$lib/components/form/ApplyErrors.svelte';
+  import ApplyErrors from '#lib/components/form/ApplyErrors.svelte';
   import {
     serverSettings,
     stageForm,
     type ServerForm
-  } from '$routes/servers/schema.svelte';
+  } from '#routes/servers/schema.svelte.ts';
 
   interface Props {
     fields: Component<{ formData: never; disabled: boolean }>;

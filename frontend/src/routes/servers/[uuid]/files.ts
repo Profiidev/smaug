@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import type { FileEntry } from '$lib/client';
+import type { FileEntry } from '#lib/client/index.ts';
 
 /** The editor refuses bigger files (the backend answers `413`). */
 export const EDIT_LIMIT = 1024 * 1024;

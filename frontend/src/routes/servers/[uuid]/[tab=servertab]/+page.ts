@@ -1,4 +1,4 @@
-import { serverInfo, serverOptions } from '$lib/client';
+import { serverInfo, serverOptions } from '#lib/client/index.ts';
 import type { PageLoad } from './$types';
 
 // Only params.uuid: switching tabs must not rerun this.

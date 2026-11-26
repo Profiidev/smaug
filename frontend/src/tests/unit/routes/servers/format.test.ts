@@ -6,7 +6,7 @@ import {
   formatRate,
   formatUptime,
   percent
-} from '$routes/servers/format';
+} from '#routes/servers/format.ts';
 
 describe('formatAllocation', () => {
   it('joins IPv4 and brackets IPv6', () => {

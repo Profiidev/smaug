@@ -23,8 +23,8 @@ import {
   type PelicanVariable,
   type PterodactylEggV2,
   RESERVED_ENV_NAMES
-} from '$lib/egg';
-import type { EggBody } from '$lib/client';
+} from '#lib/egg.ts';
+import type { EggBody } from '#lib/client/index.ts';
 
 export const PARSER_OPTIONS = PARSERS.map((v) => ({ label: v, value: v }));
 

@@ -1,9 +1,9 @@
 <script lang="ts">
   // Renders the group Permissions component inside a real BaseForm (superForm).
   import BaseForm from '@profidev/pleiades/components/form/base-form.svelte';
-  import type { UserInfo } from '$lib/client';
-  import Permissions from '$routes/groups/[uuid]/Permissions.svelte';
-  import { groupSettings } from '$routes/groups/[uuid]/schema.svelte';
+  import type { UserInfo } from '#lib/client/index.ts';
+  import Permissions from '#routes/groups/[uuid]/Permissions.svelte';
+  import { groupSettings } from '#routes/groups/[uuid]/schema.svelte.ts';
 
   interface Props {
     user?: UserInfo;

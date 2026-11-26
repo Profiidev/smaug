@@ -1,10 +1,10 @@
 import { expect } from '@playwright/test';
 import { HttpResponse } from 'msw';
-import * as gen from '$lib/client/msw.gen';
-import { test } from '$test_helpers/e2e-fixture';
-import { setupSession } from '$test_helpers/session';
-import { gotoReady } from '$test_helpers/layout';
-import { action, combo, ok } from '$test_helpers/servers-e2e';
+import * as gen from '#lib/client/msw.gen.ts';
+import { test } from '#test_helpers/e2e-fixture.ts';
+import { setupSession } from '#test_helpers/session.ts';
+import { gotoReady } from '#test_helpers/layout.ts';
+import { action, combo, ok } from '#test_helpers/servers-e2e.ts';
 import { serverOptions } from '../mocks/e2e/data';
 
 test.describe('server transfer and delete', () => {

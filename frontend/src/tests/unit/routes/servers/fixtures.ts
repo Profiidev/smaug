@@ -1,4 +1,8 @@
-import type { ServerInfo, ServerListItem, ServerOptions } from '$lib/client';
+import type {
+  ServerInfo,
+  ServerListItem,
+  ServerOptions
+} from '#lib/client/index.ts';
 
 export const options: ServerOptions = {
   eggs: [

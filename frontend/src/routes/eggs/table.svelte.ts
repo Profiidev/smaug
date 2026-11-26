@@ -4,9 +4,9 @@ import {
   createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
-import type { EggListItem } from '$lib/client';
+import type { EggListItem } from '#lib/client/index.ts';
 import type { EggUpdate } from './update';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
 import NameCell from './NameCell.svelte';
 
 export const columns = ({

@@ -2,7 +2,7 @@
   import FileIcon from '@lucide/svelte/icons/file';
   import Folder from '@lucide/svelte/icons/folder';
   import FileSymlink from '@lucide/svelte/icons/file-symlink';
-  import type { FileEntry } from '$lib/client';
+  import type { FileEntry } from '#lib/client/index.ts';
 
   interface Props {
     entry: FileEntry;

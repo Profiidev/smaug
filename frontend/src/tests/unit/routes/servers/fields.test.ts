@@ -7,17 +7,17 @@ import {
   waitFor,
   within
 } from '@testing-library/svelte';
-import Harness from '$test_helpers/ServerFieldsHarness.svelte';
-import GeneralFields from '$routes/servers/GeneralFields.svelte';
-import StartupFields from '$routes/servers/StartupFields.svelte';
-import VariablesFields from '$routes/servers/VariablesFields.svelte';
-import ResourcesFields from '$routes/servers/ResourcesFields.svelte';
-import PermissionsFields from '$routes/servers/PermissionsFields.svelte';
+import Harness from '#test_helpers/ServerFieldsHarness.svelte';
+import GeneralFields from '#routes/servers/GeneralFields.svelte';
+import StartupFields from '#routes/servers/StartupFields.svelte';
+import VariablesFields from '#routes/servers/VariablesFields.svelte';
+import ResourcesFields from '#routes/servers/ResourcesFields.svelte';
+import PermissionsFields from '#routes/servers/PermissionsFields.svelte';
 import {
   type ServerForm,
   eggVariables,
   fromServerInfo
-} from '$routes/servers/schema.svelte';
+} from '#routes/servers/schema.svelte.ts';
 import { options, serverInfo } from './fixtures';
 
 // SvelteKit's real applyAction needs a mounted app root; superforms calls it on invalid submits.

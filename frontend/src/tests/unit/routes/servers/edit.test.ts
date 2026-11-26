@@ -9,14 +9,18 @@ import {
 import { toast as sonner } from 'svelte-sonner';
 import { goto } from '$app/navigation';
 import { toast } from '@profidev/pleiades/components/util/general';
-import { type ServerInfo, deleteServer, updateServer } from '$lib/client';
-import EditPage from '$routes/servers/[uuid]/[tab=servertab]/+page.svelte';
-import { fromServerInfo, toUpdateBody } from '$routes/servers/schema.svelte';
-import { page } from '$test_helpers/page-state.svelte';
-import { FakeWebSocket, stubWebSocket } from '$test_helpers/fake-websocket';
+import {
+  type ServerInfo,
+  deleteServer,
+  updateServer
+} from '#lib/client/index.ts';
+import EditPage from '#routes/servers/[uuid]/[tab=servertab]/+page.svelte';
+import { fromServerInfo, toUpdateBody } from '#routes/servers/schema.svelte.ts';
+import { page } from '#test_helpers/page-state.svelte.ts';
+import { FakeWebSocket, stubWebSocket } from '#test_helpers/fake-websocket.ts';
 import { options, serverInfo } from './fixtures';
 
-vi.mock('$app/state', async () => import('$test_helpers/page-state.svelte'));
+vi.mock('$app/state', async () => import('#test_helpers/page-state.svelte.ts'));
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
   ...(await orig<object>()),
@@ -28,7 +32,7 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   deleteServer: vi.fn(),
   updateServer: vi.fn()
@@ -380,9 +384,8 @@ describe('server edit page save', () => {
       'active'
     );
     expect(goto).toHaveBeenLastCalledWith('/servers/srv-1/variables', {
-      keepFocus: true,
-      noScroll: true,
-      replaceState: false
+      replace: false,
+      reset: false
     });
     for (const name of ['Variables', 'Resources']) {
       const tab = screen.getByRole('tab', { name: new RegExp(`^${name}`) });
@@ -419,9 +422,8 @@ describe('server edit page save', () => {
       'active'
     );
     expect(goto).toHaveBeenLastCalledWith('/servers/srv-1/general', {
-      keepFocus: true,
-      noScroll: true,
-      replaceState: false
+      replace: false,
+      reset: false
     });
   });
 
@@ -724,9 +726,8 @@ describe('server edit page tabs', () => {
     await mount();
     await openTab('Startup');
     expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/startup', {
-      keepFocus: true,
-      noScroll: true,
-      replaceState: false
+      replace: false,
+      reset: false
     });
     expect(tab('Startup')).toHaveAttribute('data-state', 'active');
   });
@@ -758,9 +759,8 @@ describe('server edit page tabs', () => {
       await mount(asAccess(access));
       await vi.waitFor(() =>
         expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/console', {
-          keepFocus: true,
-          noScroll: true,
-          replaceState: true
+          replace: true,
+          reset: false
         })
       );
       expect(tab('Console')).toHaveAttribute('data-state', 'active');
@@ -772,9 +772,8 @@ describe('server edit page tabs', () => {
     await mount(info({ backup_limit: 0 }));
     await vi.waitFor(() =>
       expect(goto).toHaveBeenCalledExactlyOnceWith('/servers/srv-1/console', {
-        keepFocus: true,
-        noScroll: true,
-        replaceState: true
+        replace: true,
+        reset: false
       })
     );
     expect(

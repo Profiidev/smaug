@@ -1,4 +1,4 @@
-import type { Allocation } from '$lib/client';
+import type { Allocation } from '#lib/client/index.ts';
 
 /** `ip:port`, IPv6 in brackets. */
 export const formatAllocation = ({ ip, port }: Allocation) =>

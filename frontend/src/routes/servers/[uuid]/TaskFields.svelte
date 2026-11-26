@@ -8,7 +8,7 @@
   } from '@profidev/pleiades/components/form/types';
   import * as Select from '@profidev/pleiades/components/ui/select';
   import { Label } from '@profidev/pleiades/components/ui/label';
-  import type { ScheduleAction } from '$lib/client';
+  import type { ScheduleAction } from '#lib/client/index.ts';
   import { IGNORE_PLACEHOLDER } from './backups';
   import { ACTION_LABELS, POWER_ACTIONS, type taskSchema } from './schedules';
 

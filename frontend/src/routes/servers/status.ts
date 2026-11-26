@@ -1,4 +1,4 @@
-import type { PowerAction } from '$lib/client';
+import type { PowerAction } from '#lib/client/index.ts';
 
 /** Server lifecycle states, matching the backend's snake_case status. */
 export type ServerStatus =

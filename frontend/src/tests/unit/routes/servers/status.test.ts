@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
-import StatusBadge from '$routes/servers/StatusBadge.svelte';
+import StatusBadge from '#routes/servers/StatusBadge.svelte';
 import {
   STATUS,
   type ServerStatus,
   availableActions,
   powerActions
-} from '$routes/servers/status';
+} from '#routes/servers/status.ts';
 
 afterEach(cleanup);
 

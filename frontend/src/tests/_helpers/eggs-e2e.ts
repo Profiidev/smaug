@@ -1,6 +1,6 @@
 import { type Page, expect } from '@playwright/test';
 import { HttpResponse } from 'msw';
-import * as gen from '$lib/client/msw.gen';
+import * as gen from '#lib/client/msw.gen.ts';
 import { eggInfo } from '../mocks/e2e/data';
 
 /** Records the JSON body of every request a handler sees. */

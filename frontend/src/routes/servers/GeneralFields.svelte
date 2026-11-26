@@ -11,7 +11,7 @@
     FormValue,
     SuperForm
   } from '@profidev/pleiades/components/form/types';
-  import type { OptionEgg, ServerOptions } from '$lib/client';
+  import type { OptionEgg, ServerOptions } from '#lib/client/index.ts';
   import {
     DEFAULT_PORT,
     findEgg,

@@ -1,4 +1,4 @@
-import { editEgg, eggInfo, eggSource } from '$lib/client';
+import { editEgg, eggInfo, eggSource } from '#lib/client/index.ts';
 import {
   type EggForm,
   STAGE_KEYS,

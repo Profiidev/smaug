@@ -4,7 +4,7 @@
   import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
   import { Button } from '@profidev/pleiades/components/ui/button';
   import * as DropdownMenu from '@profidev/pleiades/components/ui/dropdown-menu';
-  import type { FileEntry } from '$lib/client';
+  import type { FileEntry } from '#lib/client/index.ts';
 
   interface Props {
     entry: FileEntry;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { load } from '$routes/setup/+page';
-import { catchRedirect, jsonFetch, runLoad } from '$test_helpers/load';
+import { load } from '#routes/setup/+page.ts';
+import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
 
 /** The setup load is async; `runLoad` types the awaited value, so resolve it. */
 const runSetup = async (body: unknown, status = 200) =>

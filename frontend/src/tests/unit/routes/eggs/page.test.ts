@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { toast as sonner } from 'svelte-sonner';
 import { goto } from '$app/navigation';
-import { deleteEgg } from '$lib/client';
+import { deleteEgg } from '#lib/client/index.ts';
 import { toast } from '@profidev/pleiades/components/util/general';
-import ListPage from '$routes/eggs/+page.svelte';
-import CreatePage from '$routes/eggs/create/+page.svelte';
-import EditPage from '$routes/eggs/[uuid]/[tab=eggtab]/+page.svelte';
-import { type EggImport, importEgg } from '$routes/eggs/schema.svelte';
-import { adminUser, eggInfo, eggList } from '$mocks/e2e/data';
-import { Permission } from '$lib/permissions.svelte';
+import ListPage from '#routes/eggs/+page.svelte';
+import CreatePage from '#routes/eggs/create/+page.svelte';
+import EditPage from '#routes/eggs/[uuid]/[tab=eggtab]/+page.svelte';
+import { type EggImport, importEgg } from '#routes/eggs/schema.svelte.ts';
+import { adminUser, eggInfo, eggList } from '#mocks/e2e/data.ts';
+import { Permission } from '#lib/permissions.svelte.ts';
 
 const pageState = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 
@@ -41,7 +41,7 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   deleteEgg: vi.fn()
 }));

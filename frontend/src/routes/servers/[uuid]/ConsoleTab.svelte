@@ -21,7 +21,7 @@
     serverPower,
     type PowerAction,
     type ServerInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import { powerActions } from '../status';
   import {
     formatAllocation,

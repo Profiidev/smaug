@@ -26,7 +26,7 @@
     type ScheduleInfo,
     type ServerInfo,
     type TaskInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import {
     ACTION_LABELS,
     CRON_FIELDS,

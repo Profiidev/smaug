@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAnsi, stripAnsi } from '$routes/servers/[uuid]/ansi';
+import { parseAnsi, stripAnsi } from '#routes/servers/[uuid]/ansi.ts';
 
 const ESC = '\u001B';
 

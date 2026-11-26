@@ -15,7 +15,7 @@ import type {
   ServerInfo,
   ServerOptions,
   UpdateServer
-} from '$lib/client';
+} from '#lib/client/index.ts';
 import { validateVariable } from './rules';
 
 /** Form sections in wizard / tab order. */

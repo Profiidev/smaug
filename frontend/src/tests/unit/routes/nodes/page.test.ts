@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { toast as sonner } from 'svelte-sonner';
 import { goto, invalidate } from '$app/navigation';
 import { toast } from '@profidev/pleiades/components/util/general';
-import { createNode, deleteNode } from '$lib/client';
-import ListPage from '$routes/nodes/+page.svelte';
-import CreatePage from '$routes/nodes/create/+page.svelte';
-import { adminUser, nodeList } from '$mocks/e2e/data';
-import { Permission } from '$lib/permissions.svelte';
+import { createNode, deleteNode } from '#lib/client/index.ts';
+import ListPage from '#routes/nodes/+page.svelte';
+import CreatePage from '#routes/nodes/create/+page.svelte';
+import { adminUser, nodeList } from '#mocks/e2e/data.ts';
+import { Permission } from '#lib/permissions.svelte.ts';
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({
   ...(await orig<object>()),
@@ -19,7 +19,7 @@ vi.mock('$app/forms', async (orig) => ({
   applyAction: vi.fn(async () => {})
 }));
 
-vi.mock('$lib/client', async (orig) => ({
+vi.mock('#lib/client/index.ts', async (orig) => ({
   ...(await orig<object>()),
   createNode: vi.fn(),
   deleteNode: vi.fn()

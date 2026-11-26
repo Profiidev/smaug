@@ -1,23 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
-import Harness from '$test_helpers/EggFieldsHarness.svelte';
-import VariablesFields from '$routes/eggs/VariablesFields.svelte';
-import RuntimeFields from '$routes/eggs/RuntimeFields.svelte';
-import ConfigFields from '$routes/eggs/ConfigFields.svelte';
-import GeneralFields from '$routes/eggs/GeneralFields.svelte';
-import InstallScriptFields from '$routes/eggs/InstallScriptFields.svelte';
-import General from '$routes/eggs/General.svelte';
-import Variables from '$routes/eggs/Variables.svelte';
-import InstallScript from '$routes/eggs/InstallScript.svelte';
-import Runtime from '$routes/eggs/Runtime.svelte';
-import Config from '$routes/eggs/Config.svelte';
+import Harness from '#test_helpers/EggFieldsHarness.svelte';
+import VariablesFields from '#routes/eggs/VariablesFields.svelte';
+import RuntimeFields from '#routes/eggs/RuntimeFields.svelte';
+import ConfigFields from '#routes/eggs/ConfigFields.svelte';
+import GeneralFields from '#routes/eggs/GeneralFields.svelte';
+import InstallScriptFields from '#routes/eggs/InstallScriptFields.svelte';
+import General from '#routes/eggs/General.svelte';
+import Variables from '#routes/eggs/Variables.svelte';
+import InstallScript from '#routes/eggs/InstallScript.svelte';
+import Runtime from '#routes/eggs/Runtime.svelte';
+import Config from '#routes/eggs/Config.svelte';
 import {
   type EggForm,
   KNOWN_FEATURES,
   STAGE_KEYS,
   formatData
-} from '$routes/eggs/schema.svelte';
-import { eggInfo } from '$mocks/e2e/data';
+} from '#routes/eggs/schema.svelte.ts';
+import { eggInfo } from '#mocks/e2e/data.ts';
 
 const base = (): EggForm => formatData(structuredClone(eggInfo));
 

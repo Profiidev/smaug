@@ -17,7 +17,7 @@
     type OptionEgg,
     type ServerOptions,
     type UserInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import {
     eggStartup,
     eggVariables,

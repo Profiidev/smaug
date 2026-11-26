@@ -22,15 +22,15 @@ import {
   toEggBody,
   upgradeEgg,
   variablesStage
-} from '$routes/eggs/schema.svelte';
+} from '#routes/eggs/schema.svelte.ts';
 import {
   FEATURES,
   PARSERS,
   PELICAN_COMMENT,
   PTERODACTYL_COMMENT,
   RESERVED_ENV_NAMES
-} from '$lib/egg';
-import { eggInfo } from '$mocks/e2e/data';
+} from '#lib/egg.ts';
+import { eggInfo } from '#mocks/e2e/data.ts';
 
 const clone = <T>(v: T): T => structuredClone(v);
 

@@ -6,7 +6,7 @@ import type {
   ScheduleInfo,
   ScheduleStatus,
   TaskInfo
-} from '$lib/client';
+} from '#lib/client/index.ts';
 import type { ScheduleFrame } from './live.svelte';
 import { NAME_MAX } from './backups';
 

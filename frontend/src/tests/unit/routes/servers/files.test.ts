@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FileEntry } from '$lib/client';
+import type { FileEntry } from '#lib/client/index.ts';
 import {
   EDIT_LIMIT,
   changedLines,
@@ -15,7 +15,7 @@ import {
   segments,
   sendChunks,
   sortEntries
-} from '$routes/servers/[uuid]/files';
+} from '#routes/servers/[uuid]/files.ts';
 
 const entry = (
   name: string,

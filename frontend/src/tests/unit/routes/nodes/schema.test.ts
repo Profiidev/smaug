@@ -8,8 +8,8 @@ import {
   reformatData,
   undoReformatData,
   units
-} from '$routes/nodes/schema.svelte';
-import type { NodeInfo } from '$lib/client';
+} from '#routes/nodes/schema.svelte.ts';
+import type { NodeInfo } from '#lib/client/index.ts';
 
 type Form = Parameters<typeof reformatData>[0];
 

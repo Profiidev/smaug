@@ -6,9 +6,9 @@ import {
   createColumnHeader
 } from '@profidev/pleiades/components/table/helpers.svelte';
 import Actions from '@profidev/pleiades/components/table/actions.svelte';
-import MutedCell from '$lib/components/table/MutedCell.svelte';
-import Status from '$lib/components/table/Status.svelte';
-import type { NodeInfo, Runtime } from '$lib/client';
+import MutedCell from '#lib/components/table/MutedCell.svelte';
+import Status from '#lib/components/table/Status.svelte';
+import type { NodeInfo, Runtime } from '#lib/client/index.ts';
 import NameCell from '../servers/NameCell.svelte';
 
 const RUNTIME_LABELS: Record<Runtime, string> = {

@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { HttpResponse } from 'msw';
-import * as gen from '$lib/client/msw.gen';
-import { test } from '$test_helpers/e2e-fixture';
-import { setupSession } from '$test_helpers/session';
-import { expectNoHorizontalOverflow, gotoReady } from '$test_helpers/layout';
+import * as gen from '#lib/client/msw.gen.ts';
+import { test } from '#test_helpers/e2e-fixture.ts';
+import { setupSession } from '#test_helpers/session.ts';
+import { expectNoHorizontalOverflow, gotoReady } from '#test_helpers/layout.ts';
 import {
   applyUpdate,
   badRequest,
@@ -14,7 +14,7 @@ import {
   pageScrolls,
   recorder,
   sourceHandler
-} from '$test_helpers/eggs-e2e';
+} from '#test_helpers/eggs-e2e.ts';
 import { eggInfo } from '../mocks/e2e/data';
 
 test.describe('egg detail', () => {
@@ -461,6 +461,7 @@ test.describe('egg detail: the URL names the open tab', () => {
     await openTab(page, 'Install script');
     await expect(page).toHaveURL(/\/eggs\/egg-paper\/install$/);
     await openTab(page, 'Config');
+    await expect(page).toHaveURL(/\/eggs\/egg-paper\/config$/);
     await page.goBack();
     await page.goBack();
     await expect(page).toHaveURL(/\/eggs\/egg-paper\/general$/);

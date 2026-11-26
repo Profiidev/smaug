@@ -21,10 +21,10 @@
     type OptionEgg,
     type ServerInfo,
     type ServerOptions
-  } from '$lib/client';
-  import SaveBar from '$lib/components/form/SaveBar.svelte';
-  import SectionErrorDot from '$lib/components/form/SectionErrorDot.svelte';
-  import ApplyErrors from '$lib/components/form/ApplyErrors.svelte';
+  } from '#lib/client/index.ts';
+  import SaveBar from '#lib/components/form/SaveBar.svelte';
+  import SectionErrorDot from '#lib/components/form/SectionErrorDot.svelte';
+  import ApplyErrors from '#lib/components/form/ApplyErrors.svelte';
   import {
     eggStartup,
     eggVariables,
@@ -123,9 +123,8 @@
   const setTab = (value: string, replaceState = false) => {
     if (value !== tab) {
       goto(`/servers/${data.uuid}/${value}`, {
-        keepFocus: true,
-        noScroll: true,
-        replaceState
+        replace: replaceState,
+        reset: false
       });
     }
   };

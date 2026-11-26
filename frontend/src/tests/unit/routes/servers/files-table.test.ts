@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FileEntry } from '$lib/client';
+import type { FileEntry } from '#lib/client/index.ts';
 import {
   type FileColumnData,
   columns,
   sizeText
-} from '$routes/servers/[uuid]/files-table.svelte';
+} from '#routes/servers/[uuid]/files-table.svelte.ts';
 
 vi.mock('@tanstack/svelte-table', async (orig) => ({
   ...(await orig<object>()),

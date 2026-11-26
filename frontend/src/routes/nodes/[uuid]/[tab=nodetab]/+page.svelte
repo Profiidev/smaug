@@ -14,17 +14,17 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { z } from 'zod';
-  import { Permission } from '$lib/permissions.svelte';
+  import { Permission } from '#lib/permissions.svelte.ts';
   import {
     deleteNode,
     updateNode,
     type NodeInfo,
     type UserInfo
-  } from '$lib/client';
-  import Status from '$lib/components/table/Status.svelte';
-  import SaveBar from '$lib/components/form/SaveBar.svelte';
-  import SectionErrorDot from '$lib/components/form/SectionErrorDot.svelte';
-  import ApplyErrors from '$lib/components/form/ApplyErrors.svelte';
+  } from '#lib/client/index.ts';
+  import Status from '#lib/components/table/Status.svelte';
+  import SaveBar from '#lib/components/form/SaveBar.svelte';
+  import SectionErrorDot from '#lib/components/form/SectionErrorDot.svelte';
+  import ApplyErrors from '#lib/components/form/ApplyErrors.svelte';
   import {
     DELETE_DESCRIPTION,
     deleteError,
@@ -69,7 +69,7 @@
 
   const setTab = (value: string) => {
     if (value !== tab) {
-      goto(`/nodes/${data.uuid}/${value}`, { keepFocus: true, noScroll: true });
+      goto(`/nodes/${data.uuid}/${value}`, { reset: false });
     }
   };
 

@@ -27,7 +27,7 @@
     updateSchedule,
     type ScheduleInfo,
     type ServerInfo
-  } from '$lib/client';
+  } from '#lib/client/index.ts';
   import type { ServerLive } from './live.svelte';
   import ScheduleDetail from './ScheduleDetail.svelte';
   import {
@@ -132,8 +132,7 @@
       ? `${page.url.pathname}?id=${encodeURIComponent(id)}`
       : page.url.pathname;
 
-  const open = (id: string | undefined) =>
-    goto(hrefFor(id), { keepFocus: true, noScroll: true });
+  const open = (id: string | undefined) => goto(hrefFor(id), { reset: false });
 
   const retry = () => {
     failed = false;

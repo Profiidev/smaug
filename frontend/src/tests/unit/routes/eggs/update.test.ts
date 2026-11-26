@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { type EggForm, formatData } from '$routes/eggs/schema.svelte';
-import { changedSections, lineDiff, mergeSections } from '$routes/eggs/update';
-import { eggInfo } from '$mocks/e2e/data';
+import { type EggForm, formatData } from '#routes/eggs/schema.svelte.ts';
+import {
+  changedSections,
+  lineDiff,
+  mergeSections
+} from '#routes/eggs/update.ts';
+import { eggInfo } from '#mocks/e2e/data.ts';
 
 const base = (): EggForm => formatData(structuredClone(eggInfo));
 
