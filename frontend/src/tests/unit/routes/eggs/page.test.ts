@@ -14,6 +14,8 @@ import { Permission } from '$lib/permissions.svelte';
 const pageState = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 
 vi.mock('$app/state', () => ({
+  // Superforms 3 also reads navigating and updated from `$app/state`.
+  navigating: { complete: Promise.resolve(), from: null, to: null, type: null },
   page: {
     data: {},
     error: null,
@@ -26,8 +28,6 @@ vi.mock('$app/state', () => ({
     status: 200,
     url: new URL('http://localhost/')
   },
-  // Superforms 3 also reads these from `$app/state`.
-  navigating: { complete: Promise.resolve(), from: null, to: null, type: null },
   updated: { current: false }
 }));
 
