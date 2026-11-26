@@ -655,7 +655,9 @@ describe('PermissionsFields', () => {
     );
     await fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     // Wait for the list to close so the next call only sees its own options.
-    await waitFor(() => expect(screen.queryAllByRole('option')).toHaveLength(0));
+    await waitFor(() =>
+      expect(screen.queryAllByRole('option')).toHaveLength(0)
+    );
     return names;
   };
   const empty = (): ServerForm => ({

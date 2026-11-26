@@ -250,7 +250,7 @@ describe('ConsoleTab console', () => {
     expect(line('Done').className).not.toMatch(/oklch/);
     // ANSI colour overrides the WARN base colour on its segment only.
     const red = screen.getByText('red');
-    // jsdom 31 resolves var() in computed styles, so check the declared value.
+    // Jsdom 31 resolves var() in computed styles, so check the declared value.
     expect(red.style.color).toBe('var(--ansi-1)');
     expect(red.parentElement).toHaveTextContent(/^red WARN plain$/);
     expect(red.parentElement!.className).toMatch(/oklch\(0\.8_/);
