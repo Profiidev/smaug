@@ -25,7 +25,10 @@ vi.mock('$app/state', () => ({
     },
     status: 200,
     url: new URL('http://localhost/')
-  }
+  },
+  // Superforms 3 also reads these from `$app/state`.
+  navigating: { complete: Promise.resolve(), from: null, to: null, type: null },
+  updated: { current: false }
 }));
 
 vi.mock('@profidev/pleiades/components/util/general', async (orig) => ({

@@ -101,7 +101,13 @@ const save = async () => {
 const comboboxes = () =>
   screen
     .getAllByRole('combobox', { hidden: true })
-    .filter((b) => b.tagName === 'BUTTON' && b.closest('[role=tabpanel]'));
+    .filter(
+      (b) =>
+        b.tagName === 'BUTTON' &&
+        b.closest('[role=tabpanel]') &&
+        // bits-ui Select triggers are comboboxes too; only count the pickers.
+        b.getAttribute('aria-haspopup') !== 'listbox'
+    );
 
 describe('server edit page loading', () => {
   it('renders tabs and a disabled, empty form until the server loads', () => {
