@@ -20,7 +20,8 @@ test.describe('server transfer and delete', () => {
     );
     await gotoReady(page, '/servers/srv-survival/actions');
     await action(page, 'Transfer…').click();
-    const dialog = page.getByRole('dialog');
+    // Named: the closing node picker popover is a dialog too.
+    const dialog = page.getByRole('dialog', { name: 'Transfer Survival SMP' });
     await expect(dialog.getByText('Transfer Survival SMP')).toBeVisible();
 
     // Empty submit validates in the dialog.
@@ -87,7 +88,10 @@ test.describe('server transfer and delete', () => {
       );
       await gotoReady(page, '/servers/srv-survival/actions');
       await action(page, 'Transfer…').click();
-      const dialog = page.getByRole('dialog');
+      // Named: the closing node picker popover is a dialog too.
+      const dialog = page.getByRole('dialog', {
+        name: 'Transfer Survival SMP'
+      });
       await combo(dialog, 'Target node').click();
       await page.getByRole('option', { name: 'Node Two' }).click();
       await dialog.getByLabel('IP address').fill('10.0.0.2');

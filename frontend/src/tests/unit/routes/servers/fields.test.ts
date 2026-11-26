@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within
 } from '@testing-library/svelte';
 import Harness from '$test_helpers/ServerFieldsHarness.svelte';
@@ -653,7 +654,10 @@ describe('PermissionsFields', () => {
       o.textContent?.trim()
     );
     await fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
-    await tick();
+    // Wait for the list to close so the next call only sees its own options.
+    await waitFor(() =>
+      expect(screen.queryAllByRole('option')).toHaveLength(0)
+    );
     return names;
   };
   const empty = (): ServerForm => ({

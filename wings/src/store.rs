@@ -114,7 +114,7 @@ impl Drop for OpGuard {
 enum Backend {
   // ponytail: lost on restart, the panel resyncs everything on reconnect
   Memory(Arc<DashMap<Uuid, (Desired, Observed)>>),
-  Kube(Api<GameServer>),
+  Kube(Box<Api<GameServer>>),
 }
 
 fn name(uuid: Uuid) -> String {
@@ -129,7 +129,7 @@ impl Store {
         let client = kube::Client::try_default()
           .await
           .expect("Failed to create kubernetes client");
-        Backend::Kube(Api::namespaced(client, &config.k8s_namespace))
+        Backend::Kube(Box::new(Api::namespaced(client, &config.k8s_namespace)))
       }
     };
     Self {

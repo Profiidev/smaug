@@ -78,7 +78,10 @@ test.describe('node create', () => {
     await expect(code).toContainText('- TOKEN=fresh-token');
     await expect(code).toContainText('/var/run/docker.sock');
 
-    await page.getByRole('button', { name: 'Docker Compose' }).click();
+    await page
+      .getByRole('combobox')
+      .filter({ hasText: 'Docker Compose' })
+      .click();
     await page.getByRole('option', { name: 'Docker Run' }).click();
     await expect(code).toContainText('docker run -d');
     await expect(code).toContainText('-e TOKEN=fresh-token');
