@@ -3,14 +3,14 @@ import { load as listLoad } from '#routes/nodes/+page.ts';
 import { load as rootLoad } from '#routes/nodes/[uuid]/+page.ts';
 import { load as detailLoad } from '#routes/nodes/[uuid]/[tab=nodetab]/+page.ts';
 import { params as matchers } from '../../../../params.ts';
+import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
+import type { NodeInfo } from '#lib/client/index.ts';
 
 // `defineParams` wraps each matcher in a Standard Schema; a match has no issues.
 const match = (param: string) => {
   const result = matchers.nodetab['~standard'].validate(param);
   return !(result instanceof Promise) && !result.issues;
 };
-import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
-import type { NodeInfo } from '#lib/client/index.ts';
 
 const node: NodeInfo = {
   address: 'wings.example.com',

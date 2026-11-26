@@ -4,14 +4,14 @@ import { load as createLoad } from '#routes/servers/create/+page.ts';
 import { load as rootLoad } from '#routes/servers/[uuid]/+page.ts';
 import { load as editLoad } from '#routes/servers/[uuid]/[tab=servertab]/+page.ts';
 import { params as matchers } from '../../../../params.ts';
+import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
+import { options, serverInfo, servers } from './fixtures';
 
 // `defineParams` wraps each matcher in a Standard Schema; a match has no issues.
 const match = (param: string) => {
   const result = matchers.servertab['~standard'].validate(param);
   return !(result instanceof Promise) && !result.issues;
 };
-import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
-import { options, serverInfo, servers } from './fixtures';
 
 const url = (q = '') => new URL(`http://localhost/servers${q}`);
 const requested = (f: ReturnType<typeof jsonFetch>) => {

@@ -3,14 +3,14 @@ import { load as listLoad } from '#routes/eggs/+page.ts';
 import { load as rootLoad } from '#routes/eggs/[uuid]/+page.ts';
 import { load as detailLoad } from '#routes/eggs/[uuid]/[tab=eggtab]/+page.ts';
 import { params as matchers } from '../../../../params.ts';
+import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
+import { eggInfo, eggList } from '#mocks/e2e/data.ts';
 
 // `defineParams` wraps each matcher in a Standard Schema; a match has no issues.
 const match = (param: string) => {
   const result = matchers.eggtab['~standard'].validate(param);
   return !(result instanceof Promise) && !result.issues;
 };
-import { catchRedirect, jsonFetch, runLoad } from '#test_helpers/load.ts';
-import { eggInfo, eggList } from '#mocks/e2e/data.ts';
 
 const url = (q = '') => new URL(`http://localhost/eggs${q}`);
 const requested = (f: ReturnType<typeof jsonFetch>) => {
